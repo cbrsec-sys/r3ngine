@@ -48,6 +48,28 @@ class TestBuildTagBatches(TestCase):
         result = build_tag_batches(tags, {}, max_per_batch=100)
         self.assertEqual(result, [['raretag']])
 
+    def test_all_zero_counts_still_splits_by_max_tags(self):
+        """Regression: when count_templates_for_tag returns 0 for every tag,
+        all tags must NOT collapse into a single batch and crash nuclei."""
+        tags = ['wordpress', 'wp-plugin', 'wp-theme', 'wp', 'nginx',
+                'apache', 'php', 'jquery', 'react', 'drupal', 'joomla']
+        counts = {t: 0 for t in tags}
+        result = build_tag_batches(tags, counts, max_per_batch=100, max_tags=5)
+        self.assertGreater(len(result), 1,
+            "11 tags with all-zero counts must not collapse into one batch")
+        for batch in result:
+            self.assertLessEqual(len(batch), 5,
+                f"Batch {batch} has {len(batch)} tags, exceeds max_tags=5")
+
+    def test_max_tags_splits_even_when_under_template_limit(self):
+        """max_tags triggers a split even when total template count is well under max_per_batch."""
+        tags = ['a', 'b', 'c', 'd', 'e', 'f']
+        counts = {t: 1 for t in tags}  # total=6, under 100
+        result = build_tag_batches(tags, counts, max_per_batch=100, max_tags=3)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], ['a', 'b', 'c'])
+        self.assertEqual(result[1], ['d', 'e', 'f'])
+
     def test_all_tags_appear_across_batches(self):
         tags = ['a', 'b', 'c', 'd', 'e']
         counts = {t: 90 for t in tags}

@@ -24,12 +24,20 @@ def count_templates_for_tag(tag: str, template_dirs: list) -> int:
         return 0
 
 
-def build_tag_batches(tags: list, tag_counts: dict, max_per_batch: int = 100) -> list:
-    """Group tags into batches so each batch's total template count <= max_per_batch.
+def build_tag_batches(tags: list, tag_counts: dict, max_per_batch: int = 100, max_tags: int = 5) -> list:
+    """Group tags into batches bounded by template count AND tag count.
 
-    Uses a greedy first-fit algorithm over the supplied tag order. A tag whose
-    individual count already exceeds max_per_batch is placed alone in its own
-    batch — further splitting at the file level is not done here.
+    Uses a greedy first-fit algorithm over the supplied tag order. A batch is
+    closed when EITHER cumulative template count would exceed max_per_batch OR
+    the batch already holds max_tags tags.
+
+    The max_tags ceiling is critical: when count_templates_for_tag returns 0 for
+    every tag (e.g. during a first scan before templates are cached), the template-
+    count guard never fires and without max_tags all tags collapse into one batch,
+    causing nuclei to receive all tags at once and crash.
+
+    A tag whose individual template count already exceeds max_per_batch is placed
+    alone in its own batch — further splitting at the file level is not done here.
 
     This function is pure (no I/O, no randomness) and safe to call from a
     Temporal workflow.
@@ -38,6 +46,7 @@ def build_tag_batches(tags: list, tag_counts: dict, max_per_batch: int = 100) ->
         tags: Ordered list of tag strings to batch.
         tag_counts: Mapping of tag -> template count (missing tags treated as 0).
         max_per_batch: Maximum cumulative template count allowed per batch.
+        max_tags: Maximum number of tags allowed per batch regardless of count.
 
     Returns:
         List of batches; each batch is a list of tag strings. Empty when tags=[].
@@ -51,7 +60,9 @@ def build_tag_batches(tags: list, tag_counts: dict, max_per_batch: int = 100) ->
 
     for tag in tags:
         count = tag_counts.get(tag, 0)
-        if current_batch and current_count + count > max_per_batch:
+        over_template_limit = current_batch and current_count + count > max_per_batch
+        over_tag_limit = len(current_batch) >= max_tags
+        if over_template_limit or over_tag_limit:
             batches.append(current_batch)
             current_batch = [tag]
             current_count = count
