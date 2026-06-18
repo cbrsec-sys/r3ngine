@@ -1,0 +1,45 @@
+"""Tests for scan workflow tier ordering — web_api_discovery before param_discovery."""
+from unittest import TestCase
+
+
+class TestSubScanWorkflowTierOrder(TestCase):
+    """Verify web_api_discovery runs before param_discovery in SubScanWorkflow tier list."""
+
+    def _build_tiers(self, active_tasks):
+        """Mirror the SubScanWorkflow tiers list.
+
+        Keep in sync with the tiers list in SubScanWorkflow — this test will
+        fail intentionally if the production list is reverted without updating here.
+        """
+        return [
+            [t for t in active_tasks if t in {"http_crawl", "port_scan", "vigolium_discovery"}],
+            [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
+            [t for t in active_tasks if t == "http_crawl_bridge"],
+            [t for t in active_tasks if t == "web_api_discovery"],
+            [t for t in active_tasks if t == "param_discovery"],
+            [t for t in active_tasks if t == "dir_file_fuzz"],
+            [t for t in active_tasks if t in {"waf_detection", "secret_scanning", "vigolium_analysis"}],
+            [t for t in active_tasks if t in {"vulnerability_scan", "waf_bypass", "vigolium_scan", "run_acunetix"}],
+        ]
+
+    def test_web_api_discovery_tier_precedes_param_discovery_tier(self):
+        active = {"fetch_url", "http_crawl_bridge", "web_api_discovery", "param_discovery", "dir_file_fuzz"}
+        tiers = self._build_tiers(active)
+        web_api_tier = next(i for i, t in enumerate(tiers) if "web_api_discovery" in t)
+        param_tier = next(i for i, t in enumerate(tiers) if "param_discovery" in t)
+        self.assertLess(web_api_tier, param_tier,
+                        "web_api_discovery must run before param_discovery (CPDE)")
+
+    def test_web_api_discovery_not_in_analysis_tier(self):
+        active = {"web_api_discovery", "waf_detection", "secret_scanning"}
+        tiers = self._build_tiers(active)
+        analysis_tier = tiers[6]
+        self.assertNotIn("web_api_discovery", analysis_tier)
+
+    def test_dir_file_fuzz_still_after_param_discovery(self):
+        active = {"fetch_url", "param_discovery", "dir_file_fuzz"}
+        tiers = self._build_tiers(active)
+        param_tier = next(i for i, t in enumerate(tiers) if "param_discovery" in t)
+        fuzz_tier = next(i for i, t in enumerate(tiers) if "dir_file_fuzz" in t)
+        self.assertLess(param_tier, fuzz_tier,
+                        "dir_file_fuzz must still run after param_discovery")

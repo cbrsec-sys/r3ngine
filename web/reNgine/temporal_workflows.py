@@ -463,7 +463,27 @@ class MasterScanWorkflow:
                 )
 
             # ------------------------------------------------------------------
-            # TIER 3b: Custom Parameter Discovery Engine (CPDE)
+            # TIER 3b: Web API Discovery
+            # Moved here from Tier 5 so kiterunner output (kr_*.json) is ready
+            # before CPDE reads it. Guarded with workflow.patched() so that
+            # in-flight workflows replaying recorded history (where this activity
+            # ran at Tier 5) skip this block and still execute at Tier 5 below.
+            # ------------------------------------------------------------------
+            if "web_api_discovery" in tasks and workflow.patched("web-api-to-tier-3b"):
+                await workflow.execute_activity(
+                    "RunWebAPIDiscoveryActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=4),
+                    heartbeat_timeout=timedelta(minutes=10),
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue"
+                )
+
+            # ------------------------------------------------------------------
+            # TIER 3c: Custom Parameter Discovery Engine (CPDE)
+            # Reads kiterunner (kr_*.json), arjun, paramspider, linkfinder, and
+            # JS bundles discovered by Tier 3. Runs after web_api_discovery so
+            # all tool output files are present.
             # ------------------------------------------------------------------
             if "param_discovery" in tasks:
                 await workflow.execute_activity(
@@ -519,10 +539,13 @@ class MasterScanWorkflow:
 
             await self._check_paused()
             # ------------------------------------------------------------------
-            # TIER 5: Analysis (parallel — API discovery, WAF detection, secrets)
+            # TIER 5: Analysis (parallel — WAF detection, secrets, vigolium)
+            # web_api_discovery is only included here for old in-flight workflows
+            # replaying history recorded before the "web-api-to-tier-3b" patch.
+            # New workflows execute web_api_discovery at Tier 3b instead.
             # ------------------------------------------------------------------
             analysis_futures = []
-            if "web_api_discovery" in tasks:
+            if "web_api_discovery" in tasks and not workflow.patched("web-api-to-tier-3b"):
                 analysis_futures.append(
                     workflow.execute_activity(
                         "RunWebAPIDiscoveryActivity",
@@ -1464,13 +1487,14 @@ class SubScanWorkflow:
                 [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
                 # TIER 3a: HTTP Crawl Bridge — crawls new/dead endpoints from fetch_url
                 [t for t in active_tasks if t == "http_crawl_bridge"],
-                # TIER 3b: Custom Parameter Discovery Engine (CPDE) — needs Tier 3 JS bundles.
+                # TIER 3b: Web API Discovery — runs before CPDE so kiterunner output is available.
+                [t for t in active_tasks if t == "web_api_discovery"],
+                # TIER 3c: Custom Parameter Discovery Engine (CPDE) — reads kiterunner/arjun/JS output.
                 [t for t in active_tasks if t == "param_discovery"],
                 # TIER 4: Directory & File Fuzzing — needs Tier 3 URLs.
                 [t for t in active_tasks if t == "dir_file_fuzz"],
-                # TIER 5: Analysis — API discovery, WAF detection, secret scanning.
-                # vigolium_analysis runs alongside web_api_discovery as in MasterScanWorkflow.
-                [t for t in active_tasks if t in {"web_api_discovery", "waf_detection", "secret_scanning", "vigolium_analysis"}],
+                # TIER 5: Analysis — WAF detection, secret scanning, vigolium.
+                [t for t in active_tasks if t in {"waf_detection", "secret_scanning", "vigolium_analysis"}],
                 # TIER 6: Security Assessment — explicit inclusion, mirrors MasterScanWorkflow Tier 6.
                 # vigolium_scan runs alongside vulnerability_scan at Tier 6.
                 [t for t in active_tasks if t in {
