@@ -860,33 +860,34 @@ def check_proxy_robust(proxy_url, timeout=5):
 	"""Test if a proxy is truly working.
 	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
 	by making a request to a public API returning a JSON payload with client IP.
-	
+
+	For SOCKS5 proxies the function also tries socks5h:// (remote DNS via proxy) as a
+	fallback, so that a working proxy is not falsely rejected when the client cannot
+	resolve the check-target domain names (common inside Docker containers).
+
 	Args:
 		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080)
 		timeout (int): Timeout in seconds. Defaults to 5.
-		
+
 	Returns:
 		bool: True if proxy forwards traffic and responds successfully, False otherwise.
 	"""
-	try:
-		proxy_url = proxy_url.strip()
-		if not proxy_url:
-			return False
-		test_proxy = proxy_url
-		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-			test_proxy = 'http://' + test_proxy
-			
-		proxies = {
-			'http': test_proxy,
-			'https': test_proxy,
-		}
-		
-		# Try up to 2 different reliable JSON APIs to avoid single-point failure (e.g. rate limits)
-		check_targets = [
-			("https://api.ipify.org?format=json", "ip"),
-			("http://ip-api.com/json", "query")
-		]
-		
+	proxy_url = proxy_url.strip()
+	if not proxy_url:
+		return False
+	test_proxy = proxy_url
+	if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://', 'socks5h://']):
+		test_proxy = 'http://' + test_proxy
+
+	# Try up to 2 different reliable JSON APIs to avoid single-point failure (e.g. rate limits)
+	check_targets = [
+		("https://api.ipify.org?format=json", "ip"),
+		("http://ip-api.com/json", "query")
+	]
+
+	def _try_proxy(scheme_proxy):
+		"""Return True if any check target succeeds through the given proxy URL."""
+		proxies = {'http': scheme_proxy, 'https': scheme_proxy}
 		for url, expected_key in check_targets:
 			try:
 				response = requests.get(
@@ -901,11 +902,28 @@ def check_proxy_robust(proxy_url, timeout=5):
 					data = response.json()
 					if expected_key in data:
 						return True
-			except Exception:
-				continue
+			except Exception as exc:
+				logger.debug("check_proxy_robust: %s via %s failed: %s", url, scheme_proxy, exc)
 		return False
-	except Exception:
-		return False
+
+	# 1) Try with the original scheme (socks5:// → client-side DNS)
+	if _try_proxy(test_proxy):
+		return True
+
+	# 2) For socks5:// only, retry with socks5h:// (remote DNS via proxy).
+	#    This handles the common case where the container cannot resolve the
+	#    check-target domain names but the proxy itself is perfectly working.
+	if test_proxy.startswith('socks5://'):
+		socks5h_proxy = test_proxy.replace('socks5://', 'socks5h://', 1)
+		logger.debug("check_proxy_robust: retrying with remote DNS via %s", socks5h_proxy)
+		if _try_proxy(socks5h_proxy):
+			return True
+
+	if test_proxy.startswith('socks5h://'):
+		# Already using remote DNS – no fallback to try.
+		pass
+
+	return False
 
 
 def validate_single_proxy(proxy_name):
