@@ -91,7 +91,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
             'width': (ele: any) => Math.min(80, 30 + (ele.data('degree_centrality') || 0) * 5),
             'height': (ele: any) => Math.min(80, 30 + (ele.data('degree_centrality') || 0) * 5),
             'border-width': (ele: any) => (ele.data('criticalVulnCount') || 0) > 0 ? 4 : 1,
-            'border-color': (ele: any) => (ele.data('criticalVulnCount') || 0) > 0 ? tokens.accent.error : (isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'),
+            'border-color': (ele: any) => (ele.data('criticalVulnCount') || 0) > 0 ? tokens.accent.error : tokens.border.subtle,
             'overlay-padding': 6,
             'z-index': 1,
             'shadow-blur': 10,
@@ -128,7 +128,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
             'text-opacity': 1,
             'shape': 'hexagon',
             'border-width': 3,
-            'border-color': isLight ? tokens.border.strong : '#fff',
+            'border-color': tokens.border.strong,
             'shadow-opacity': 0.8,
             'shadow-blur': 20
           } as any
@@ -160,8 +160,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
           selector: 'edge',
           style: {
             'width': 1,
-            'line-color': isLight ? 'rgba(15, 23, 42, 0.15)' : 'rgba(255, 255, 255, 0.1)',
-            'target-arrow-color': isLight ? 'rgba(15, 23, 42, 0.15)' : 'rgba(255, 255, 255, 0.1)',
+            'line-color': tokens.border.subtle,
+            'target-arrow-color': tokens.border.subtle,
             'target-arrow-shape': 'triangle',
             'curve-style': 'unbundled-bezier',
             'control-point-distances': [20, -20],
@@ -174,7 +174,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
             style: {
                 'text-opacity': 1,
                 'border-width': 4,
-                'border-color': isLight ? tokens.border.strong : '#fff',
+                'border-color': tokens.border.strong,
                 'z-index': 999,
                 'text-background-opacity': 0.9,
                 'text-background-color': tokens.surface.elevated,
