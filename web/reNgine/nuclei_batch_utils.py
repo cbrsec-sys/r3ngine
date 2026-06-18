@@ -24,7 +24,7 @@ def count_templates_for_tag(tag: str, template_dirs: list) -> int:
         return 0
 
 
-def build_tag_batches(tags: list, tag_counts: dict, max_per_batch: int = 100, max_tags: int = 5) -> list:
+def build_tag_batches(tags: list, tag_counts: dict, max_per_batch: int = 100, max_tags: int = 3) -> list:
     """Group tags into batches bounded by template count AND tag count.
 
     Uses a greedy first-fit algorithm over the supplied tag order. A batch is
