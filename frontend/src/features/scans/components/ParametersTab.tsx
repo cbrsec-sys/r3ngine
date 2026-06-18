@@ -30,7 +30,7 @@ interface ParametersTabProps {
 }
 
 export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }) => {
-  const { tokens } = useThemeTokens();
+  const { tokens, isLight } = useThemeTokens();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -84,10 +84,10 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return '#00ff62';
+    if (confidence >= 80) return isLight ? tokens.accent.success : '#00ff62';
     if (confidence >= 50) return tokens.accent.primary;
-    if (confidence >= 20) return '#ffae00';
-    return '#888';
+    if (confidence >= 20) return isLight ? tokens.accent.warning : '#ffae00';
+    return 'text.disabled';
   };
 
   return (
