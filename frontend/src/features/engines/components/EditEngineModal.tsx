@@ -17,8 +17,8 @@ import {
 import { X, Cpu, Save, BookOpen } from 'lucide-react';
 import { fetchEngineDetails, useUpdateEngine } from '../api';
 import { EngineConfigReferenceModal } from './EngineConfigReferenceModal';
-import { useThemeTokens } from '../../theme/useThemeTokens';
-import { getDialogPaperSx, getFieldSx } from '../../theme/semanticColors';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getDialogPaperSx, getFieldSx } from '../../../theme/semanticColors';
 
 interface EditEngineModalProps {
   open: boolean;

@@ -836,6 +836,7 @@ export const TargetSummary = () => {
           onClose={() => setStartScanTargets(null)}
           domainIds={startScanTargets.ids}
           domainNames={startScanTargets.names}
+          projectSlug={projectSlug || 'default'}
         />
       )}
     </Box>
