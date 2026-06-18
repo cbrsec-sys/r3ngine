@@ -856,7 +856,7 @@ def get_chaos_api_key():
 	return key_obj.key if key_obj else ''
 
 
-def check_proxy_robust(proxy_url, timeout=5):
+def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT):
 	"""Test if a proxy is truly working.
 	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
 	by making a request to a public API returning a JSON payload with client IP.
@@ -867,7 +867,7 @@ def check_proxy_robust(proxy_url, timeout=5):
 
 	Args:
 		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080)
-		timeout (int): Timeout in seconds. Defaults to 5.
+		timeout (int): Timeout in seconds. Defaults to PROXY_VALIDATION_TIMEOUT.
 
 	Returns:
 		bool: True if proxy forwards traffic and responds successfully, False otherwise.
@@ -942,7 +942,7 @@ def validate_single_proxy(proxy_name):
 	"""Helper to validate a single proxy string.
 	Returns (proxy_name, True) if valid, otherwise (proxy_name, False).
 	"""
-	is_valid = check_proxy_robust(proxy_name, timeout=5)
+	is_valid = check_proxy_robust(proxy_name)
 	return proxy_name, is_valid
 
 
@@ -959,7 +959,7 @@ def validate_proxies(proxy_text):
 	valid_proxies = []
 	max_workers = min(1000, max(1, len(raw_proxies)))
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
-		future_to_proxy = {executor.submit(check_proxy_robust, p, 15): p for p in raw_proxies}
+		future_to_proxy = {executor.submit(check_proxy_robust, p, PROXY_VALIDATION_TIMEOUT): p for p in raw_proxies}
 		for future in as_completed(future_to_proxy):
 			proxy_name = future_to_proxy[future]
 			try:
@@ -1043,7 +1043,7 @@ def get_random_proxy():
 	random.shuffle(proxies)
 
 	# Validate each proxy sequentially until we find a working one.
-	# Limit to 25 checks to cap worst-case wait (25 × timeout = 125 s).
+	# Limit to 25 checks to cap worst-case wait using the configured validation timeout.
 	checked_count = 0
 	for proxy_name in proxies:
 		if checked_count >= 25:
@@ -1056,7 +1056,7 @@ def get_random_proxy():
 			proxy_name = f"http://{proxy_name}"
 			
 		logger.info("Validating proxy: %s", proxy_name)
-		if check_proxy_robust(proxy_name, timeout=5):
+		if check_proxy_robust(proxy_name):
 			logger.warning("Using valid proxy: %s", proxy_name)
 			return proxy_name
 		logger.warning("Proxy %s validation failed.", proxy_name)
