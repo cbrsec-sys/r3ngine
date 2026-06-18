@@ -887,23 +887,41 @@ def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT):
 
 	def _try_proxy(scheme_proxy):
 		"""Return True if any check target succeeds through the given proxy URL."""
+		from concurrent.futures import ThreadPoolExecutor, as_completed
+
 		proxies = {'http': scheme_proxy, 'https': scheme_proxy}
-		for url, expected_key in check_targets:
-			try:
-				response = requests.get(
-					url,
-					proxies=proxies,
-					headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
-					timeout=timeout,
-					allow_redirects=True
-				)
-				if response.status_code == 200:
-					# Verify response contains valid JSON with the expected key
-					data = response.json()
-					if expected_key in data:
+		headers = {
+			"User-Agent": (
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+				"(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+			)
+		}
+
+		def _check_target(url, expected_key):
+			response = requests.get(
+				url,
+				proxies=proxies,
+				headers=headers,
+				timeout=timeout,
+				allow_redirects=True
+			)
+			if response.status_code != 200:
+				return False
+			data = response.json()
+			return expected_key in data
+
+		with ThreadPoolExecutor(max_workers=len(check_targets)) as executor:
+			futures = {
+				executor.submit(_check_target, url, expected_key): (url, expected_key)
+				for url, expected_key in check_targets
+			}
+			for future in as_completed(futures):
+				url, _ = futures[future]
+				try:
+					if future.result():
 						return True
-			except Exception as exc:
-				logger.debug("check_proxy_robust: %s via %s failed: %s", url, scheme_proxy, exc)
+				except Exception as exc:
+					logger.debug("check_proxy_robust: %s via %s failed: %s", url, scheme_proxy, exc)
 		return False
 
 	# 1) Try with the original scheme (socks5:// → client-side DNS)
@@ -945,7 +963,7 @@ def validate_proxies(proxy_text):
 	if not raw_proxies:
 		return ''
 	valid_proxies = []
-	max_workers = min(1000, max(1, len(raw_proxies)))
+	max_workers = min(PROXY_VALIDATION_MAX_WORKERS, max(1, len(raw_proxies)))
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
 		future_to_proxy = {executor.submit(check_proxy_robust, p, PROXY_VALIDATION_TIMEOUT): p for p in raw_proxies}
 		for future in as_completed(future_to_proxy):
