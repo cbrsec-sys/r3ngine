@@ -10,7 +10,7 @@ interface Props {
 }
 
 export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
-  const { tokens, isLight } = useThemeTokens();
+  const { tokens, theme } = useThemeTokens();
   const { selectedNodeId, selectedNodeData, activePanel, setActivePanel } = useGraphStore();
   
   const { data: details, isLoading } = useGraphNodeDetails(
@@ -106,10 +106,10 @@ export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
               onClick={handleCreateTicket}
               sx={{ 
                 bgcolor: tokens.severity.critical, 
-                color: '#ffffff', 
+                color: theme.palette.common.white,
                 fontSize: '11px', 
                 fontWeight: 700, 
-                '&:hover': { bgcolor: isLight ? '#dc2626' : '#cc1f1f' } 
+                '&:hover': { bgcolor: theme.palette.error.dark } 
               }}
             >
               CREATE TICKET

@@ -23,7 +23,7 @@ export const GraphControlPanel: React.FC<Props> = ({
   layoutName,
   onChangeLayout
 }) => {
-  const { tokens, isLight } = useThemeTokens();
+  const { tokens, theme } = useThemeTokens();
   return (
     <Box sx={{ 
       p: 2, 
@@ -36,11 +36,11 @@ export const GraphControlPanel: React.FC<Props> = ({
     }}>
        <Box sx={{ 
           display: 'flex', 
-          bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', 
+          bgcolor: 'action.hover',
           borderRadius: 1, 
           border: `1px solid ${tokens.border.subtle}`,
           width: { xs: '100%', md: '400px' },
-          boxShadow: isLight ? 'none' : `0 0 10px ${tokens.accent.primary}15`,
+          boxShadow: theme.shadows[1],
           alignItems: 'center'
        }}>
           <Box sx={{ p: 1, color: tokens.accent.primary }}><Sparkles size={16} /></Box>
@@ -58,7 +58,7 @@ export const GraphControlPanel: React.FC<Props> = ({
             onChange={(e, newLayout) => newLayout && onChangeLayout(newLayout as any)}
             size="small"
             sx={{ 
-                bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                bgcolor: 'action.hover',
                 '& .MuiToggleButton-root': {
                     color: 'text.secondary',
                     border: `1px solid ${tokens.border.subtle}`,

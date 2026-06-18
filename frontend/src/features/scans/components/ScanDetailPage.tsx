@@ -16,7 +16,6 @@ import {
   Tabs,
   Paper,
   Divider,
-  useTheme,
   CircularProgress,
   Tooltip as MuiTooltip,
   List,
@@ -367,35 +366,21 @@ const VulnerabilityInfoModal: React.FC<{
   );
 };
 
-const ENGINE_COLORS_MAP: Record<string, string> = {
-  'Subdomain discovery': '#06b6d4', // cyan
-  'Vulnerability scan': '#ef4444', // red
-  'OS Intelligence': '#a855f7', // purple
-  'OSINT': '#a855f7', // purple
-  'Fetch URL': '#3b82f6', // blue
-  'HTTP crawl': '#3b82f6', // blue
-  'WAF detection': '#d946ef', // magenta
-  'WAF bypass': '#d946ef', // magenta
-  'Port scan': '#22c55e', // green
-  'Web API Discovery': '#f97316', // orange
-  'Attack Path Modeling': '#eab308', // yellow
-  'Directories & files fuzz': '#f97316', // orange
-  'Firewall & VPN scan': '#22c55e', // green
-  'Screenshot': '#06b6d4', // cyan
-};
-
-const getFrontendEngineColor = (activityTitle: string, isLight?: boolean) => {
-  if (!activityTitle) return isLight ? '#000' : '#fff';
-  // Try exact match first
-  if (ENGINE_COLORS_MAP[activityTitle]) return ENGINE_COLORS_MAP[activityTitle];
-
-  // Try case-insensitive partial match
+const getFrontendEngineColor = (
+  activityTitle: string,
+  tokens: ReturnType<typeof useThemeTokens>['tokens']
+) => {
+  if (!activityTitle) return tokens.text.primary;
   const lowerTitle = activityTitle.toLowerCase();
-  for (const [key, color] of Object.entries(ENGINE_COLORS_MAP)) {
-    if (lowerTitle.includes(key.toLowerCase())) return color as string;
-  }
-
-  return isLight ? '#000' : '#fff';
+  if (lowerTitle.includes('vulnerability')) return tokens.accent.error;
+  if (lowerTitle.includes('osint') || lowerTitle.includes('intelligence')) return tokens.accent.secondary;
+  if (lowerTitle.includes('fetch') || lowerTitle.includes('http')) return tokens.accent.info;
+  if (lowerTitle.includes('waf')) return tokens.accent.secondary;
+  if (lowerTitle.includes('port') || lowerTitle.includes('firewall') || lowerTitle.includes('vpn')) return tokens.accent.success;
+  if (lowerTitle.includes('attack path')) return tokens.accent.warning;
+  if (lowerTitle.includes('directories') || lowerTitle.includes('web api')) return tokens.accent.warning;
+  if (lowerTitle.includes('subdomain') || lowerTitle.includes('screenshot')) return tokens.accent.primary;
+  return tokens.text.primary;
 };
 
 const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRunning?: boolean }> = ({ status, compact = false, isSpiderFootRunning = false }) => {
@@ -494,9 +479,9 @@ const getCommandBinary = (cmd: string) => {
 const getToolColor = (binary: string, tokens: any, isLight?: boolean) => {
   const b = binary.toLowerCase();
   if (b.includes('httpx')) return tokens.accent.primary;
-  if (b.includes('nuclei')) return isLight ? tokens.accent.error : '#ff003c';
-  if (b.includes('semgrep')) return isLight ? tokens.accent.success : '#00ff62';
-  if (b.includes('gau') || b.includes('hakrawler') || b.includes('katana') || b.includes('gospider') || b.includes('waybackurls')) return isLight ? tokens.accent.warning : '#fffc00';
+  if (b.includes('nuclei')) return tokens.accent.error;
+  if (b.includes('semgrep')) return tokens.accent.success;
+  if (b.includes('gau') || b.includes('hakrawler') || b.includes('katana') || b.includes('gospider') || b.includes('waybackurls')) return tokens.accent.warning;
   if (b.includes('cat') || b.includes('sort') || b.includes('grep') || b.includes('mv') || b.includes('rm')) return 'text.secondary';
   return tokens.accent.secondary;
 };
@@ -531,12 +516,12 @@ const TaskOverlay: React.FC<{
       slotProps={{
         paper: {
           sx: {
-            bgcolor: isLight ? 'background.paper' : '#0a0a0a',
+            bgcolor: 'background.paper',
             backgroundImage: isLight
               ? 'linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px)'
               : 'linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
-            border: `1px solid ${isLight ? tokens.border.subtle : 'rgba(255,255,255,0.1)'}`,
+            border: `1px solid ${tokens.border.subtle}`,
             borderRadius: 2,
             minHeight: '70vh'
           }
@@ -644,17 +629,17 @@ const TaskOverlay: React.FC<{
             )}
           </Grid>
           {/* Command Output */}
-          <Grid size={{ xs: 8 }} sx={{ height: '100%', overflowY: 'auto', bgcolor: isLight ? 'rgba(0,0,0,0.01)' : '#050505' }}>
+          <Grid size={{ xs: 8 }} sx={{ height: '100%', overflowY: 'auto', bgcolor: isLight ? 'rgba(0,0,0,0.01)' : 'background.default' }}>
             {selectedLog ? (
               <Box sx={{ p: 2 }}>
                 {/* Clean Command Box Header */}
                 <Box sx={{
                   p: 2,
                   mb: 3,
-                  bgcolor: isLight ? 'background.paper' : 'rgba(0,0,0,0.6)',
+                  bgcolor: 'background.paper',
                   border: 1, borderColor: 'divider',
                   borderRadius: 1,
-                  boxShadow: isLight ? 'none' : '0 4px 20px rgba(0,0,0,0.5)'
+                  boxShadow: theme.shadows[2]
                 }}>
                   <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
@@ -662,8 +647,8 @@ const TaskOverlay: React.FC<{
                         width: 8,
                         height: 8,
                         borderRadius: '50%',
-                        bgcolor: selectedLog.return_code === 0 ? (isLight ? tokens.accent.success : '#00ff62') : selectedLog.return_code === null ? (isLight ? tokens.accent.warning : '#ff9f00') : (isLight ? tokens.accent.error : '#ff003c'),
-                        boxShadow: isLight ? 'none' : `0 0 10px ${selectedLog.return_code === 0 ? '#00ff62' : selectedLog.return_code === null ? '#ff9f00' : '#ff003c'}`
+                        bgcolor: selectedLog.return_code === 0 ? tokens.accent.success : selectedLog.return_code === null ? tokens.accent.warning : tokens.accent.error,
+                        boxShadow: isLight ? 'none' : `0 0 10px ${selectedLog.return_code === 0 ? tokens.accent.success : selectedLog.return_code === null ? tokens.accent.warning : tokens.accent.error}`
                       }} />
                       <Typography sx={{
                         fontSize: '0.65rem',
@@ -682,9 +667,9 @@ const TaskOverlay: React.FC<{
                       fontFamily: 'monospace',
                       fontWeight: 900,
                       borderRadius: 0.5,
-                      bgcolor: selectedLog.return_code === 0 ? (isLight ? `${tokens.accent.success}1A` : 'rgba(0,255,98,0.1)') : selectedLog.return_code === null ? (isLight ? `${tokens.accent.warning}1A` : 'rgba(255,159,0,0.1)') : (isLight ? `${tokens.accent.error}1A` : 'rgba(255,0,60,0.1)'),
-                      color: selectedLog.return_code === 0 ? (isLight ? tokens.accent.success : '#00ff62') : selectedLog.return_code === null ? (isLight ? tokens.accent.warning : '#ff9f00') : (isLight ? tokens.accent.error : '#ff003c'),
-                      border: `1px solid ${selectedLog.return_code === 0 ? (isLight ? `${tokens.accent.success}33` : 'rgba(0,255,98,0.2)') : selectedLog.return_code === null ? (isLight ? `${tokens.accent.warning}33` : 'rgba(255,159,0,0.2)') : (isLight ? `${tokens.accent.error}33` : 'rgba(255,0,60,0.2)')}`
+                      bgcolor: selectedLog.return_code === 0 ? `${tokens.accent.success}1A` : selectedLog.return_code === null ? `${tokens.accent.warning}1A` : `${tokens.accent.error}1A`,
+                      color: selectedLog.return_code === 0 ? tokens.accent.success : selectedLog.return_code === null ? tokens.accent.warning : tokens.accent.error,
+                      border: `1px solid ${selectedLog.return_code === 0 ? `${tokens.accent.success}33` : selectedLog.return_code === null ? `${tokens.accent.warning}33` : `${tokens.accent.error}33`}`
                     }}>
                       STATUS: {selectedLog.return_code === 0 ? 'SUCCESS' : selectedLog.return_code === null ? 'RUNNING' : `EXIT CODE: ${selectedLog.return_code}`}
                     </Box>
@@ -711,7 +696,7 @@ const TaskOverlay: React.FC<{
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography sx={{
                     fontSize: '0.7rem',
-                    color: getFrontendEngineColor(selectedLog.activity?.title || activityTitle, isLight),
+                    color: getFrontendEngineColor(selectedLog.activity?.title || activityTitle, tokens),
                     fontWeight: 900,
                     textTransform: 'uppercase',
                     letterSpacing: 1
@@ -734,7 +719,7 @@ const TaskOverlay: React.FC<{
                   borderRadius: 1,
                   fontFamily: 'monospace',
                   fontSize: '0.75rem',
-                  color: isLight ? 'text.primary' : 'rgba(255,255,255,0.8)',
+                  color: 'text.primary',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-all',
                   minHeight: '30vh'
@@ -1399,7 +1384,7 @@ export const ScanDetailPage = () => {
 
   const scanStatus = data.scan_info.scan_status;
   const isTerminal = [0, 2, 3, 4].includes(scanStatus);
-  const progressColor = scanStatus === 2 ? (isLight ? tokens.accent.success : '#00ff62') : (scanStatus === 3 || scanStatus === 0) ? (isLight ? tokens.accent.error : '#ff003c') : scanStatus === 4 ? (isLight ? tokens.accent.warning : '#fffc00') : tokens.accent.primary;
+  const progressColor = scanStatus === 2 ? tokens.accent.success : (scanStatus === 3 || scanStatus === 0) ? tokens.accent.error : scanStatus === 4 ? tokens.accent.warning : tokens.accent.primary;
   const progressValue = isTerminal ? 100 : data.scan_info.progress;
 
   const baseTabs = [
@@ -1489,7 +1474,7 @@ export const ScanDetailPage = () => {
               <Grid size={{ xs: 6 }}>
                 <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', mb: 1, fontWeight: 700 }}>DURATION</Typography>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Timer size={16} color={isLight ? tokens.accent.warning : '#fffc00'} />
+                  <Timer size={16} color={tokens.accent.warning} />
                   <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: 'text.primary' }}>{Math.floor(data.scan_info.duration / 60)}m {data.scan_info.duration % 60}s</Typography>
                 </Stack>
               </Grid>
@@ -1517,7 +1502,7 @@ export const ScanDetailPage = () => {
               <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', mb: 0.5 }}>OUT OF SCOPE</Typography>
               {data.scan_info.cfg_out_of_scope_subdomains?.length > 0 ? (
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                  {data.scan_info.cfg_out_of_scope_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: isLight ? `${tokens.accent.error}15` : 'rgba(255,0,60,0.1)', color: isLight ? tokens.accent.error : '#ff003c', mb: 0.5 }} />)}
+                  {data.scan_info.cfg_out_of_scope_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: `${tokens.accent.error}15`, color: tokens.accent.error, mb: 0.5 }} />)}
                 </Stack>
               ) : <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled' }}>None</Typography>}
             </Box>
@@ -2131,7 +2116,7 @@ export const ScanDetailPage = () => {
       <PluginCardSlot context={{ type: 'scan', scanId: parseInt(scanId) }} />
 
       {/* Tab Bar Integration - Now spanning full width at the top */}
-      <Box sx={{ mb: 3, borderBottom: 1, borderColor: 'divider', position: 'sticky', top: 0, bgcolor: isLight ? 'rgba(248, 250, 252, 0.95)' : 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
+      <Box sx={{ mb: 3, borderBottom: 1, borderColor: 'divider', position: 'sticky', top: 0, bgcolor: 'background.paper', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
         <Tabs
           value={activeTab}
           onChange={(_, v) => setActiveTab(v)}
@@ -2222,7 +2207,7 @@ export const ScanDetailPage = () => {
                     title="ENDPOINTS"
                     value={data.endpoint_count}
                     subtitle={`${data.endpoint_alive_count} ALIVE`}
-                    color={isLight ? '#c026d3' : '#ff00f7'}
+                    color={tokens.accent.secondary}
                     icon={Target}
                     sx={{ height: '100%' }}
                   />
@@ -2230,7 +2215,7 @@ export const ScanDetailPage = () => {
                     title="VULNS"
                     value={data.vulnerability_count}
                     subtitle={`${data.critical_count} CRITICAL`}
-                    color={isLight ? tokens.accent.error : '#ff003c'}
+                    color={tokens.accent.error}
                     icon={Bug}
                     sx={{ height: '100%' }}
                   />
@@ -2238,7 +2223,7 @@ export const ScanDetailPage = () => {
                     title="OSINT"
                     value={data.secret_leaks_count}
                     subtitle="SENSITIVE DATA"
-                    color={isLight ? tokens.accent.warning : '#fffc00'}
+                    color={tokens.accent.warning}
                     icon={Key}
                     sx={{ height: '100%' }}
                   />
