@@ -23,7 +23,7 @@ export const GraphControlPanel: React.FC<Props> = ({
   layoutName,
   onChangeLayout
 }) => {
-  const { tokens } = useThemeTokens();
+  const { tokens, isLight } = useThemeTokens();
   return (
     <Box sx={{ 
       p: 2, 
@@ -36,11 +36,11 @@ export const GraphControlPanel: React.FC<Props> = ({
     }}>
        <Box sx={{ 
           display: 'flex', 
-          bgcolor: 'rgba(255,255,255,0.03)', 
+          bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', 
           borderRadius: 1, 
-          border: `1px solid ${tokens.accent.primary}4D`,
+          border: `1px solid ${tokens.border.subtle}`,
           width: { xs: '100%', md: '400px' },
-          boxShadow: `0 0 10px ${tokens.accent.primary}15`,
+          boxShadow: isLight ? 'none' : `0 0 10px ${tokens.accent.primary}15`,
           alignItems: 'center'
        }}>
           <Box sx={{ p: 1, color: tokens.accent.primary }}><Sparkles size={16} /></Box>
@@ -58,10 +58,10 @@ export const GraphControlPanel: React.FC<Props> = ({
             onChange={(e, newLayout) => newLayout && onChangeLayout(newLayout as any)}
             size="small"
             sx={{ 
-                bgcolor: 'rgba(255,255,255,0.03)',
+                bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
                 '& .MuiToggleButton-root': {
                     color: 'text.secondary',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    border: `1px solid ${tokens.border.subtle}`,
                     p: '4px 8px',
                     '&.Mui-selected': {
                         color: tokens.accent.primary,
@@ -87,9 +87,9 @@ export const GraphControlPanel: React.FC<Props> = ({
               </ToggleButton>
           </ToggleButtonGroup>
 
-          <Button size="small" startIcon={<Maximize size={14} />} onClick={onResetZoom} sx={{ bgcolor: 'rgba(33,150,243,0.1)', color: '#2196f3', fontSize: '0.7rem', fontWeight: 800 }}>RESET</Button>
-          <Button size="small" startIcon={<RefreshCw size={14} />} onClick={onRefreshLayout} sx={{ bgcolor: 'rgba(112,0,255,0.1)', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800 }}>RE-RUN LAYOUT</Button>
-          <Button size="small" startIcon={<Download size={14} />} onClick={onExport} sx={{ bgcolor: 'rgba(0,255,170,0.1)', color: '#00ffaa', fontSize: '0.7rem', fontWeight: 800 }}>EXPORT</Button>
+          <Button size="small" startIcon={<Maximize size={14} />} onClick={onResetZoom} sx={{ bgcolor: `${tokens.accent.info}1A`, color: tokens.accent.info, fontSize: '0.7rem', fontWeight: 800 }}>RESET</Button>
+          <Button size="small" startIcon={<RefreshCw size={14} />} onClick={onRefreshLayout} sx={{ bgcolor: `${tokens.accent.secondary}1A`, color: tokens.accent.secondary, fontSize: '0.7rem', fontWeight: 800 }}>RE-RUN LAYOUT</Button>
+          <Button size="small" startIcon={<Download size={14} />} onClick={onExport} sx={{ bgcolor: `${tokens.accent.success}1A`, color: tokens.accent.success, fontSize: '0.7rem', fontWeight: 800 }}>EXPORT</Button>
        </Stack>
     </Box>
   );
