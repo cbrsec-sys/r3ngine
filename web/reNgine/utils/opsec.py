@@ -306,7 +306,7 @@ class ProxychainsWrapper:
                 proxy_url = f"{scheme}://{p_host}:{p_port}"
                 
                 try:
-                    from reNgine.common_func import check_proxy_robust
+                    from reNgine.common_func import check_proxy_robust, remove_proxy_from_pool
                     
                     # Perform validation check with robust verification method to avoid false positives
                     if not check_proxy_robust(proxy_url, timeout=5):
@@ -317,6 +317,7 @@ class ProxychainsWrapper:
                 except Exception as e:
                     # Log the proxy validation failure and continue to the next one
                     logging.getLogger(__name__).error(f"Proxychains proxy {proxy_url} validation failed: {e}")
+                    remove_proxy_from_pool(proxy_url)
                     
         return None
 
@@ -349,5 +350,4 @@ class ProxychainsWrapper:
             conf_path = self.write_temp_config(proxy)
             return f"{PROXYCHAINS_EXEC_PATH} -f {conf_path} {cmd}", conf_path
         return cmd, None
-
 

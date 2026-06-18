@@ -977,6 +977,51 @@ def validate_proxies(proxy_text):
 	return '\n'.join(valid_proxies)
 
 
+def _normalize_proxy_pool_line(proxy_line):
+	"""Normalize a proxy line for consistent persistence comparisons."""
+	proxy_line = (proxy_line or '').strip()
+	if not proxy_line:
+		return ''
+	if not proxy_line.startswith('http') and not proxy_line.startswith('socks'):
+		return f"http://{proxy_line}"
+	return proxy_line
+
+
+def get_valid_proxy_count(proxy_obj=None):
+	"""Return the count of persisted non-empty proxy lines."""
+	proxy_obj = proxy_obj or Proxy.objects.first()
+	if not proxy_obj or not proxy_obj.proxies:
+		return 0
+	return len([line for line in proxy_obj.proxies.splitlines() if line.strip()])
+
+
+def remove_proxy_from_pool(proxy_value, proxy_obj=None):
+	"""Remove a proxy from the persisted pool safely and idempotently."""
+	proxy_obj = proxy_obj or Proxy.objects.first()
+	if not proxy_obj or not proxy_obj.proxies:
+		return False
+
+	target = _normalize_proxy_pool_line(proxy_value)
+	if not target:
+		return False
+
+	remaining_lines = []
+	removed = False
+	for line in proxy_obj.proxies.splitlines():
+		stripped = line.strip()
+		if not stripped:
+			continue
+		if not removed and _normalize_proxy_pool_line(stripped) == target:
+			removed = True
+			continue
+		remaining_lines.append(stripped)
+
+	if removed:
+		proxy_obj.proxies = '\n'.join(remaining_lines)
+		proxy_obj.save(update_fields=['proxies'])
+	return removed
+
+
 # Curated pool of modern desktop browser user agents for realistic request spoofing.
 # Rotated when OpSec random UA is enabled.
 _USER_AGENT_POOL = [
@@ -1066,6 +1111,8 @@ def get_random_proxy():
 			logger.warning("Using valid proxy: %s", proxy_name)
 			return proxy_name
 		logger.warning("Proxy %s validation failed.", proxy_name)
+		if remove_proxy_from_pool(proxy_name, proxy):
+			logger.warning("Removed invalid proxy from pool: %s", proxy_name)
 
 	logger.error('No valid proxies found in the list!')
 	return ''

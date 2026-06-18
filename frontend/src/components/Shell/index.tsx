@@ -25,7 +25,9 @@ import {
   Grid,
   Badge,
   alpha,
-  useMediaQuery
+  useMediaQuery,
+  Snackbar,
+  Alert
 } from '@mui/material';
 
 import {
@@ -76,7 +78,7 @@ import { NotificationsDropdown } from '../../features/notifications/components/N
 import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
 import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
-import { useRengineUpdateCheck, useTorStatus, useTorExitIP } from '../../features/settings/api';
+import { useProxySettings, useRengineUpdateCheck, useTorStatus, useTorExitIP } from '../../features/settings/api';
 import { HeaderThemeSwitcher } from './HeaderThemeSwitcher';
 
 const drawerWidth = 260;
@@ -114,6 +116,12 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const torActive = torStatus?.running ?? false;
   const { data: torExitIP } = useTorExitIP(torActive);
   const { data: unreadData } = useUnreadCount(projectSlug);
+  const { data: proxySettings } = useProxySettings(projectSlug, {
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true,
+  });
+  const [proxyWarningOpen, setProxyWarningOpen] = useState(false);
+  const [hasWarnedForLowProxyStock, setHasWarnedForLowProxyStock] = useState(false);
 
   const { data: pluginsRegistry } = useQuery({
     queryKey: ['pluginsRegistry'],
@@ -238,6 +246,61 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       }
     }
   }, []);
+
+  const validProxyCount = proxySettings?.valid_proxy_count ?? 0;
+  const proxyModeEnabled = Boolean(proxySettings?.use_proxy);
+  const proxyIndicator = React.useMemo(() => {
+    if (!proxyModeEnabled) {
+      return {
+        fg: alpha(theme.palette.text.secondary, 0.8),
+        bg: alpha(theme.palette.text.secondary, 0.08),
+        border: alpha(theme.palette.text.secondary, 0.16),
+        label: 'PROXY OFF',
+      };
+    }
+    if (validProxyCount > 20) {
+      return {
+        fg: tokens.accent.success,
+        bg: alpha(tokens.accent.success, 0.12),
+        border: alpha(tokens.accent.success, 0.28),
+        label: `PROXY ${validProxyCount}`,
+      };
+    }
+    if (validProxyCount >= 10) {
+      return {
+        fg: tokens.accent.warning,
+        bg: alpha(tokens.accent.warning, 0.12),
+        border: alpha(tokens.accent.warning, 0.28),
+        label: `PROXY ${validProxyCount}`,
+      };
+    }
+    return {
+      fg: tokens.accent.error,
+      bg: alpha(tokens.accent.error, 0.12),
+      border: alpha(tokens.accent.error, 0.28),
+      label: `PROXY ${validProxyCount}`,
+    };
+  }, [
+    proxyModeEnabled,
+    theme.palette.text.secondary,
+    tokens.accent.error,
+    tokens.accent.success,
+    tokens.accent.warning,
+    validProxyCount,
+  ]);
+
+  React.useEffect(() => {
+    if (!proxyModeEnabled || validProxyCount >= 5) {
+      setHasWarnedForLowProxyStock(false);
+      setProxyWarningOpen(false);
+      return;
+    }
+
+    if (!hasWarnedForLowProxyStock) {
+      setProxyWarningOpen(true);
+      setHasWarnedForLowProxyStock(true);
+    }
+  }, [hasWarnedForLowProxyStock, proxyModeEnabled, validProxyCount]);
 
   const handleUpdateCheckClick = () => {
     setUpdateModalOpen(true);
@@ -584,6 +647,34 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                         <ScanEyeIcon size={18} />
                       </Badge>
                     </IconButton>
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.75,
+                        px: isMobileHeader ? 1 : 1.25,
+                        py: 0.6,
+                        borderRadius: 999,
+                        border: `1px solid ${proxyIndicator.border}`,
+                        bgcolor: proxyIndicator.bg,
+                        color: proxyIndicator.fg,
+                        minWidth: isMobileHeader ? 'auto' : 96,
+                        cursor: 'default',
+                      }}
+                    >
+                      <ShieldAlert size={14} />
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: 'inherit',
+                          fontWeight: 800,
+                          letterSpacing: 0.7,
+                          fontSize: isMobileHeader ? '0.62rem' : '0.68rem',
+                        }}
+                      >
+                        {isMobileHeader ? validProxyCount : proxyIndicator.label}
+                      </Typography>
+                    </Box>
                   </Box>
 
                   <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
@@ -604,20 +695,49 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   </Box>
                 </>
               ) : (
-                <IconButton
-                  onClick={() => setMobileMenuOpen(true)}
-                  sx={{
-                    color: alpha(theme.palette.primary.main, 0.8),
-                    bgcolor: alpha(theme.palette.primary.main, 0.05),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      color: theme.palette.primary.main,
-                    }
-                  }}
-                >
-                  <MenuIcon size={20} />
-                </IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.6,
+                      px: 1,
+                      py: 0.55,
+                      borderRadius: 999,
+                      border: `1px solid ${proxyIndicator.border}`,
+                      bgcolor: proxyIndicator.bg,
+                      color: proxyIndicator.fg,
+                      cursor: 'default',
+                    }}
+                  >
+                    <ShieldAlert size={13} />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: 'inherit',
+                        fontWeight: 800,
+                        letterSpacing: 0.6,
+                        fontSize: '0.62rem',
+                      }}
+                    >
+                      {validProxyCount}
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    onClick={() => setMobileMenuOpen(true)}
+                    sx={{
+                      color: alpha(theme.palette.primary.main, 0.8),
+                      bgcolor: alpha(theme.palette.primary.main, 0.05),
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        color: theme.palette.primary.main,
+                      }
+                    }}
+                  >
+                    <MenuIcon size={20} />
+                  </IconButton>
+                </Box>
               )}
             </Box>
 
@@ -790,6 +910,37 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               onClose={() => setScanHistoryOpen(false)}
               projectSlug={projectSlug}
             />
+
+            <Snackbar
+              open={proxyWarningOpen}
+              autoHideDuration={8000}
+              onClose={() => setProxyWarningOpen(false)}
+              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              <Alert
+                severity="warning"
+                onClose={() => setProxyWarningOpen(false)}
+                action={(
+                  <Button
+                    component={Link}
+                    to={`/${projectSlug}/settings/proxies`}
+                    size="small"
+                    color="inherit"
+                    sx={{ fontWeight: 700 }}
+                  >
+                    Open Proxies
+                  </Button>
+                )}
+                sx={{
+                  alignItems: 'center',
+                  bgcolor: theme.palette.background.paper,
+                  color: theme.palette.text.primary,
+                  border: `1px solid ${alpha(tokens.accent.warning, 0.3)}`,
+                }}
+              >
+                Very few proxies remain in the pool ({validProxyCount} left).
+              </Alert>
+            </Snackbar>
 
             <CheckForUpdateModal
               open={updateModalOpen}
