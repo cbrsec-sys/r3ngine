@@ -190,6 +190,17 @@ if [ ! -d "/root/nuclei-templates/kayala-custom" ]; then
     /root/nuclei-templates/kayala-custom
 fi
 
+# topscoder/nuclei-wordfence-cve — 70k+ WordPress CVE templates (daily-updated)
+# Pre-loaded so WordPress scans don't incur a git clone mid-scan.
+if [ ! -d "/root/nuclei-templates/wordfence/.git" ]; then
+  echo "Installing Wordfence nuclei templates"
+  git clone --depth 1 https://github.com/topscoder/nuclei-wordfence-cve.git \
+    /root/nuclei-templates/wordfence
+else
+  echo "Updating Wordfence nuclei templates"
+  git -C /root/nuclei-templates/wordfence pull --quiet || true
+fi
+
 # httpx alias
 echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc
 

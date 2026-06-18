@@ -754,7 +754,7 @@ export const TargetSummary = () => {
                 onClose={() => setAiExportModalOpen(false)}
                 projectSlug={projectSlug || 'default'}
                 scanId={latestScanId}
-                targetName={data.target_info.name}
+                targetName={data?.target_info?.name ?? ''}
               />
             )}
           </Box>

@@ -1,6 +1,61 @@
 # Changelog
 
-### [v3.6.0]
+### [v3.7.0] — unreleased
+
+#### Fixed
+
+- **`run_param_discovery_activity` (CPDE) — ScanActivity permanently stuck at RUNNING**:
+  Refactored to use `_run_task`, which provides heartbeating, pre-flight abort-guard, and
+  `SUCCESS_TASK`/`FAILED_TASK` status updates identical to every other activity. Previously the
+  function called `param_discovery` directly with no try/except and never called
+  `update_scan_activity`, leaving the `ScanActivity` row at `RUNNING_TASK` forever after
+  completion. The no-URLs skip path now also marks the row `SUCCESS_TASK` instead of silently
+  returning.
+
+- **`run_search_vulns_activity` (CVE lookup) — all fan-out instances stuck at RUNNING**:
+  Same root cause as CPDE: direct call to `search_vulns_scan` with no status update or
+  heartbeat. Refactored to use `_run_task`. With 14+ concurrent instances per port scan, this
+  left up to 14 `ScanActivity` rows permanently at `RUNNING_TASK`.
+
+- **`web_api_discovery` — silent hang with no subprocess visible**:
+  Three bugs in the per-URL loop caused `has_graphql_endpoint` and `has_jwt_tokens` to be
+  called for every URL instead of once per subdomain, and LinkFinder to re-run for every URL
+  of the same subdomain when its output file was empty:
+  - Added `_graphql_gate_cache` (dict keyed by subdomain_name): `has_graphql_endpoint` issues
+    a DB `iregex` query against all endpoint rows plus up to 6 network probes × 5 s timeout
+    each. With 17 URLs the worst case was 17 × 2 call-sites × 30 s = **17 minutes of silent
+    Python I/O** with no subprocess spawned. Now called at most once per subdomain; both the
+    InQL and graphql-cop blocks share the same cache.
+  - Added `_jwt_gate_cache` (dict keyed by subdomain_name): `has_jwt_tokens` issues 2 DB
+    queries per call. Now called at most once per subdomain.
+  - Added `processed_linkfinder_subdomains` (set): LinkFinder previously re-ran for every URL
+    of the same subdomain when the output file was 0 bytes (no JS found). The primary dedup
+    guard is now the set (matching Arjun and ParamSpider); `os.path.exists` remains as the
+    Temporal retry guard for files written by a prior activity attempt.
+
+- **Gate-check functions — silent blocking with no log output**:
+  `has_graphql_endpoint`, `has_jwt_tokens`, and `has_openapi_spec` now log every DB query
+  and every individual network probe (URL, status code or exception) so any future slowdown
+  is immediately visible in the orchestrator log rather than appearing as a silent hang.
+
+### CPDE Enhancements (Parameter Discovery)
+- Added `url_param_collector.py` sub-module to `web/reNgine/cpde/`:
+  reads `urls_*.txt` (Katana/gau/gospider/waybackurls), `arjun_*.json`,
+  `ps_*.txt` (ParamSpider), `kr_*.json` (Kiterunner), and `lf_*.txt`
+  (LinkFinder) output files from the scan results directory and converts
+  them to CPDE-format findings for the correlation engine.
+- Added noise blocklist to `correlation_engine.py`: Google Analytics
+  `utm_*`, `_ga`/`_gl`/`_gid`, ad click IDs (`fbclid`, `gclid`,
+  `msclkid`), and Cloudflare challenge tokens are now filtered from output
+  regardless of confidence score. Blocklist can be disabled per-call with
+  `apply_noise_filter=False`.
+- CPDE `param_discovery` now correlates parameters from all discovered
+  sources (JS AST, OpenAPI, + all tool output files) instead of only
+  JavaScript files and OpenAPI schemas.
+
+---
+
+### [v3.6.2]
 
 - **Intelligent Auth Form Extraction — Full Rewrite (`auth_discovery_tasks.py`)**:
   - Replaced the single-attempt, regex-based implementation with a robust two-helper architecture:
@@ -49,6 +104,7 @@
   - Extended wp-taint plugin discovery to support three sources of WordPress plugin slugs (legacy `WordPress Plugin: {slug}`, `WordPress Plugin: {slug} - {vuln title}`, and `WordPress Plugin Detected: {slug}`) and HTTP URLs matching the pattern `/wp-content/plugins/([^/?#]+)/` from crawled or fuzz-discovered endpoints.
   - Ensured that new findings from both WPScan and WPTaint are dynamically passed through the LLM description generator (`get_vulnerability_gpt_report`) with full PII anonymization layer. Added checks to verify if a description/GPT has already been generated (`is_gpt_used=False`) before triggering the LLM call.
   - Added comprehensive tests in `test_wpscan.py` and `test_wptaint.py`.
+  - Fixed `parse_wptaint_results` crashing with `'str' object has no attribute 'get'` for every plugin: `taint-scan` emits `{"summary": {...}, "results": [...], "errors": null}` but the parser was iterating the top-level dict (yielding string keys). Added `_CHECK_ID_MAP` mapping all 11 known `check_id` values to `(severity, canonical_name)` tuples with a keyword-based fallback for future rules, and rewrote the field extraction to use the actual schema (`check_id`, `extra.message`, `path`, `start.line`, `extra.dataflow_trace`). Validated against 256 findings across 12 plugins from a live scan.
 
 - **WPScan Execution Reliability**:
   - Automatically runs `wpscan --update --no-banner` (with rotation proxies if configured) before starting the scan loop to ensure up-to-date vulnerability definition databases.
@@ -184,9 +240,34 @@
   - Added `LinkedInSessionCard` React component: live status indicator (green/amber/red), file upload, session revocation, and helper script download — all via the API vault settings page.
   - 24 tests covering model fields, scraper authentication paths (storage_state, cookie injection, graceful fallback), all four API endpoints, and `run_linkedint` caller resilience.
 
+- **Report Settings — 2-Column Layout & Found Parameters Toggle**:
+  - Reorganized the Report Settings checkbox area into a two-column grid: left column holds "Ignore Information Vulnerabilities" and "Include Attack Surface Map"; right column holds "Include Attack Paths" and the new "Include Found Parameters".
+  - Added **Include Found Parameters** checkbox, which gates whether discovered `Parameter` records are appended to the generated report. The flag is passed as `include_found_parameters` in the report generation request to `/scan/create_report/`.
+
+- **Fix: Report Generation Respects `include_found_parameters` Checkbox** (`startScan/views.py`, `reNgine/report_tasks.py`):
+  - Previously the "Include Found Parameters" checkbox in the report generation modal had no effect — `Parameter` records were always included in the report regardless of the user's selection.
+  - Root cause: `create_report` was not persisting the `include_found_parameters` flag in `ScanReport.params`, so `generate_report_task` always ran the parameters queryset unconditionally.
+  - Fixed by reading `include_found_parameters` from the GET request in `create_report` (defaulting `True` for backward-compat) and storing it in `ScanReport.params`. `generate_report_task` now reads the flag and gates the `Parameter` queryset behind `include_found_parameters`, producing reports without a parameters section when the box is unchecked.
+
+- **Fix: Temporal Workflows No Longer Resume Aborted or Deleted Scans** (`reNgine/temporal_activities.py`):
+  - After a container restart, Temporal replays durable workflows from its own history independently of Django's database. Scans that were aborted or deleted before the restart would continue executing, causing:
+    - **Deleted scans**: `IntegrityError` FK violations (`scan_history_id` not present in `startScan_scanhistory`), triggering infinite Temporal retry loops.
+    - **Aborted scans**: `TargetProfilingActivity` was unconditionally re-arming `scan_status` back to `RUNNING_TASK`, silently undoing the abort.
+  - Root cause confirmed by container logs showing the `dalfox_xss_scan` activity for deleted scan #32 entering an infinite retry cycle after every restart.
+  - Fixed with a two-layer guard using Temporal's `ApplicationError(non_retryable=True)`:
+    - **Layer 1 — `TargetProfilingActivity`**: Acts as the primary lifecycle guard (first real activity every workflow runs). If `ScanHistory` does not exist or has `scan_status=ABORTED_TASK`, raises a non-retryable error to permanently terminate the workflow before any work is attempted. The unconditional re-arm of `ABORTED_TASK` status has been removed; only `FAILED_TASK`/other states are re-armed to `RUNNING_TASK`.
+    - **Layer 2 — `_run_task` helper**: Pre-flight guard at the entry point of every activity function. Catches activities that were in-flight mid-scan at the time of abort/delete, preventing them from proceeding and entering retry loops.
+    - **Layer 3 — `CheckScanAliveActivity` (child workflow guard)**: Child workflows (`NucleiPlannerWorkflow`, `SubScanWorkflow`) are replayed by Temporal independently of `MasterScanWorkflow` after a container restart, so they skip Layer 1 entirely. A new `CheckScanAliveActivity` is now called as the **first activity** in both child workflows. It performs the same abort/delete check and raises `ApplicationError(non_retryable=True)` to terminate the child workflow cleanly before any scan data is accessed. This closes the remaining gap in lifecycle guard coverage for replayed child workflows.
+  - Orphaned `TemporalWorkflowExecution` DB records for aborted scans (scans 4 and 8) were reconciled and marked `CANCELLED`/`TERMINATED`. The actively-looping workflow for deleted scan 32 (`master-scan-32-run-0-f36d62b1-nuclei`) was cancelled directly via the Temporal API.
+
+
+
+
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:
+
   - Upgraded the container execution runtime from Python 3.10 to Python 3.12 to improve performance by ~25% and ensure support until October 2028.
   - Configured the trusted deadsnakes PPA signing keyring (`/usr/share/keyrings/deadsnakes.gpg`) to install `python3.12`, `python3.12-dev`, and `python3.12-venv` in the Ubuntu 22.04 base image.
   - Avoided installing the system `python3-pip` package (which forces default Python 3.10 installation) by bootstrapping Python 3.12's `ensurepip` module directly.

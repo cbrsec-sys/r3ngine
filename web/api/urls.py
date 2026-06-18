@@ -289,6 +289,16 @@ urlpatterns = [
         TorExitIPAPIView.as_view(),
         name='rengine_tor_exit_ip'),
     path(
+        'action/directory-file/dispatch/',
+        DirectoryFileDispatchView.as_view(),
+        name='directory-file-dispatch',
+    ),
+    path(
+        'action/directory-file/delete/',
+        DirectoryFileDeleteView.as_view(),
+        name='directory-file-delete',
+    ),
+    path(
         'action/subdomain/add/',
         AddManualSubdomain.as_view(),
         name='add_manual_subdomain'),

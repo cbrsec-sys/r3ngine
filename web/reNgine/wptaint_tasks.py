@@ -13,9 +13,45 @@ from reNgine.tasks import stream_command
 
 logger = logging.getLogger(__name__)
 
+# Maps taint-scan check_id values to (severity_str, canonical_name) tuples.
+# Severity strings must match keys in NUCLEI_SEVERITY_MAP.
+_CHECK_ID_MAP = {
+    'path-transversal':                                   ('high',     'Path Traversal'),
+    'request-path-read-delete':                           ('medium',   'Arbitrary File Read/Delete'),
+    'tainted-sql-string':                                 ('high',     'SQL Injection (Tainted String)'),
+    'unsafe-deserialization':                             ('critical', 'Unsafe Deserialization'),
+    'wp-header-injection':                                ('medium',   'HTTP Header Injection'),
+    'wp-open-redirect':                                   ('medium',   'Open Redirect'),
+    'wp-reflected-xss-direct-request-output':             ('high',     'Reflected XSS'),
+    'wp-request-file-upload-without-cap-check':           ('high',     'Unauthorized File Upload'),
+    'wp-request-record-read-to-output-without-cap-check': ('medium',   'IDOR / Unauthorized Record Read'),
+    'wp-request-sensitive-action-without-cap-check':      ('medium',   'Missing Capability Check'),
+    'wp-stored-xss-persistent-read-to-output':            ('high',     'Stored XSS'),
+}
+
+
+def _check_id_to_severity_and_name(check_id):
+    """Return (severity_str, canonical_name) for a taint-scan check_id."""
+    if check_id in _CHECK_ID_MAP:
+        return _CHECK_ID_MAP[check_id]
+    # Fallback heuristic for unknown future rules
+    lower = check_id.lower()
+    if 'deserializ' in lower or 'rce' in lower:
+        severity = 'critical'
+    elif 'sql' in lower or 'xss' in lower or 'traversal' in lower or 'upload' in lower:
+        severity = 'high'
+    else:
+        severity = 'medium'
+    name = check_id.replace('-', ' ').title()
+    return (severity, name)
+
+
 def parse_wptaint_results(task_instance, output_file, subdomains, plugin_name):
     """
     Parses wp-taint-scan JSON output and saves vulnerabilities to the database.
+
+    taint-scan emits: {"summary": {...}, "results": [...], "errors": null}
+    Each result has: check_id, path, start.line, extra.message, extra.dataflow_trace
     """
     try:
         if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
@@ -24,33 +60,59 @@ def parse_wptaint_results(task_instance, output_file, subdomains, plugin_name):
         with open(output_file, 'r') as f:
             data = json.load(f)
 
-        for finding in data:
-            title = finding.get('Title', f"WP Taint: {finding.get('SinkOp', 'Unknown')}")
-            description = finding.get('Description', '')
-            if finding.get('File'):
-                description += f"\n\n**File**: `{finding.get('File')}`"
-                if finding.get('Line'):
-                    description += f" (Line {finding.get('Line')})"
-            if finding.get('SourceCode'):
-                description += f"\n\n**Source Code**:\n```php\n{finding.get('SourceCode')}\n```"
+        # taint-scan wraps results in a top-level dict
+        findings = data.get('results', []) if isinstance(data, dict) else data
+        if not findings:
+            return
 
-            vuln_data = {
-                'name': f"WP Taint ({plugin_name}): {title}",
-                'severity': 3,  # High severity for SAST findings
-                'description': description,
-                'type': 'WordPress',
-                'references': [],
-                'cve_ids': [],
-                'source': 'WPTaintScan'
-            }
+        from reNgine.definitions import NUCLEI_SEVERITY_MAP
+
+        for finding in findings:
+            if not isinstance(finding, dict):
+                continue
+
+            check_id = finding.get('check_id', 'unknown')
+            severity_str, canonical_name = _check_id_to_severity_and_name(check_id)
+
+            extra = finding.get('extra') or {}
+            message = extra.get('message', '')
+
+            description_parts = []
+            if message:
+                description_parts.append(message)
+
+            file_path = finding.get('path', '')
+            line = (finding.get('start') or {}).get('line')
+            if file_path:
+                file_line = '`%s`' % file_path
+                if line:
+                    file_line += ' (Line %d)' % line
+                description_parts.append('**File**: ' + file_line)
+
+            trace = extra.get('dataflow_trace') or {}
+            source_snippet = (trace.get('source') or {}).get('snippet', '')
+            sink_snippet = (trace.get('sink') or {}).get('snippet', '')
+            if source_snippet:
+                description_parts.append('**Source**:\n```php\n%s\n```' % source_snippet)
+            if sink_snippet:
+                description_parts.append('**Sink**:\n```php\n%s\n```' % sink_snippet)
+
+            description = '\n\n'.join(description_parts)
+            severity_num = NUCLEI_SEVERITY_MAP.get(severity_str, 3)
 
             for subdomain in subdomains:
                 vuln, created = save_vulnerability(
                     target_domain=task_instance.domain,
-                    http_url=f"http://{subdomain.name}",
+                    http_url='http://%s' % subdomain.name,
                     scan_history=task_instance.scan,
                     subdomain=subdomain,
-                    **vuln_data
+                    name='WP Taint (%s): %s' % (plugin_name, canonical_name),
+                    severity=severity_num,
+                    description=description,
+                    type='WordPress',
+                    references=[],
+                    cve_ids=[],
+                    source='WPTaintScan',
                 )
                 if not vuln.is_gpt_used:
                     try:
@@ -60,10 +122,10 @@ def parse_wptaint_results(task_instance, output_file, subdomains, plugin_name):
                             path = '/'
                         get_vulnerability_gpt_report((vuln.name, path), vulnerability_id=vuln.id)
                     except Exception as e:
-                        logger.error(f"Failed to generate LLM description for WPTaint finding {vuln.name}: {e}")
+                        logger.error('Failed to generate LLM description for WPTaint finding %s: %s', vuln.name, e)
 
     except Exception as e:
-        logger.error(f"Failed to parse WP Taint Scan results for plugin {plugin_name}: {str(e)}")
+        logger.error('Failed to parse WP Taint Scan results for plugin %s: %s', plugin_name, str(e))
 
 def wptaint_scan(self, urls=[], ctx={}, description=None):
     """

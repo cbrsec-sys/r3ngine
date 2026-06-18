@@ -2556,11 +2556,15 @@ def has_graphql_endpoint(scan_id, url, proxy=None):
 	Checks existing EndPoint records first (zero network cost). Falls back to
 	HEAD-probing common GraphQL paths if the DB has no evidence.
 	"""
-	if EndPoint.objects.filter(
+	logger.info('[GATE] has_graphql_endpoint: DB query — scan_id=%s url=%s', scan_id, url)
+	db_match = EndPoint.objects.filter(
 		scan_history_id=scan_id,
 		http_url__iregex=r'/graphi?ql',
-	).exists():
+	).exists()
+	if db_match:
+		logger.info('[GATE] has_graphql_endpoint: DB hit — GraphQL endpoint already recorded for scan %s', scan_id)
 		return True
+	logger.info('[GATE] has_graphql_endpoint: DB miss — probing %d paths for %s (timeout=%ds each)', len(_GRAPHQL_PROBE_PATHS), url, _PROBE_TIMEOUT)
 
 	from urllib.parse import urlparse as _urlparse
 	parsed = _urlparse(url)
@@ -2569,6 +2573,7 @@ def has_graphql_endpoint(scan_id, url, proxy=None):
 
 	for path in _GRAPHQL_PROBE_PATHS:
 		probe_url = base + path
+		logger.info('[GATE] has_graphql_endpoint: probing %s', probe_url)
 		try:
 			resp = requests.head(
 				probe_url,
@@ -2577,12 +2582,15 @@ def has_graphql_endpoint(scan_id, url, proxy=None):
 				allow_redirects=True,
 				headers=_PROBE_HEADERS,
 			)
+			logger.info('[GATE] has_graphql_endpoint: %s → HTTP %d', probe_url, resp.status_code)
 			if resp.status_code not in (400, 404, 410):
 				logger.info('[GATE] GraphQL endpoint candidate at %s (HTTP %d)', probe_url, resp.status_code)
 				return True
-		except requests.RequestException:
+		except requests.RequestException as e:
+			logger.info('[GATE] has_graphql_endpoint: %s → error (%s)', probe_url, e)
 			continue
 
+	logger.info('[GATE] has_graphql_endpoint: no GraphQL endpoint found for %s', url)
 	return False
 
 
@@ -2599,8 +2607,10 @@ def has_openapi_spec(url, proxy=None):
 	base = '%s://%s' % (parsed.scheme, parsed.netloc)
 	proxies = {'http': proxy, 'https': proxy} if proxy else None
 
+	logger.info('[GATE] has_openapi_spec: probing %d paths for %s (timeout=%ds each)', len(_OPENAPI_PROBE_PATHS), url, _PROBE_TIMEOUT)
 	for path in _OPENAPI_PROBE_PATHS:
 		probe_url = base + path
+		logger.info('[GATE] has_openapi_spec: probing %s', probe_url)
 		try:
 			resp = requests.head(
 				probe_url,
@@ -2609,6 +2619,7 @@ def has_openapi_spec(url, proxy=None):
 				allow_redirects=True,
 				headers=_PROBE_HEADERS,
 			)
+			logger.info('[GATE] has_openapi_spec: %s → HTTP %d', probe_url, resp.status_code)
 			if resp.status_code != 200:
 				continue
 			# HEAD returned 200 — accept json/yaml content types directly
@@ -2617,6 +2628,7 @@ def has_openapi_spec(url, proxy=None):
 				logger.info('[GATE] OpenAPI spec found at %s (Content-Type: %s)', probe_url, ct)
 				return True
 			# For ambiguous content types confirm with a lightweight GET
+			logger.info('[GATE] has_openapi_spec: ambiguous Content-Type %r — issuing GET %s', ct, probe_url)
 			get_resp = requests.get(
 				probe_url,
 				timeout=_PROBE_TIMEOUT * 2,
@@ -2633,9 +2645,11 @@ def has_openapi_spec(url, proxy=None):
 					return True
 			except Exception:
 				continue
-		except requests.RequestException:
+		except requests.RequestException as e:
+			logger.info('[GATE] has_openapi_spec: %s → error (%s)', probe_url, e)
 			continue
 
+	logger.info('[GATE] has_openapi_spec: no OpenAPI spec found for %s', url)
 	return False
 
 
@@ -2648,6 +2662,8 @@ def has_jwt_tokens(scan_id, subdomain=None):
 	scoped to that subdomain; SecretLeak always covers the full scan so
 	that scan-wide secret discoveries gate per-subdomain runs correctly.
 	"""
+	subdomain_label = subdomain.name if subdomain is not None else 'scan-wide'
+	logger.info('[GATE] has_jwt_tokens: querying auth parameters — scan_id=%s scope=%s', scan_id, subdomain_label)
 	param_qs = Parameter.objects.filter(
 		endpoint__scan_history_id=scan_id,
 		is_auth_related=True,
@@ -2656,10 +2672,14 @@ def has_jwt_tokens(scan_id, subdomain=None):
 		param_qs = param_qs.filter(endpoint__subdomain=subdomain)
 	for name in param_qs.values_list('name', flat=True):
 		if _JWT_PARAM_RE.search(name):
+			logger.info('[GATE] has_jwt_tokens: JWT param match on %r — scan_id=%s scope=%s', name, scan_id, subdomain_label)
 			return True
 
+	logger.info('[GATE] has_jwt_tokens: no JWT params found, querying SecretLeak — scan_id=%s', scan_id)
 	for secret_type in SecretLeak.objects.filter(scan_history_id=scan_id).values_list('secret_type', flat=True):
 		if _JWT_SECRET_TYPE_RE.search(secret_type):
+			logger.info('[GATE] has_jwt_tokens: JWT secret match on %r — scan_id=%s', secret_type, scan_id)
 			return True
 
+	logger.info('[GATE] has_jwt_tokens: no JWT tokens found — scan_id=%s scope=%s', scan_id, subdomain_label)
 	return False
