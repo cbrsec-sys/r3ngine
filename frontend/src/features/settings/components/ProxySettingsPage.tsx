@@ -47,6 +47,8 @@ export const ProxySettingsPage: React.FC = () => {
   const [validateOnSave, setValidateOnSave] = useState(false);
   const [useTor, setUseTor] = useState(false);
   const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+  const [isFetchingQuick, setIsFetchingQuick] = useState<string | null>(null);
+
   const { data: torStatus } = useTorStatus();
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -167,6 +169,65 @@ export const ProxySettingsPage: React.FC = () => {
       }
     });
   };
+
+  const handleFetchQuick = async (url: string, protocol: 'socks5' | 'socks4' | 'https', label: string) => {
+    setIsFetchingQuick(label);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const text = await response.text();
+      const cleanProxies = text
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => {
+          if (!line) return false;
+          if (line.startsWith('#') || line.startsWith('//')) return false;
+          return line.includes(':');
+        });
+
+      if (cleanProxies.length === 0) {
+        setSnackbar({
+          open: true,
+          message: `No valid proxies found in ${label}.`,
+          severity: 'warning'
+        });
+        return;
+      }
+
+      const formatted = cleanProxies.map(p => {
+        const prefix = `${protocol}://`;
+        if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('socks4://') || p.startsWith('socks5://')) {
+          return p;
+        }
+        return `${prefix}${p}`;
+      });
+
+      setProxyList(prev => {
+        const existingLines = prev.split('\n').map(l => l.trim()).filter(Boolean);
+        const combined = [...existingLines, ...formatted];
+        const unique = Array.from(new Set(combined));
+        return unique.join('\n');
+      });
+
+      setSnackbar({
+        open: true,
+        message: `Successfully fetched and added ${formatted.length} proxies from ${label}.`,
+        severity: 'success'
+      });
+      setUseProxy(true);
+    } catch (error: any) {
+      setSnackbar({
+        open: true,
+        message: `Failed to fetch from ${label}: ${error.message}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsFetchingQuick(null);
+    }
+  };
+
 
   const parsedProxies = proxyList.split('\n').map(p => p.trim()).filter(p => p.length > 0);
 
@@ -344,9 +405,112 @@ export const ProxySettingsPage: React.FC = () => {
               </Box>
             </Box>
 
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 3, mb: 1, fontWeight: 600 }}>
+            <Box sx={{ mt: 3, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, fontFamily: 'Orbitron', fontSize: '0.75rem', letterSpacing: 0.5 }}>
+                FETCH PROXY FROM:
+              </Typography>
+              
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={isFetchingQuick !== null}
+                onClick={() => handleFetchQuick(
+                  'https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/socks5/data.txt',
+                  'socks5',
+                  'proxifly(s5)'
+                )}
+                sx={{
+                  borderColor: 'divider',
+                  color: tokens.accent.primary,
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  py: 0.2,
+                  px: 1.2,
+                  minWidth: 0,
+                  '&:hover': { borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D` }
+                }}
+              >
+                {isFetchingQuick === 'proxifly(s5)' ? 'LOADING...' : 'PROXIFLY(S5)'}
+              </Button>
+
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={isFetchingQuick !== null}
+                onClick={() => handleFetchQuick(
+                  'https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/socks4/data.txt',
+                  'socks4',
+                  'proxifly(s4)'
+                )}
+                sx={{
+                  borderColor: 'divider',
+                  color: tokens.accent.secondary,
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  py: 0.2,
+                  px: 1.2,
+                  minWidth: 0,
+                  '&:hover': { borderColor: tokens.accent.secondary, bgcolor: `${tokens.accent.secondary}0D` }
+                }}
+              >
+                {isFetchingQuick === 'proxifly(s4)' ? 'LOADING...' : 'PROXIFLY(S4)'}
+              </Button>
+
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={isFetchingQuick !== null}
+                onClick={() => handleFetchQuick(
+                  'https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/https/data.txt',
+                  'https',
+                  'proxifly(https)'
+                )}
+                sx={{
+                  borderColor: 'divider',
+                  color: tokens.accent.primary,
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  py: 0.2,
+                  px: 1.2,
+                  minWidth: 0,
+                  '&:hover': { borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D` }
+                }}
+              >
+                {isFetchingQuick === 'proxifly(https)' ? 'LOADING...' : 'PROXIFLY(HTTPS)'}
+              </Button>
+
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={isFetchingQuick !== null}
+                onClick={() => handleFetchQuick(
+                  'https://raw.githubusercontent.com/VPSLabCloud/VPSLab-Free-Proxy-List/refs/heads/main/socks5_all.txt',
+                  'socks5',
+                  'vpslab(s5)'
+                )}
+                sx={{
+                  borderColor: 'divider',
+                  color: tokens.accent.secondary,
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  py: 0.2,
+                  px: 1.2,
+                  minWidth: 0,
+                  '&:hover': { borderColor: tokens.accent.secondary, bgcolor: `${tokens.accent.secondary}0D` }
+                }}
+              >
+                {isFetchingQuick === 'vpslab(s5)' ? 'LOADING...' : 'VPSLAB(S5)'}
+              </Button>
+            </Box>
+
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2, mb: 1, fontWeight: 600 }}>
               PROXY LIST (ONE PER LINE)
             </Typography>
+
             <TextField
               multiline
               rows={12}
