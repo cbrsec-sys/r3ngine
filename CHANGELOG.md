@@ -4,6 +4,9 @@
 
 #### Fixed
 
+- **Initiate New Targets modal theme compatibility**:
+  Removed hardcoded dark backgrounds and hex colors from `AddTargetModal.tsx` and refactored it to use dynamic theme-aware properties and colors. The modal now renders with a matching background and correct text contrast on the v3 light theme.
+
 - **Scan History drawer theme compatibility**:
   Removed hardcoded dark backgrounds and hex colors from `ScanHistoryDrawer.tsx` and updated components to use theme tokens and values. The drawer now displays with correct light/dark theme compliance and proper contrast.
 
