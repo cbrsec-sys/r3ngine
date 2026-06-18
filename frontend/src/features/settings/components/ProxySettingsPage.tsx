@@ -431,7 +431,7 @@ export const ProxySettingsPage: React.FC = () => {
                   '&:hover': { borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D` }
                 }}
               >
-                {isFetchingQuick === 'proxifly(s5)' ? 'LOADING...' : 'PROXIFLY(S5)'}
+                {isFetchingQuick === 'proxifly(s5)' ? 'LOADING...' : 'PROXIFLY (S5)'}
               </Button>
 
               <Button
@@ -455,7 +455,7 @@ export const ProxySettingsPage: React.FC = () => {
                   '&:hover': { borderColor: tokens.accent.secondary, bgcolor: `${tokens.accent.secondary}0D` }
                 }}
               >
-                {isFetchingQuick === 'proxifly(s4)' ? 'LOADING...' : 'PROXIFLY(S4)'}
+                {isFetchingQuick === 'proxifly(s4)' ? 'LOADING...' : 'PROXIFLY (S4)'}
               </Button>
 
               <Button
@@ -479,7 +479,7 @@ export const ProxySettingsPage: React.FC = () => {
                   '&:hover': { borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D` }
                 }}
               >
-                {isFetchingQuick === 'proxifly(https)' ? 'LOADING...' : 'PROXIFLY(HTTPS)'}
+                {isFetchingQuick === 'proxifly(https)' ? 'LOADING...' : 'PROXIFLY (HTTPS)'}
               </Button>
 
               <Button
@@ -503,7 +503,7 @@ export const ProxySettingsPage: React.FC = () => {
                   '&:hover': { borderColor: tokens.accent.secondary, bgcolor: `${tokens.accent.secondary}0D` }
                 }}
               >
-                {isFetchingQuick === 'vpslab(s5)' ? 'LOADING...' : 'VPSLAB(S5)'}
+                {isFetchingQuick === 'vpslab(s5)' ? 'LOADING...' : 'VPSLAB (S5)'}
               </Button>
             </Box>
 
