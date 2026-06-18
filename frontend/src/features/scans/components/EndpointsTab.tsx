@@ -66,9 +66,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
   const getStatusColor = (status: number) => {
     if (status >= 200 && status < 300) return isLight ? tokens.accent.success : '#00ff62';
     if (status >= 300 && status < 400) return tokens.accent.primary;
-    if (status >= 400 && status < 500) return isLight ? '#d97706' : '#ffae00';
+    if (status >= 400 && status < 500) return isLight ? tokens.accent.warning : '#ffae00';
     if (status >= 500) return isLight ? tokens.accent.error : '#ff003c';
-    return isLight ? 'text.secondary' : '#888';
+    return isLight ? tokens.text.secondary : 'rgba(255,255,255,0.4)';
   };
 
   return (
@@ -77,11 +77,11 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <Box sx={{
           display: 'flex',
-          bgcolor: 'rgba(255,255,255,0.03)',
+          bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
           borderRadius: '4px',
           overflow: 'hidden',
           flex: 1,
-          border: `1px solid ${tokens.accent.primary}33`,
+          border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : `${tokens.accent.primary}33`}`,
           boxShadow: `0 0 20px ${tokens.accent.primary}0D`
         }}>
           <InputBase
@@ -109,7 +109,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               fontWeight: 800,
               letterSpacing: 2,
               fontFamily: 'Orbitron',
-              borderLeft: `1px solid ${tokens.accent.primary}33`,
+              borderLeft: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : `${tokens.accent.primary}33`}`,
               '&:hover': { bgcolor: `${tokens.accent.primary}33` }
             }}
           >
@@ -127,9 +127,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               sx={{
                 height: '100%',
                 px: 2,
-                borderColor: `${tokens.accent.primary}33`,
-                color: selectedGfPattern ? '#ff003c' : '#fff',
-                bgcolor: selectedGfPattern ? 'rgba(255, 0, 60, 0.05)' : 'rgba(255,255,255,0.03)',
+                borderColor: isLight ? 'divider' : `${tokens.accent.primary}33`,
+                color: selectedGfPattern ? 'error.main' : 'text.primary',
+                bgcolor: selectedGfPattern ? (isLight ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255, 0, 60, 0.05)') : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)'),
                 fontWeight: 800,
                 fontSize: '0.75rem',
                 letterSpacing: 1,
@@ -145,14 +145,14 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: isLight ? 'background.paper' : '#0a0a0f',
+                    bgcolor: 'background.paper',
                     border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : `${tokens.accent.primary}33`}`,
                     boxShadow: isLight ? '0 4px 20px rgba(0,0,0,0.05)' : '0 0 30px rgba(0,0,0,0.5)',
                     mt: 1,
                     '& .MuiMenuItem-root': {
                       fontSize: '0.75rem',
                       fontWeight: 700,
-                      color: isLight ? 'text.primary' : 'rgba(255,255,255,0.7)',
+                      color: 'text.primary',
                       px: 3,
                       py: 1,
                       '&:hover': { bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary }
@@ -166,7 +166,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                 <MenuItem key={pattern.matched_gf_patterns} onClick={() => handleSelectPattern(pattern.matched_gf_patterns)}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 4 }}>
                     <span>{pattern.matched_gf_patterns.toUpperCase()}</span>
-                    <Box component="span" sx={{ color: '#ff003c', opacity: 0.8 }}>{pattern.count}</Box>
+                    <Box component="span" sx={{ color: 'error.main', opacity: 0.8 }}>{pattern.count}</Box>
                   </Box>
                 </MenuItem>
               ))}
@@ -191,7 +191,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Refresh">
-              <IconButton size="small" sx={{ color: 'text.secondary', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}><Filter size={16} /></IconButton>
+              <IconButton size="small" sx={{ color: 'text.secondary', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}><Filter size={16} /></IconButton>
             </Tooltip>
             <Tooltip title="Export Data">
               <IconButton size="small" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15`, border: `1px solid ${tokens.accent.primary}33`, borderRadius: 1 }}><Download size={16} /></IconButton>
@@ -210,7 +210,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
             <thead>
               <tr style={{
                 textAlign: 'left',
-                borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.1)',
+                borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'}`,
                 backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
               }}>
                 <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>HTTP URL</th>
@@ -245,7 +245,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                         <IconButton
                           size="small"
                           onClick={() => copyToClipboard(endpoint.http_url)}
-                          sx={{ color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: tokens.accent.primary } }}
+                          sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: tokens.accent.primary } }}
                         >
                           <Copy size={12} />
                         </IconButton>
@@ -254,8 +254,8 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                       {/* Tech Badges */}
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {endpoint.webserver && (
-                          <Box sx={{ px: 0.8, py: 0.2, bgcolor: 'rgba(112, 0, 255, 0.1)', border: '1px solid rgba(112, 0, 255, 0.3)', borderRadius: 0.5 }}>
-                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: '#7000ff' }}>{endpoint.webserver}</Typography>
+                          <Box sx={{ px: 0.8, py: 0.2, bgcolor: isLight ? 'rgba(112, 0, 255, 0.08)' : 'rgba(112, 0, 255, 0.1)', border: `1px solid ${isLight ? 'rgba(112, 0, 255, 0.2)' : 'rgba(112, 0, 255, 0.3)'}`, borderRadius: 0.5 }}>
+                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: isLight ? '#7c3aed' : '#7000ff' }}>{endpoint.webserver}</Typography>
                           </Box>
                         )}
                         {endpoint.techs?.map(tech => (
@@ -318,7 +318,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               {(!isLoading && data?.results.length === 0) && (
                 <tr>
                   <td colSpan={5} style={{ padding: '60px', textAlign: 'center' }}>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>ZERO ENDPOINTS DETECTED</Typography>
+                    <Typography sx={{ color: 'text.disabled', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>ZERO ENDPOINTS DETECTED</Typography>
                   </td>
                 </tr>
               )}
@@ -327,7 +327,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
         </Box>
 
         {/* Tactical Pagination */}
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid', borderColor: 'divider' }}>
           <Pagination
             count={Math.ceil((data?.count || 0) / 100)}
             page={page}
@@ -336,7 +336,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
             sx={{
               '& .MuiPaginationItem-root': {
                 color: 'text.secondary',
-                borderColor: 'rgba(255,255,255,0.1)',
+                borderColor: 'divider',
                 fontFamily: 'Orbitron',
                 fontSize: '10px',
                 '&.Mui-selected': {
