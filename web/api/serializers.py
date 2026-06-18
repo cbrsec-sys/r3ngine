@@ -162,12 +162,10 @@ class DomainSerializer(serializers.ModelSerializer):
 	def _get_recent_scan(self, obj):
 		from django.apps import apps
 		ScanHistory = apps.get_model('startScan.ScanHistory')
-		if not obj.start_scan_date:
-			return None
 		return (
 			ScanHistory.objects
 			.filter(domain__id=obj.id)
-			.order_by('-start_scan_date', '-id')
+			.order_by('-id')
 			.first()
 		)
 
