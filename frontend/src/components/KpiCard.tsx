@@ -13,13 +13,15 @@ export interface KpiCardProps {
   subtitle?: string;
   className?: string;
   sx?: SxProps<Theme>;
+  onClick?: () => void;
 }
 
-export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, color, subtitle, sx }) => {
+export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, color, subtitle, sx, onClick }) => {
   const { tokens, theme, isLight } = useThemeTokens();
 
   return (
     <Card
+      onClick={onClick}
       sx={{
         height: '100%',
         ...getSurfaceSx(isLight, tokens, theme),
@@ -28,6 +30,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
         overflow: 'hidden',
         borderRadius: isLight ? '8px' : '12px',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        cursor: onClick ? 'pointer' : 'default',
         '&:hover': {
           transform: 'translateY(-4px)',
           borderColor: color,

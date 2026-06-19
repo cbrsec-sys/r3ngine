@@ -80,6 +80,7 @@ interface SubdomainsTabProps {
   scanId?: number;
   targetId?: number;
   onTabChange?: (index: number) => void;
+  initialAlive?: boolean;
 }
 
 const TASK_TIER_ORDER: string[] = [
@@ -98,7 +99,7 @@ const TASK_TIER_ORDER: string[] = [
   'vulnerability_scan', 'waf_bypass', 'brute_force_scan', 'vigolium_scan',
 ];
 
-export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
+export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange, initialAlive }) => {
   const { tokens, isLight, theme } = useThemeTokens();
   const warningAccent = tokens.accent.warning;
 
@@ -109,6 +110,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
   const [hasIpFilter, setHasIpFilter] = useState(false);
+  const [isAliveFilter, setIsAliveFilter] = useState(initialAlive || false);
   const [sortCol, setSortCol] = useState<string | undefined>('1');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -123,7 +125,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   };
 
   const filters: SubdomainFilters = {
-    has_ip: hasIpFilter ? 'true' : undefined
+    has_ip: hasIpFilter ? 'true' : undefined,
+    http_status: isAliveFilter ? '200' : undefined
   };
 
   const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId, filters, 10, sortCol, sortDir);
@@ -525,6 +528,29 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           }}
         >
           {isLoading ? 'LOADING...' : hasIpFilter ? 'HAS IP [ON]' : 'HAS IP'}
+        </Button>
+        <Button
+          onClick={() => {
+            setIsAliveFilter(prev => !prev);
+            setPage(1);
+            setSelectedAssets([]);
+          }}
+          disabled={isLoading}
+          sx={{
+            bgcolor: isAliveFilter ? `${tokens.accent.primary}33` : 'transparent',
+            color: isAliveFilter ? tokens.accent.primary : 'text.primary',
+            opacity: isLoading ? 0.6 : 1,
+            px: 3,
+            borderRadius: 0,
+            fontWeight: 700,
+            fontSize: '11px',
+            letterSpacing: 1,
+            borderLeft: '1px solid',
+            borderLeftColor: 'divider',
+            '&:hover': { bgcolor: `${tokens.accent.primary}26` }
+          }}
+        >
+          {isLoading ? 'LOADING...' : isAliveFilter ? 'ALIVE [ON]' : 'ALIVE'}
         </Button>
       </Box>
 

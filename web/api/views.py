@@ -4520,6 +4520,10 @@ class EndPointViewSet(viewsets.ModelViewSet):
 		if subdomain_id:
 			endpoints = endpoints.filter(subdomain__id=subdomain_id)
 
+		http_status = req.query_params.get('http_status')
+		if http_status:
+			endpoints = endpoints.filter(http_status=http_status)
+
 		if 'only_urls' in req.query_params:
 			self.serializer_class = EndpointOnlyURLsSerializer
 
