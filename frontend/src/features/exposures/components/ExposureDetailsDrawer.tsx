@@ -3,7 +3,6 @@ import { Drawer, Box, Typography, IconButton, Divider, List, ListItem, ListItemT
 import CloseIcon from '@mui/icons-material/Close';
 import type { Exposure } from '../types';
 import { useThemeTokens } from '@/theme/useThemeTokens';
-import { useSemanticColors } from '@/theme/useSemanticColors';
 
 interface ExposureDetailsDrawerProps {
   exposure: Exposure;
@@ -12,7 +11,6 @@ interface ExposureDetailsDrawerProps {
 
 export const ExposureDetailsDrawer: React.FC<ExposureDetailsDrawerProps> = ({ exposure, onClose }) => {
   const { tokens } = useThemeTokens();
-  const semantic = useSemanticColors();
 
   return (
     <Drawer
@@ -86,9 +84,9 @@ export const ExposureDetailsDrawer: React.FC<ExposureDetailsDrawerProps> = ({ ex
                 primary={
                   <Typography variant="body2" sx={{ color: 'text.primary' }}>
                     <Box component="span" sx={{ fontWeight: 600, mr: 1, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>
-                      {ev.evidence_type}
+                      {ev.source_tool}
                     </Box>
-                    {ev.evidence_value}
+                    {ev.evidence_data?.url as string || ev.evidence_data?.name as string || JSON.stringify(ev.evidence_data)}
                   </Typography>
                 }
               />

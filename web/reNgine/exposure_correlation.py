@@ -1,6 +1,6 @@
 import logging
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from startScan.models import (
 	Subdomain, EndPoint, Screenshot, Vulnerability,
 	Exposure, ExposureEvidence
@@ -25,26 +25,33 @@ class ExposureCorrelationEngine:
 			logger.warning("ExposureCorrelationEngine: No scan_history provided.")
 			return
 
-		# Fetch all subdomains associated with this scan
-		subdomains = Subdomain.objects.filter(scan_history=self.scan_history).prefetch_related(
-			'ip_addresses__ports', 'technologies', 'screenshots'
+		subdomains = Subdomain.objects.filter(
+			scan_history=self.scan_history
+		).prefetch_related(
+			'ip_addresses__ports',
+			'technologies',
+			'screenshots',
+			Prefetch(
+				'endpoint_set',
+				queryset=EndPoint.objects.filter(
+					scan_history=self.scan_history
+				).prefetch_related('techs'),
+			),
+			Prefetch(
+				'vulnerability_set',
+				queryset=Vulnerability.objects.filter(
+					scan_history=self.scan_history
+				),
+			),
 		)
 
 		for subdomain in subdomains:
 			self._process_subdomain(subdomain)
 
 	def _process_subdomain(self, subdomain):
-		endpoints = EndPoint.objects.filter(
-			scan_history=self.scan_history, subdomain=subdomain
-		).prefetch_related('techs')
-		
-		screenshots = Screenshot.objects.filter(
-			scan_history=self.scan_history, subdomain=subdomain
-		)
-
-		vulns = Vulnerability.objects.filter(
-			scan_history=self.scan_history, subdomain=subdomain
-		)
+		endpoints = subdomain.endpoint_set.all()
+		screenshots = subdomain.screenshots.all()
+		vulns = subdomain.vulnerability_set.all()
 
 		# Group by host/endpoint base URL or just create one primary exposure per Subdomain
 		# For a robust MVP, we will create an Exposure for the Subdomain itself,
@@ -72,7 +79,19 @@ class ExposureCorrelationEngine:
 				vulns.update(exposure=exposure)
 				
 		except Exception as e:
-			logger.error(f"Error correlating exposure for subdomain {subdomain.name}: {e}")
+			logger.error("Error correlating exposure for subdomain %s: %s", subdomain.name, e, exc_info=True)
+
+	@staticmethod
+	def _has_keyword(text_corpus: str, keywords: list[str]) -> bool:
+		return any(kw in text_corpus for kw in keywords)
+
+	@staticmethod
+	def _has_tech(tech_corpus: set[str], candidates: list[str]) -> bool:
+		return any(
+			candidate in tech
+			for tech in tech_corpus
+			for candidate in candidates
+		)
 
 	def _classify_exposure(self, subdomain, endpoints, screenshots):
 		"""
@@ -83,7 +102,6 @@ class ExposureCorrelationEngine:
 		tech_corpus = []
 		ports = set()
 
-		# Collect from Subdomain
 		if subdomain.page_title:
 			text_corpus += f" {subdomain.page_title.lower()}"
 		for tech in subdomain.technologies.all():
@@ -92,7 +110,6 @@ class ExposureCorrelationEngine:
 			for port in ip.ports.all():
 				ports.add(port.number)
 
-		# Collect from Endpoints
 		for ep in endpoints:
 			if ep.page_title:
 				text_corpus += f" {ep.page_title.lower()}"
@@ -101,152 +118,136 @@ class ExposureCorrelationEngine:
 			for tech in ep.techs.all():
 				tech_corpus.append(tech.name.lower())
 
-		# Collect from Screenshots
 		for sc in screenshots:
 			if sc.title:
 				text_corpus += f" {sc.title.lower()}"
 
 		tech_corpus = set(tech_corpus)
+		has_kw = self._has_keyword
+		has_tech = self._has_tech
 		classifications = []
 
 		# 1. Access & Security
-		vpn_keywords = ['vpn', 'fortigate', 'pulse secure', 'cisco anyconnect', 'globalprotect', 'citrix gateway']
-		if any(kw in text_corpus for kw in vpn_keywords) or any('vpn' in tech for tech in tech_corpus):
+		if has_kw(text_corpus, ['vpn', 'fortigate', 'pulse secure', 'cisco anyconnect', 'globalprotect', 'citrix gateway']) or has_tech(tech_corpus, ['vpn']):
 			classifications.append("VPN Gateway")
-			
-		ra_ports = {22, 3389, 5900, 23, 5985}
-		ra_techs = ['ssh', 'rdp', 'vnc']
-		if ports.intersection(ra_ports) or any(t in tech for t in ra_techs for tech in tech_corpus):
+
+		if ports.intersection({22, 3389, 5900, 23, 5985}) or has_tech(tech_corpus, ['ssh', 'rdp', 'vnc']):
 			classifications.append("Remote Access Protocol")
-			
-		sso_keywords = ['sso', 'okta', 'keycloak', 'auth0', 'saml', 'single sign-on']
-		if any(kw in text_corpus for kw in sso_keywords):
+
+		if has_kw(text_corpus, ['sso', 'okta', 'keycloak', 'auth0', 'saml', 'single sign-on']):
 			classifications.append("Identity & SSO")
-			
-		waf_techs = ['cloudflare', 'f5', 'imperva', 'akamai', 'fastly']
-		if any(t in tech for t in waf_techs for tech in tech_corpus):
+
+		if has_tech(tech_corpus, ['cloudflare', 'f5', 'imperva', 'akamai', 'fastly']):
 			classifications.append("WAF / Edge")
 
 		# 2. Infrastructure & DevOps
-		cicd_keywords = ['jenkins', 'gitlab', 'bamboo', 'teamcity', 'github actions']
-		if any(kw in text_corpus for kw in cicd_keywords) or any('jenkins' in tech for tech in tech_corpus):
+		if has_kw(text_corpus, ['jenkins', 'gitlab', 'bamboo', 'teamcity', 'github actions']) or has_tech(tech_corpus, ['jenkins']):
 			classifications.append("CI/CD & Automation")
-			
-		container_keywords = ['kubernetes', 'rancher', 'portainer']
-		container_techs = ['docker', 'kubernetes']
-		if any(kw in text_corpus for kw in container_keywords) or any(t in tech for t in container_techs for tech in tech_corpus):
+
+		if has_kw(text_corpus, ['kubernetes', 'rancher', 'portainer']) or has_tech(tech_corpus, ['docker', 'kubernetes']):
 			classifications.append("Container / Orchestration")
-			
-		repo_keywords = ['bitbucket', 'gitea', 'svn', 'gitlab']
-		if any(kw in text_corpus for kw in repo_keywords):
+
+		if has_kw(text_corpus, ['bitbucket', 'gitea', 'svn', 'gitlab']):
 			classifications.append("Source Code Repository")
-			
-		cloud_keywords = ['s3', 'minio', 'azure blob', 'bucket']
-		if any(kw in text_corpus for kw in cloud_keywords):
+
+		if has_kw(text_corpus, ['s3', 'minio', 'azure blob', 'bucket']):
 			classifications.append("Cloud Storage")
 
 		# 3. Data & Storage
-		db_ports = {3306, 5432, 27017, 1433, 1521, 9200, 6379, 11211}
-		db_techs = ['mysql', 'postgres', 'mongodb', 'redis', 'elasticsearch', 'mssql', 'oracle']
-		if ports.intersection(db_ports) or any(db in tech for db in db_techs for tech in tech_corpus):
+		if ports.intersection({3306, 5432, 27017, 1433, 1521, 9200, 6379, 11211}) or has_tech(tech_corpus, ['mysql', 'postgres', 'mongodb', 'redis', 'elasticsearch', 'mssql', 'oracle']):
 			classifications.append("Database")
-			
-		fs_ports = {21, 445, 2049, 139}
-		fs_techs = ['ftp', 'smb', 'nfs', 'owncloud', 'nextcloud']
-		if ports.intersection(fs_ports) or any(fs in tech for fs in fs_techs for tech in tech_corpus):
+
+		if ports.intersection({21, 445, 2049, 139}) or has_tech(tech_corpus, ['ftp', 'smb', 'nfs', 'owncloud', 'nextcloud']):
 			classifications.append("File Sharing")
-			
-		mq_ports = {5672, 9092}
-		mq_techs = ['rabbitmq', 'kafka']
-		if ports.intersection(mq_ports) or any(mq in tech for mq in mq_techs for tech in tech_corpus):
+
+		if ports.intersection({5672, 9092}) or has_tech(tech_corpus, ['rabbitmq', 'kafka']):
 			classifications.append("Message Queue")
 
 		# 4. Services
-		email_ports = {25, 110, 143, 465, 587, 993, 995}
-		email_techs = ['exchange', 'postfix', 'zimbra']
-		if ports.intersection(email_ports) or any(e in tech for e in email_techs for tech in tech_corpus):
+		if ports.intersection({25, 110, 143, 465, 587, 993, 995}) or has_tech(tech_corpus, ['exchange', 'postfix', 'zimbra']):
 			classifications.append("Email Server")
-			
-		voip_ports = {5060, 5061}
-		voip_techs = ['sip', 'asterisk']
-		if ports.intersection(voip_ports) or any(v in tech for v in voip_techs for tech in tech_corpus):
+
+		if ports.intersection({5060, 5061}) or has_tech(tech_corpus, ['sip', 'asterisk']):
 			classifications.append("VoIP / Communication")
 
 		# 5. Web Applications
-		admin_keywords = ['admin', 'dashboard', 'control panel', 'login', 'cpanel', 'plesk']
-		if any(kw in text_corpus for kw in admin_keywords):
+		if has_kw(text_corpus, ['admin', 'dashboard', 'control panel', 'cpanel', 'plesk']):
 			classifications.append("Admin Portal")
-			
-		api_keywords = ['api', 'graphql', 'swagger', 'openapi']
-		if any(kw in text_corpus for kw in api_keywords) or any(kw in tech for kw in api_keywords for tech in tech_corpus):
+
+		if has_kw(text_corpus, ['graphql', 'swagger', 'openapi']) or has_tech(tech_corpus, ['graphql', 'swagger', 'openapi']):
 			classifications.append("API Endpoint")
-			
-		staging_keywords = ['dev', 'staging', 'test', 'uat', 'sandbox']
-		if any(kw in text_corpus for kw in staging_keywords):
+
+		# Word-boundary prefixes to avoid false positives on e.g. "developer", "attestation"
+		subdomain_name = subdomain.name.lower() if subdomain.name else ""
+		staging_prefixes = ['dev.', 'staging.', 'test.', 'uat.', 'sandbox.', 'stg.', 'qa.']
+		if any(subdomain_name.startswith(p) or f".{p}" in subdomain_name for p in staging_prefixes):
 			classifications.append("Staging / Dev")
-			
-		web_ports = {80, 443, 8080, 8443}
-		if "Admin Portal" not in classifications and "API Endpoint" not in classifications and "Staging / Dev" not in classifications:
+
+		if not classifications:
+			web_ports = {80, 443, 8080, 8443}
 			if ports.intersection(web_ports) or tech_corpus or text_corpus.strip():
 				classifications.append("Web Application")
 
 		if not classifications:
 			classifications.append("Unclassified Asset")
-			
+
 		return classifications
 
 	def _collect_evidence(self, exposure, subdomain, endpoints, screenshots, vulns):
 		"""
-		Create ExposureEvidence records based on the underlying data.
+		Rebuild ExposureEvidence records for an exposure.
+		Deletes stale evidence and bulk-creates fresh records to avoid
+		JSONField-based get_or_create duplicates on re-scans.
 		"""
-		# Subdomain HTTP details (often from httpx)
+		ExposureEvidence.objects.filter(exposure=exposure).delete()
+
+		evidence_batch = []
+
 		if subdomain.http_status:
-			ExposureEvidence.objects.get_or_create(
+			evidence_batch.append(ExposureEvidence(
 				exposure=exposure,
 				source_tool="HTTP Probe",
-				defaults={
-					'evidence_data': {
-						'url': subdomain.http_url,
-						'status': subdomain.http_status,
-						'title': subdomain.page_title,
-						'webserver': subdomain.webserver
-					}
-				}
-			)
+				evidence_data={
+					'url': subdomain.http_url,
+					'status': subdomain.http_status,
+					'title': subdomain.page_title,
+					'webserver': subdomain.webserver,
+				},
+			))
 
-		# Endpoints (e.g., from Katana)
-		for ep in endpoints[:5]: # Limit to top 5 to avoid blowing up DB
-			ExposureEvidence.objects.get_or_create(
+		for ep in endpoints[:5]:
+			evidence_batch.append(ExposureEvidence(
 				exposure=exposure,
 				source_tool="Crawler",
 				evidence_data={
 					'url': ep.http_url,
 					'status': ep.http_status,
-					'title': ep.page_title
-				}
-			)
+					'title': ep.page_title,
+				},
+			))
 
-		# Screenshots
 		for sc in screenshots[:3]:
-			ExposureEvidence.objects.get_or_create(
+			evidence_batch.append(ExposureEvidence(
 				exposure=exposure,
 				source_tool="Screenshot",
 				evidence_data={
 					'url': sc.url,
 					'screenshot_path': sc.screenshot_path,
-					'title': sc.title
-				}
-			)
+					'title': sc.title,
+				},
+			))
 
-		# Info-level Vulnerabilities (Nuclei info templates)
-		for vuln in vulns.filter(severity=0)[:5]:
-			ExposureEvidence.objects.get_or_create(
+		for vuln in [v for v in vulns if v.severity == 0][:5]:
+			evidence_batch.append(ExposureEvidence(
 				exposure=exposure,
 				source_tool="Vulnerability Scanner (Info)",
 				evidence_data={
 					'name': vuln.name,
 					'template': vuln.template_id,
-					'matched_at': vuln.http_url
-				}
-			)
+					'matched_at': vuln.http_url,
+				},
+			))
+
+		if evidence_batch:
+			ExposureEvidence.objects.bulk_create(evidence_batch)
 

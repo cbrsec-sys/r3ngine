@@ -1565,8 +1565,8 @@ class ExposureSerializer(serializers.ModelSerializer):
 		depth = 2
 
 	def get_discovered_date(self, obj):
-		if obj.discovered_date:
-			return obj.discovered_date.strftime("%b %d, %Y %H:%M")
+		if obj.first_seen:
+			return obj.first_seen.strftime("%b %d, %Y %H:%M")
 		return None
 
 	def get_scan_history(self, obj):

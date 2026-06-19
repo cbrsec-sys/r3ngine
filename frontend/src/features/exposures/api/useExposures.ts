@@ -14,7 +14,7 @@ export const useMutateExposureStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status }: { id: number; status: 'open' | 'resolved' | 'false_positive' }) => 
+    mutationFn: ({ id, status }: { id: number; status: 'open' | 'verified' | 'false_positive' | 'remediated' }) =>
       updateExposureStatus(id, status),
     onSuccess: () => {
       // Invalidate and refetch exposures

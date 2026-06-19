@@ -1,15 +1,11 @@
 import type { Vulnerability } from '@/features/vulnerabilities/types';
-import type { Subdomain } from '@/features/subdomains/types';
-import type { Endpoint } from '@/features/endpoints/types';
 
 export interface ExposureEvidence {
   id: number;
   exposure: number;
-  evidence_type: 'port' | 'header' | 'tag' | 'cpe';
-  evidence_value: string;
-  endpoint?: Endpoint;
-  subdomain?: Subdomain;
-  created_at: string;
+  source_tool: string;
+  evidence_data: Record<string, unknown>;
+  timestamp: string;
 }
 
 export interface Exposure {
@@ -17,7 +13,7 @@ export interface Exposure {
   scan_history: number;
   type: string[];
   risk_score: number;
-  status: 'open' | 'resolved' | 'false_positive';
+  status: 'open' | 'verified' | 'false_positive' | 'remediated';
   evidence: ExposureEvidence[];
   vulnerabilities: Vulnerability[];
   created_at: string;

@@ -150,6 +150,7 @@ from reNgine.temporal_activities import (
 
     # Tier 7: Post-Processing & Intel
     correlate_vulnerabilities_activity,
+    correlate_exposures_activity,
     enrich_scan_cves_activity,
     calculate_risk_scores_activity,
     generate_impact_assessment_activity,
@@ -479,6 +480,7 @@ class Command(BaseCommand):
 
                 # Tier 7
                 correlate_vulnerabilities_activity,
+                correlate_exposures_activity,
                 enrich_scan_cves_activity,
                 calculate_risk_scores_activity,
                 generate_impact_assessment_activity,

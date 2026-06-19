@@ -16,7 +16,7 @@ from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
 from django.db.models.functions import Lower
-from rest_framework import viewsets, serializers, status
+from rest_framework import mixins, viewsets, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_datatables.pagination import DatatablesPageNumberPagination
 from rest_framework.response import Response
@@ -5198,7 +5198,12 @@ class ExposurePagination(PageNumberPagination):
 	page_size_query_param = 'length'
 	max_page_size = 200
 
-class ExposureViewSet(viewsets.ModelViewSet):
+class ExposureViewSet(
+	mixins.ListModelMixin,
+	mixins.RetrieveModelMixin,
+	mixins.UpdateModelMixin,
+	viewsets.GenericViewSet,
+):
 	pagination_class = ExposurePagination
 	permission_classes = [IsPenetrationTester]
 	serializer_class = ExposureSerializer
@@ -5212,24 +5217,35 @@ class ExposureViewSet(viewsets.ModelViewSet):
 
 		if project:
 			qs = Exposure.objects.filter(scan_history__domain__project__slug=project)
-		else:
-			qs = Exposure.objects.all()
-
-		if scan_id:
-			qs = qs.filter(scan_history__id=scan_id)
 		elif target_id:
-			qs = qs.filter(scan_history__domain__id=target_id)
+			qs = Exposure.objects.filter(scan_history__domain__id=target_id)
+		elif scan_id:
+			qs = Exposure.objects.filter(scan_history__id=scan_id)
+		else:
+			return Exposure.objects.none()
 
-		status = req.query_params.get('status')
-		if status:
-			qs = qs.filter(status=status)
-		
+		if scan_id and project:
+			qs = qs.filter(scan_history__id=scan_id)
+
+		exposure_status = req.query_params.get('status')
+		if exposure_status:
+			qs = qs.filter(status=exposure_status)
+
 		exp_type = req.query_params.get('type')
 		if exp_type:
-			qs = qs.filter(type=exp_type)
+			qs = qs.filter(type__contains=[exp_type])
 
 		self.queryset = qs.distinct().order_by('-risk_score')
 		return self.queryset
+
+	def partial_update(self, request, *args, **kwargs):
+		allowed_fields = {'status'}
+		if set(request.data.keys()) - allowed_fields:
+			return Response(
+				{'detail': 'Only status updates are allowed.'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+		return super().partial_update(request, *args, **kwargs)
 
 class ReportSettingsAPIView(APIView):
 	permission_classes = [HasPermission]

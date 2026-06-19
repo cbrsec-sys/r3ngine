@@ -2,7 +2,6 @@ import React from 'react';
 import { Box, Typography, Button, Chip, Stack } from '@mui/material';
 import type { Exposure } from '../types';
 import { useThemeTokens } from '@/theme/useThemeTokens';
-import { useSemanticColors } from '@/theme/useSemanticColors';
 import { useMutateExposureStatus } from '../api/useExposures';
 
 interface ExposureCardProps {
@@ -12,12 +11,11 @@ interface ExposureCardProps {
 
 export const ExposureCard: React.FC<ExposureCardProps> = ({ exposure, onClick }) => {
   const { tokens } = useThemeTokens();
-  const semantic = useSemanticColors();
   const mutateStatus = useMutateExposureStatus();
 
   const handleResolve = (e: React.MouseEvent) => {
     e.stopPropagation();
-    mutateStatus.mutate({ id: exposure.id, status: 'resolved' });
+    mutateStatus.mutate({ id: exposure.id, status: 'remediated' });
   };
 
   const handleFalsePositive = (e: React.MouseEvent) => {
