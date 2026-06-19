@@ -1294,7 +1294,10 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
     """
     from reNgine.tech_mapping import get_nuclei_tags_from_techs
     from reNgine.nuclei_batch_utils import count_templates_for_tag, build_tag_batches, get_template_counts_for_tags
-    from reNgine.definitions import NUCLEI_MAX_TEMPLATES_PER_BATCH, NUCLEI_DEFAULT_TEMPLATES_PATH
+    from reNgine.definitions import (
+        NUCLEI_MAX_TEMPLATES_PER_BATCH, NUCLEI_DEFAULT_TEMPLATES_PATH,
+        NUCLEI_TEMPLATE, NUCLEI_CUSTOM_TEMPLATE, ALL
+    )
 
     scan_id = ctx.get('scan_history_id')
     subdomain_id = ctx.get('subdomain_id')
@@ -1320,8 +1323,28 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
     tech_tags = get_nuclei_tags_from_techs(list(all_techs)) if all_techs else []
     merged = sorted(set(user_tags) | set(tech_tags))
 
+    # Build the full list of template directories to scan for tag counts
+    template_dirs = []
+    nuclei_templates = nuclei_cfg.get(NUCLEI_TEMPLATE)
+    custom_nuclei_templates = nuclei_cfg.get(NUCLEI_CUSTOM_TEMPLATE)
+
+    if not (nuclei_templates or custom_nuclei_templates):
+        template_dirs.append(NUCLEI_DEFAULT_TEMPLATES_PATH)
+
+    if nuclei_templates:
+        if ALL in nuclei_templates:
+            template_dirs.append(NUCLEI_DEFAULT_TEMPLATES_PATH)
+        else:
+            template_dirs.extend(nuclei_templates)
+
+    if custom_nuclei_templates:
+        for elem in custom_nuclei_templates:
+            if str(elem).endswith(('.yaml', '.yml')) or str(elem).endswith('/'):
+                template_dirs.append(str(elem))
+            else:
+                template_dirs.append(f'{str(elem)}.yaml')
+
     # Count templates per tag so batches are bounded by template count not tag count.
-    template_dirs = [NUCLEI_DEFAULT_TEMPLATES_PATH]
     tag_counts = get_template_counts_for_tags(merged, template_dirs)
     for tag in merged:
         logger.log_line(
