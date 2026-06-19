@@ -11,7 +11,9 @@ import {
   Tooltip,
   Menu,
   MenuItem,
-  Chip
+  Chip,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   Search,
@@ -19,30 +21,69 @@ import {
   Download,
   Filter,
   LayoutGrid,
-  ChevronDown
+  ChevronDown,
+  Trash2,
+  ExternalLink
 } from 'lucide-react';
 
-import { useEndpoints } from '../../endpoints/api';
+import { useEndpoints, useDeleteEndpoints } from '../../endpoints/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { copyToClipboard } from '../../endpoints/utils/copy';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface EndpointsTabProps {
   projectSlug: string;
   scanId?: number;
   matchedGfCounts?: Array<{ matched_gf_patterns: string; count: number }>;
   targetId?: number;
+  initialAlive?: boolean;
 }
 
-export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId, matchedGfCounts, targetId }) => {
-  const { tokens, isLight } = useThemeTokens();
+export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId, matchedGfCounts, targetId, initialAlive }) => {
+  const { tokens, isLight, theme } = useThemeTokens();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [selectedGfPattern, setSelectedGfPattern] = useState<string | undefined>(undefined);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [isAliveFilter, setIsAliveFilter] = useState(initialAlive || false);
 
-  const { data, isLoading } = useEndpoints(projectSlug, page, activeSearch, scanId, selectedGfPattern, targetId);
+  // Actions state
+  const [selectedEndpoints, setSelectedEndpoints] = useState<number[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({
+    title: '',
+    message: '',
+    type: 'danger' as 'danger' | 'warning' | 'info',
+    onConfirm: () => {}
+  });
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' | 'warning' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  const showNotification = (message: string, severity: 'success' | 'error' | 'info' | 'warning' = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const deleteMutation = useDeleteEndpoints(projectSlug);
+
+  const { data, isLoading } = useEndpoints(
+    projectSlug,
+    page,
+    activeSearch,
+    scanId,
+    selectedGfPattern,
+    targetId,
+    isAliveFilter ? '200' : undefined
+  );
+
+  // Reset selection on query/page changes
+  React.useEffect(() => {
+    setSelectedEndpoints([]);
+  }, [page, activeSearch, selectedGfPattern, isAliveFilter]);
 
   const handleSearch = () => {
     setPage(1);
@@ -61,6 +102,86 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
     setPage(1);
     setSelectedGfPattern(pattern);
     handleMenuClose();
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedEndpoints.length === data?.results.length) {
+      setSelectedEndpoints([]);
+    } else {
+      setSelectedEndpoints(data?.results.map(e => e.id) || []);
+    }
+  };
+
+  const toggleSelectEndpoint = (id: number) => {
+    setSelectedEndpoints(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkCopy = () => {
+    if (selectedEndpoints.length === 0) return;
+    const selectedUrls = data?.results
+      .filter(e => selectedEndpoints.includes(e.id))
+      .map(e => e.http_url)
+      .join('\n');
+    if (selectedUrls) {
+      copyToClipboard(selectedUrls);
+      showNotification(`${selectedEndpoints.length} URL(s) copied to clipboard`);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedEndpoints.length === 0) return;
+    setConfirmConfig({
+      title: 'BULK DELETE ENDPOINTS',
+      message: `Are you sure you want to delete ${selectedEndpoints.length} endpoints? This operation is permanent.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteMutation.mutateAsync(selectedEndpoints);
+          showNotification(`${selectedEndpoints.length} endpoint(s) deleted successfully`);
+          setSelectedEndpoints([]);
+        } catch (error: any) {
+          showNotification(error.message || 'Failed to delete endpoints', 'error');
+        }
+      }
+    });
+    setConfirmOpen(true);
+  };
+
+  const handleSingleDelete = (id: number) => {
+    setConfirmConfig({
+      title: 'DELETE ENDPOINT',
+      message: 'Are you sure you want to delete this endpoint? This operation is permanent.',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteMutation.mutateAsync([id]);
+          showNotification('Endpoint deleted successfully');
+          setSelectedEndpoints(prev => prev.filter(i => i !== id));
+        } catch (error: any) {
+          showNotification(error.message || 'Failed to delete endpoint', 'error');
+        }
+      }
+    });
+    setConfirmOpen(true);
+  };
+
+  const handleExportVisible = () => {
+    if (!data?.results || data.results.length === 0) {
+      showNotification('No endpoints to export', 'warning');
+      return;
+    }
+    const urls = data.results.map(e => e.http_url).join('\n');
+    const blob = new Blob([urls], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `endpoints_${projectSlug}_page_${page}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showNotification('Endpoints exported successfully');
   };
 
   const getStatusColor = (status: number) => {
@@ -114,6 +235,28 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
             }}
           >
             SEARCH
+          </Button>
+          <Button
+            onClick={() => {
+              setIsAliveFilter(prev => !prev);
+              setPage(1);
+            }}
+            disabled={isLoading}
+            sx={{
+              bgcolor: isAliveFilter ? `${tokens.accent.primary}33` : 'transparent',
+              color: isAliveFilter ? tokens.accent.primary : 'text.primary',
+              opacity: isLoading ? 0.6 : 1,
+              px: 3,
+              borderRadius: 0,
+              fontWeight: 800,
+              fontSize: '11px',
+              letterSpacing: 2,
+              fontFamily: 'Orbitron',
+              borderLeft: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : `${tokens.accent.primary}33`}`,
+              '&:hover': { bgcolor: `${tokens.accent.primary}26` }
+            }}
+          >
+            {isLoading ? 'LOADING...' : isAliveFilter ? 'ALIVE [ON]' : 'ALIVE'}
           </Button>
         </Box>
 
@@ -189,12 +332,56 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               </Typography>
             </Box>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {selectedEndpoints.length > 0 && (
+              <Stack direction="row" spacing={1} sx={{ mr: 1 }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={handleBulkCopy}
+                  startIcon={<Copy size={12} />}
+                  sx={{
+                    bgcolor: `${tokens.accent.primary}15`,
+                    color: tokens.accent.primary,
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    border: `1px solid ${tokens.accent.primary}33`,
+                    '&:hover': { bgcolor: `${tokens.accent.primary}33` }
+                  }}
+                >
+                  COPY SELECTED ({selectedEndpoints.length})
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={handleBulkDelete}
+                  startIcon={<Trash2 size={12} />}
+                  disabled={deleteMutation.isPending}
+                  sx={{
+                    bgcolor: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 0, 60, 0.1)',
+                    color: tokens.accent.error,
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    border: '1px solid',
+                    borderColor: 'error.main',
+                    '&:hover': { bgcolor: isLight ? 'rgba(239, 68, 68, 0.16)' : 'rgba(255, 0, 60, 0.2)' }
+                  }}
+                >
+                  {deleteMutation.isPending ? 'DELETING...' : `DELETE SELECTED (${selectedEndpoints.length})`}
+                </Button>
+              </Stack>
+            )}
             <Tooltip title="Refresh">
               <IconButton size="small" sx={{ color: 'text.secondary', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}><Filter size={16} /></IconButton>
             </Tooltip>
-            <Tooltip title="Export Data">
-              <IconButton size="small" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15`, border: `1px solid ${tokens.accent.primary}33`, borderRadius: 1 }}><Download size={16} /></IconButton>
+            <Tooltip title="Export URLs">
+              <IconButton
+                size="small"
+                onClick={handleExportVisible}
+                sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15`, border: `1px solid ${tokens.accent.primary}33`, borderRadius: 1 }}
+              >
+                <Download size={16} />
+              </IconButton>
             </Tooltip>
           </Box>
         </Box>
@@ -213,22 +400,52 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                 borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'}`,
                 backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
               }}>
+                <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedEndpoints.length === data?.results.length && data?.results.length > 0}
+                    onChange={toggleSelectAll}
+                    style={{ width: '14px', height: '14px', accentColor: tokens.accent.primary, cursor: 'pointer', opacity: 0.6 }}
+                  />
+                </th>
                 <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>HTTP URL</th>
                 <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
                 <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</Box>
                 <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TAGS</Box>
                 <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>INFO</Box>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron', textAlign: 'right' }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '40px', textAlign: 'center' }}>
+                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center' }}>
                     <CircularProgress size={24} sx={{ color: tokens.accent.primary }} />
                   </td>
                 </tr>
               ) : data?.results.map((endpoint) => (
-                <tr key={endpoint.id} style={{ borderBottom: 1, borderColor: 'divider', transition: 'background 0.2s' }}>
+                <tr key={endpoint.id} style={{
+                  borderBottom: '1px solid',
+                  borderColor: theme.palette.divider,
+                  backgroundColor: selectedEndpoints.includes(endpoint.id)
+                    ? (isLight ? 'rgba(14, 165, 233, 0.04)' : 'rgba(0, 243, 255, 0.02)')
+                    : 'transparent',
+                  transition: 'background 0.2s'
+                }}>
+                  <td style={{ padding: '16px', verticalAlign: 'top', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedEndpoints.includes(endpoint.id)}
+                      onChange={() => toggleSelectEndpoint(endpoint.id)}
+                      style={{
+                        width: '14px',
+                        height: '14px',
+                        accentColor: tokens.accent.primary,
+                        cursor: 'pointer',
+                        opacity: 0.6
+                      }}
+                    />
+                  </td>
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -242,13 +459,6 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                         }} component="a" href={endpoint.http_url} target="_blank">
                           {endpoint.http_url}
                         </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => copyToClipboard(endpoint.http_url)}
-                          sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: tokens.accent.primary } }}
-                        >
-                          <Copy size={12} />
-                        </IconButton>
                       </Box>
 
                       {/* Tech Badges */}
@@ -312,12 +522,47 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                       </Typography>
                     </Stack>
                   </Box>
-
+                  <td style={{ padding: '16px', verticalAlign: 'top', textAlign: 'right' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                      <Tooltip title="Copy URL">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            copyToClipboard(endpoint.http_url);
+                            showNotification('Copied URL to clipboard');
+                          }}
+                          sx={{ color: 'text.secondary', '&:hover': { color: tokens.accent.primary } }}
+                        >
+                          <Copy size={14} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Open in browser">
+                        <IconButton
+                          size="small"
+                          component="a"
+                          href={endpoint.http_url}
+                          target="_blank"
+                          sx={{ color: 'text.secondary', '&:hover': { color: tokens.accent.primary } }}
+                        >
+                          <ExternalLink size={14} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Endpoint">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleSingleDelete(endpoint.id)}
+                          sx={{ color: 'text.secondary', '&:hover': { color: tokens.accent.error } }}
+                        >
+                          <Trash2 size={14} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </td>
                 </tr>
               ))}
               {(!isLoading && data?.results.length === 0) && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '60px', textAlign: 'center' }}>
+                  <td colSpan={7} style={{ padding: '60px', textAlign: 'center' }}>
                     <Typography sx={{ color: 'text.disabled', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>ZERO ENDPOINTS DETECTED</Typography>
                   </td>
                 </tr>
@@ -352,6 +597,35 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
           />
         </Box>
       </TacticalPanel>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setConfirmOpen(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+      />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', fontWeight: 700, fontFamily: 'Orbitron', fontSize: '11px', letterSpacing: 0.5 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
