@@ -5,9 +5,11 @@ import type { VulnerabilityResponse } from '../types';
 
 export interface VulnerabilityFilters {
   severity?: string;
+  exclude_severity?: string;
   validation_status?: string;
   open_status?: string;
   source?: string;
+  exclude_source?: string;
 }
 
 export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, targetId?: number, filters?: VulnerabilityFilters, pageSize = 10) => {
@@ -33,9 +35,11 @@ export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = 
       
       if (filters) {
         if (filters.severity) url.searchParams.append('severity', filters.severity);
+        if (filters.exclude_severity) url.searchParams.append('exclude_severity', filters.exclude_severity);
         if (filters.validation_status) url.searchParams.append('validation_status', filters.validation_status);
         if (filters.open_status) url.searchParams.append('open_status', filters.open_status);
         if (filters.source) url.searchParams.append('source', filters.source);
+        if (filters.exclude_source) url.searchParams.append('exclude_source', filters.exclude_source);
       }
       
       url.searchParams.append('format', 'json');

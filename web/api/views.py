@@ -4952,9 +4952,11 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		scan_id = req.query_params.get('scan_history')
 		domain = req.query_params.get('domain')
 		severity = req.query_params.get('severity')
+		exclude_severity = req.query_params.get('exclude_severity')
 		validation_status = req.query_params.get('validation_status')
 		open_status = req.query_params.get('open_status')
 		source = req.query_params.get('source')
+		exclude_source = req.query_params.get('exclude_source')
 		subdomain_id = req.query_params.get('subdomain_id')
 		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
@@ -4995,6 +4997,11 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 			severity_values = self._normalize_severity_filters(severity)
 			if severity_values:
 				qs = qs.filter(severity__in=severity_values)
+		if exclude_severity:
+			# Filter out (exclude) vulnerabilities matching these severity levels
+			exclude_severity_values = self._normalize_severity_filters(exclude_severity)
+			if exclude_severity_values:
+				qs = qs.exclude(severity__in=exclude_severity_values)
 		if validation_status:
 			qs = qs.filter(validation_status__iexact=validation_status)
 		if open_status is not None:
@@ -5009,6 +5016,14 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 				for source_value in source_values:
 					source_query |= Q(source__iexact=source_value)
 				qs = qs.filter(source_query)
+		if exclude_source:
+			# Filter out (exclude) vulnerabilities matching these scanner source tools
+			exclude_source_values = self._normalize_csv_filters(exclude_source)
+			if exclude_source_values:
+				exclude_source_query = Q()
+				for source_value in exclude_source_values:
+					exclude_source_query |= Q(source__iexact=source_value)
+				qs = qs.exclude(exclude_source_query)
 		if subdomain_id:
 			qs = qs.filter(subdomain__id=subdomain_id)
 		self.queryset = qs
