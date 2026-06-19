@@ -31,6 +31,12 @@ if [ -f "/usr/src/github/Sublist3r/sublist3r.py" ]; then
   sed -i "s/token = csrf_regex.findall(resp)\[0\]/token = csrf_regex.findall(resp)[0] if csrf_regex.findall(resp) else ''/g" /usr/src/github/Sublist3r/sublist3r.py
 fi
 
+# Temporary fix for ctfr invalid escape sequences in Python 3.12
+if [ -f "/usr/src/github/ctfr/ctfr.py" ]; then
+  sed -i "s/b = '''/b = r'''/g" /usr/src/github/ctfr/ctfr.py
+  sed -i "s/'.*www\\\\.'/r'.*www\\\\.'/g" /usr/src/github/ctfr/ctfr.py
+fi
+
 
 # update whatportis
 yes | whatportis --update
