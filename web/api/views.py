@@ -2494,21 +2494,39 @@ class InitiateSubTask(APIView):
 			if single:
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
+
+		from concurrent.futures import ThreadPoolExecutor
+		from django.db import connections
+
+		def _run_single_subscan(sub_id):
+			"""Run a single subscan launch inside a worker thread, ensuring DB connection cleanup."""
+			try:
+				logger.info(f'Running subscans {scan_types} on subdomain "{sub_id}" (concurrent) ...')
+				ctx = {
+					'scan_history_id': None,
+					'subdomain_id': sub_id,
+					'scan_type': scan_types,
+					'engine_id': engine_id,
+					'selected_plugin_slugs': selected_plugins,
+					'task_queue': task_queue or worker_name,
+				}
+				return sub_id, initiate_subscan_temporal(**ctx)
+			except Exception as ex:
+				logger.exception(f'Error starting concurrent subscan for subdomain {sub_id}: {ex}')
+				return sub_id, {'success': False, 'error': str(ex)}
+			finally:
+				# Close all connections created or cached for this thread to prevent leaks
+				connections.close_all()
+
+		max_workers = min(len(subdomain_ids), 15)
+		with ThreadPoolExecutor(max_workers=max_workers) as executor:
+			results = list(executor.map(_run_single_subscan, subdomain_ids))
+
 		errors = []
-		for subdomain_id in subdomain_ids:
-			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
-			ctx = {
-				'scan_history_id': None,
-				'subdomain_id': subdomain_id,
-				'scan_type': scan_types,
-				'engine_id': engine_id,
-				'selected_plugin_slugs': selected_plugins,
-				'task_queue': task_queue or worker_name,
-			}
-			res = initiate_subscan_temporal(**ctx)
+		for sub_id, res in results:
 			if not res.get('success'):
 				errors.append({
-					'subdomain_id': subdomain_id,
+					'subdomain_id': sub_id,
 					'error': res.get('error', 'Failed to initiate subscan'),
 				})
 
