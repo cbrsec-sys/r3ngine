@@ -16,7 +16,7 @@ class TestParamDiscoveryWiresUrlCollector(TestCase):
             'proxy': None,
         }
 
-        with patch('reNgine.cpde.js_collector.get_js_urls_from_katana_output', return_value=[]), \
+        with patch('reNgine.cpde.js_collector.get_js_urls_from_results_dir', return_value=[]), \
              patch('reNgine.cpde.js_collector.download_js_files', return_value=[]), \
              patch('reNgine.cpde.ast_analyzer.extract_from_js_files', return_value=[]), \
              patch('reNgine.cpde_tasks.has_openapi_spec', return_value=False), \
@@ -54,7 +54,7 @@ class TestParamDiscoveryWiresUrlCollector(TestCase):
             'context': 'arjun:GET', 'is_auth_related': False,
         }
 
-        with patch('reNgine.cpde.js_collector.get_js_urls_from_katana_output', return_value=[]), \
+        with patch('reNgine.cpde.js_collector.get_js_urls_from_results_dir', return_value=[]), \
              patch('reNgine.cpde.js_collector.download_js_files', return_value=[]), \
              patch('reNgine.cpde.ast_analyzer.extract_from_js_files', return_value=[]), \
              patch('reNgine.cpde_tasks.has_openapi_spec', return_value=False), \
