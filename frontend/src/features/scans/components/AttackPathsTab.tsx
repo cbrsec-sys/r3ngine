@@ -42,6 +42,7 @@ import { TacticalPanel } from '../../../components/TacticalPanel';
 import { Bot, Brain } from 'lucide-react';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getSeverityColor } from '../../../theme/semanticColors';
+import { AttackTreeViewer } from './AttackTreeViewer';
 
 const RISK_LABEL: Record<string, string> = {
   critical: 'CRITICAL',
@@ -699,6 +700,10 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
           </Typography>
           
           <AttackPathTimeline steps={path.steps} projectSlug={projectSlug} />
+          
+          {path.steps.length > 0 && scanId && (
+            <AttackTreeViewer scanId={scanId} targetId={path.steps[path.steps.length - 1].to} />
+          )}
         </Box>
       </Collapse>
     </Box>
