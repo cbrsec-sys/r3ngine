@@ -186,3 +186,61 @@ class TestGatherNucleiTagsActivity(TestCase):
 
         self.assertEqual(result['tags'], [])
         self.assertEqual(result['batches'], [])
+
+    @patch('reNgine.nuclei_batch_utils.subprocess.run')
+    def test_null_max_templates_per_batch_uses_default(self, mock_run):
+        """max_templates_per_batch: null in YAML must not crash GatherNucleiTagsActivity."""
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ''
+
+        with patch('reNgine.temporal_activities.Subdomain') as mock_sub:
+            mock_qs = MagicMock()
+            mock_qs.__iter__ = MagicMock(return_value=iter([]))
+            mock_sub.objects.filter.return_value = mock_qs
+
+            from reNgine.temporal_activities import gather_nuclei_tags_activity
+            ctx = {
+                'scan_history_id': 1,
+                'yaml_configuration': {
+                    'vulnerability_scan': {
+                        'nuclei': {
+                            'tags': ['wordpress'],
+                            'max_templates_per_batch': None,
+                        }
+                    }
+                },
+            }
+            result = gather_nuclei_tags_activity(ctx)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn('batches', result)
+
+    @patch('reNgine.nuclei_batch_utils.subprocess.run')
+    def test_batches_never_exceed_three_tags(self, mock_run):
+        """GatherNucleiTagsActivity must never produce a batch with more than 3 tags."""
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ''
+
+        with patch('reNgine.temporal_activities.Subdomain') as mock_sub:
+            mock_qs = MagicMock()
+            mock_qs.__iter__ = MagicMock(return_value=iter([]))
+            mock_sub.objects.filter.return_value = mock_qs
+
+            from reNgine.temporal_activities import gather_nuclei_tags_activity
+            ctx = {
+                'scan_history_id': 1,
+                'yaml_configuration': {
+                    'vulnerability_scan': {
+                        'nuclei': {
+                            'tags': ['wordpress', 'apache', 'nginx', 'php', 'spring', 'jenkins'],
+                        }
+                    }
+                },
+            }
+            result = gather_nuclei_tags_activity(ctx)
+
+        for batch in result['batches']:
+            self.assertLessEqual(
+                len(batch), 3,
+                msg=f"Batch {batch} has {len(batch)} tags, exceeds max_tags=3",
+            )

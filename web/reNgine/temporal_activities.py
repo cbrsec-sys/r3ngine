@@ -1307,7 +1307,7 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
     if isinstance(user_tags, str):
         user_tags = [t.strip() for t in user_tags.split(',') if t.strip()]
 
-    max_per_batch = int(nuclei_cfg.get(NUCLEI_MAX_TEMPLATES_PER_BATCH, 100))
+    max_per_batch = int(nuclei_cfg.get(NUCLEI_MAX_TEMPLATES_PER_BATCH) or 100)
 
     qs = Subdomain.objects.filter(scan_history_id=scan_id)
     if subdomain_id:
@@ -1330,7 +1330,7 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
             "task=gather_nuclei_tags scan_id=%s tag=%s templates=%d" % (scan_id, tag, tag_counts[tag])
         )
 
-    batches = build_tag_batches(merged, tag_counts, max_per_batch=max_per_batch)
+    batches = build_tag_batches(merged, tag_counts, max_per_batch=max_per_batch, max_tags=3)
 
     activity.logger.info(
         "[GatherNucleiTagsActivity] scan_id=%s tags=%s batches=%d max_per_batch=%d",

@@ -3978,9 +3978,18 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 
 		if tech_tags:
 			# Combine user tags with tech tags
+			from reNgine.nuclei_batch_utils import build_tag_batches
 			user_tags = set(tags if isinstance(tags, list) else tags.split(',') if tags else [])
 			user_tags.update(tech_tags)
-			tags = ','.join(user_tags)
+			all_combined = sorted(user_tags)
+			batches = build_tag_batches(all_combined, {}, max_tags=3)
+			if len(batches) > 1:
+				logger.warning(
+					'nuclei_scan: %d tags detected outside Temporal batching; '
+					'running first batch of %d only. Use NucleiPlannerWorkflow for full coverage.',
+					len(all_combined), len(batches[0]),
+				)
+			tags = ','.join(batches[0]) if batches else ''
 		else:
 			tags = ','.join(tags) if isinstance(tags, list) else tags
 
