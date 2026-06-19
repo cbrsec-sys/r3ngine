@@ -1,8 +1,44 @@
+import os
 import logging
 import subprocess
 
 logger = logging.getLogger(__name__)
 
+
+def get_template_counts_for_tags(tags: list, template_dirs: list) -> dict:
+    """Fast python-based tag counting to avoid Nuclei OOM and timeouts.
+    
+    Reads the 'tags:' line from all .yaml templates and tallies counts 
+    for the requested tags. This takes ~10 seconds for 100k+ templates
+    but prevents `nuclei -tl` from exhausting memory.
+    """
+    if not tags or not template_dirs:
+        return {}
+        
+    requested_tags = set(tags)
+    tag_counts = {tag: 0 for tag in requested_tags}
+    
+    for d in template_dirs:
+        if not os.path.isdir(d):
+            continue
+        for root, _, files in os.walk(d):
+            for file in files:
+                if file.endswith('.yaml'):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                            for line in f:
+                                line = line.strip()
+                                if line.startswith('tags:'):
+                                    tags_str = line.split(':', 1)[1].strip()
+                                    file_tags = [t.strip().strip("'").strip('"') for t in tags_str.split(',')]
+                                    for t in file_tags:
+                                        if t in requested_tags:
+                                            tag_counts[t] += 1
+                                    break  # Only parse the first tags line in info block
+                    except Exception:
+                        pass
+    return tag_counts
 
 def count_templates_for_tag(tag: str, template_dirs: list) -> int:
     """Count nuclei templates matching a given tag by running ``nuclei -tl``.

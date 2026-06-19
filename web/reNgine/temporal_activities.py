@@ -1293,7 +1293,7 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
                          detected (caller falls back to unfiltered scan).
     """
     from reNgine.tech_mapping import get_nuclei_tags_from_techs
-    from reNgine.nuclei_batch_utils import count_templates_for_tag, build_tag_batches
+    from reNgine.nuclei_batch_utils import count_templates_for_tag, build_tag_batches, get_template_counts_for_tags
     from reNgine.definitions import NUCLEI_MAX_TEMPLATES_PER_BATCH, NUCLEI_DEFAULT_TEMPLATES_PATH
 
     scan_id = ctx.get('scan_history_id')
@@ -1322,12 +1322,11 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
 
     # Count templates per tag so batches are bounded by template count not tag count.
     template_dirs = [NUCLEI_DEFAULT_TEMPLATES_PATH]
-    tag_counts: dict = {}
+    tag_counts = get_template_counts_for_tags(merged, template_dirs)
     for tag in merged:
-        tag_counts[tag] = count_templates_for_tag(tag, template_dirs)
         logger.log_line(
             "[TEMPORAL]", "INFO",
-            "task=gather_nuclei_tags scan_id=%s tag=%s templates=%d" % (scan_id, tag, tag_counts[tag])
+            "task=gather_nuclei_tags scan_id=%s tag=%s templates=%d" % (scan_id, tag, tag_counts.get(tag, 0))
         )
 
     batches = build_tag_batches(merged, tag_counts, max_per_batch=max_per_batch, max_tags=3)
