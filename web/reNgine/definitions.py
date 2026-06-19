@@ -189,6 +189,7 @@ USERNAME_ANARCHY = 'username-anarchy'
 AMASS_INTEL = 'amass_intel'
 DIRSEARCH = 'dirsearch'
 RUN_DIRSEARCH = 'run_dirsearch'
+RUN_FEROXBUSTER = 'run_feroxbuster'
 
 # TLS deep audit
 ENABLE_TESTSSL = 'enable_testssl'

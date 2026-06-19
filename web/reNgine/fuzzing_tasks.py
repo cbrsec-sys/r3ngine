@@ -30,7 +30,8 @@ from reNgine.definitions import (
 	CUSTOM_HEADERS,
 	CUSTOM_HEADER,
 	FFUF_DEFAULT_WORDLIST_PATH,
-	RUN_DIRSEARCH
+	RUN_DIRSEARCH,
+	RUN_FEROXBUSTER,
 )
 from reNgine.settings import (
 	DEFAULT_ENABLE_HTTP_CRAWL,
@@ -199,6 +200,78 @@ def _flush_ds_batch(batch, dirscan_ds, ctx, scan):
 		dirscan_ds.directory_files.add(*dfiles)
 
 
+def _flush_ferox_batch(batch, dirscan, ctx, scan):
+	"""Persist a batch of feroxbuster NDJSON result dicts with batched DB writes."""
+	if not batch or not scan:
+		return
+
+	rows = []
+	urls = []
+	for entry in batch:
+		if entry.get('type') != 'response':
+			continue
+		res_url = entry.get('url')
+		if not res_url:
+			continue
+		name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+		if not name:
+			continue
+		http_url = sanitize_url(res_url)
+		urls.append(http_url)
+		rows.append({
+			'entry': entry,
+			'name': name,
+			'url': res_url,
+			'http_url': http_url,
+		})
+
+	if not urls:
+		return
+
+	bulk_persist_fetch_urls(urls, ctx, batch_size=len(urls))
+	endpoints = {
+		ep.http_url: ep
+		for ep in EndPoint.objects.filter(scan_history=scan, http_url__in=urls)
+	}
+
+	ep_updates = []
+	dfile_candidates = []
+	for row in rows:
+		entry = row['entry']
+		ep = endpoints.get(row['http_url'])
+		if not ep:
+			continue
+		status = entry.get('status', 0)
+		length = entry.get('content_length', 0)
+		words = entry.get('word_count', 0)
+		lines_count = entry.get('line_count', 0)
+		content_type = entry.get('content_type', '')
+		ep.http_status = status
+		ep.content_length = length
+		ep.content_type = content_type
+		ep_updates.append(ep)
+		dfile_candidates.append({
+			'name': row['name'],
+			'url': row['url'],
+			'http_status': status,
+			'length': length,
+			'words': words,
+			'lines': lines_count,
+			'content_type': content_type,
+		})
+
+	if ep_updates:
+		EndPoint.objects.bulk_update(
+			ep_updates,
+			['http_status', 'content_length', 'content_type'],
+			batch_size=_FUZZ_BATCH_SIZE,
+		)
+
+	dfiles = bulk_get_or_create_directory_files(dfile_candidates)
+	if dfiles:
+		dirscan.directory_files.add(*dfiles)
+
+
 def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_only=None):
 	"""Perform directory and file fuzzing using FFUF and Dirsearch.
 
@@ -240,6 +313,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		delay = rate_limit / (threads * 100) if threads else 0
 		custom_headers = config.get(CUSTOM_HEADERS) or config.get(CUSTOM_HEADER) or []
 		run_dirsearch = config.get(RUN_DIRSEARCH, True)
+		run_feroxbuster = config.get(RUN_FEROXBUSTER, False)
 
 		custom_headers_list = parse_custom_header_to_list(custom_headers)
 
@@ -308,6 +382,29 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		else:
 			logger.info('Dirsearch disabled via run_dirsearch config key. Only ffuf will run.')
 
+		ferox_base_cmd = None
+		if run_feroxbuster:
+			ferox_base_cmd = 'feroxbuster --no-state --silent --json'
+			ferox_base_cmd += f' --wordlist {wordlist_path}'
+			if extensions:
+				ferox_base_cmd += f' --extensions {extensions_str}'
+			if threads and threads > 0:
+				ferox_base_cmd += f' --threads {threads}'
+			if rate_limit and rate_limit > 0:
+				ferox_base_cmd += f' --rate-limit {rate_limit}'
+			if timeout and timeout > 0:
+				ferox_base_cmd += f' --timeout {timeout}'
+			if recursive_level > 0:
+				ferox_base_cmd += f' --depth {recursive_level}'
+			else:
+				ferox_base_cmd += ' --no-recursion'
+			if follow_redirect:
+				ferox_base_cmd += ' --follow-redirects'
+			if auto_calibration:
+				ferox_base_cmd += ' --auto-calibration'
+			for header in custom_headers_list:
+				ferox_base_cmd += f" -H '{header}'"
+
 		if ctx.get("urls_override"):
 			urls = ctx["urls_override"]
 		else:
@@ -351,6 +448,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				"urls": urls,
 				"ffuf_base_cmd": ffuf_base_cmd,
 				"dirsearch_base_cmd": dirsearch_base_cmd,
+				"ferox_base_cmd": ferox_base_cmd,
 				"enable_http_crawl": enable_http_crawl,
 			}
 
@@ -556,19 +654,103 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 					except Exception as e:
 						ds_exc[0] = e
 
+				def _run_feroxbuster():
+					if not run_feroxbuster or not ferox_base_cmd:
+						return
+					ferox_output = f'{self.results_dir}/feroxbuster_{hashlib.md5(target_url.encode()).hexdigest()[:8]}.json'
+					fcmd = f'{ferox_base_cmd} --url {target_url} --output {ferox_output}'
+					ferox_proxy = proxy
+					if ferox_proxy:
+						if ferox_proxy.startswith('socks'):
+							ferox_proxy = None
+						else:
+							fcmd += f' --proxy {ferox_proxy}'
+
+					dirscan_ferox = DirectoryScan.objects.create(
+						scanned_date=timezone.now(),
+						command_line=fcmd,
+					)
+					if subdomain:
+						subdomain.directories.add(dirscan_ferox)
+
+					logger.info(f'Running feroxbuster for {target_url}')
+					logger.warning(f'feroxbuster command: {fcmd}')
+
+					ferox_batch = []
+					if parse_only is not None and target_url in parse_only.get('ferox', {}):
+						for raw_line in parse_only['ferox'][target_url].splitlines():
+							raw_line = raw_line.strip()
+							if not raw_line:
+								continue
+							try:
+								entry = json.loads(raw_line)
+								if entry.get('type') == 'response':
+									ferox_batch.append(entry)
+							except Exception:
+								pass
+						_flush_ferox_batch(ferox_batch, dirscan_ferox, ctx, scan)
+					else:
+						run_command(
+							fcmd,
+							shell=True,
+							history_file=self.history_file,
+							scan_id=self.scan_id,
+							activity_id=self.activity_id,
+						)
+						if os.path.exists(ferox_output):
+							try:
+								ferox_total = 0
+								with open(ferox_output, 'r') as f:
+									for raw_line in f:
+										raw_line = raw_line.strip()
+										if not raw_line:
+											continue
+										try:
+											entry = json.loads(raw_line)
+											if entry.get('type') == 'response':
+												ferox_batch.append(entry)
+												ferox_total += 1
+												if len(ferox_batch) >= _FUZZ_BATCH_SIZE:
+													_flush_ferox_batch(ferox_batch, dirscan_ferox, ctx, scan)
+													activity_heartbeat_safe(f'feroxbuster {target_url} {ferox_total} hits')
+													ferox_batch = []
+										except Exception:
+											pass
+								if ferox_batch:
+									_flush_ferox_batch(ferox_batch, dirscan_ferox, ctx, scan)
+								logger.info(f'feroxbuster collected {ferox_total} results for {target_url}')
+							except Exception as e:
+								logger.error('Error parsing feroxbuster output for %s: %s', target_url, e)
+							finally:
+								try:
+									os.remove(ferox_output)
+								except FileNotFoundError:
+									pass
+						else:
+							logger.warning(f'feroxbuster output file not found for {target_url}')
+
+					if self.subscan:
+						from startScan.models import SubScan
+						if SubScan.objects.filter(pk=self.subscan.pk).exists():
+							dirscan_ferox.dir_subscan_ids.add(self.subscan)
+					dirscan_ferox.save()
+
 				# Run ffuf first
 				logger.info(f'Starting sequential execution: ffuf first, then dirsearch for {target_url}')
 				_run_ffuf()
-				
+
 				if ffuf_exc[0]:
 					raise ffuf_exc[0]
 
 				# Run dirsearch after ffuf completes
 				if run_dirsearch and dirsearch_base_cmd:
 					_run_dirsearch()
-				
+
 				if ds_exc[0]:
 					logger.error(f'dirsearch failed for {target_url}: {ds_exc[0]}')
+
+				if run_feroxbuster and ferox_base_cmd:
+					_run_feroxbuster()
 
 				results.extend(ffuf_results_local)
 

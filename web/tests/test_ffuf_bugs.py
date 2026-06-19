@@ -337,6 +337,155 @@ class TestFfufMaxtimeJob(TestCase):
                          "Non-recursive scan must not have -maxtime-job flag")
 
 
+class TestFeroxbusterConfig(TestCase):
+    """run_feroxbuster config key: command construction and prepare_only contract."""
+
+    BASE_CONFIG = {
+        'dir_file_fuzz': {
+            'auto_calibration': True,
+            'rate_limit': 100,
+            'threads': 20,
+            'extensions': ['.php', '.html'],
+            'match_http_status': [200],
+            'recursive_level': 2,
+            'max_time': 0,
+            'stop_on_error': False,
+            'follow_redirect': True,
+            'timeout': 10,
+            'run_feroxbuster': True,
+        }
+    }
+
+    def test_disabled_by_default(self):
+        """run_feroxbuster defaults to False; ferox_base_cmd must be None."""
+        config = {
+            'dir_file_fuzz': {
+                'auto_calibration': True,
+                'rate_limit': 0,
+                'threads': 10,
+                'extensions': [],
+                'match_http_status': [200],
+                'recursive_level': 0,
+                'max_time': 0,
+                'stop_on_error': False,
+                'follow_redirect': False,
+                'timeout': 10,
+                # run_feroxbuster intentionally absent
+            }
+        }
+        result = _prepare(config)
+        self.assertIsNotNone(result)
+        self.assertIn('ferox_base_cmd', result)
+        self.assertIsNone(result['ferox_base_cmd'],
+                          "ferox_base_cmd must be None when run_feroxbuster is absent/False")
+
+    def test_enabled_returns_non_none_cmd(self):
+        """When run_feroxbuster=True, ferox_base_cmd must be a non-empty string."""
+        result = _prepare(self.BASE_CONFIG)
+        self.assertIsNotNone(result)
+        self.assertIn('ferox_base_cmd', result)
+        self.assertIsNotNone(result['ferox_base_cmd'],
+                             "ferox_base_cmd must be set when run_feroxbuster=True")
+        self.assertIsInstance(result['ferox_base_cmd'], str)
+
+    def test_command_includes_no_state_and_json(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--no-state', cmd)
+        self.assertIn('--json', cmd)
+
+    def test_wordlist_propagated(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--wordlist', cmd)
+
+    def test_threads_propagated(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--threads 20', cmd)
+
+    def test_rate_limit_propagated(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--rate-limit 100', cmd)
+
+    def test_timeout_propagated(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--timeout 10', cmd)
+
+    def test_extensions_propagated(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--extensions', cmd)
+        self.assertIn('.php', cmd)
+        self.assertIn('.html', cmd)
+
+    def test_follow_redirects_when_enabled(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--follow-redirects', cmd)
+
+    def test_no_follow_redirects_when_disabled(self):
+        config = {
+            'dir_file_fuzz': {
+                **self.BASE_CONFIG['dir_file_fuzz'],
+                'follow_redirect': False,
+            }
+        }
+        result = _prepare(config)
+        self.assertNotIn('--follow-redirects', result['ferox_base_cmd'])
+
+    def test_depth_set_when_recursive(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--depth 2', cmd)
+        self.assertNotIn('--no-recursion', cmd)
+
+    def test_no_recursion_when_level_zero(self):
+        config = {
+            'dir_file_fuzz': {
+                **self.BASE_CONFIG['dir_file_fuzz'],
+                'recursive_level': 0,
+            }
+        }
+        result = _prepare(config)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--no-recursion', cmd)
+        self.assertNotIn('--depth', cmd)
+
+    def test_auto_calibration_adds_flag(self):
+        result = _prepare(self.BASE_CONFIG)
+        cmd = result['ferox_base_cmd']
+        self.assertIn('--auto-calibration', cmd)
+
+    def test_no_auto_calibration_omits_flag(self):
+        config = {
+            'dir_file_fuzz': {
+                **self.BASE_CONFIG['dir_file_fuzz'],
+                'auto_calibration': False,
+            }
+        }
+        result = _prepare(config)
+        self.assertNotIn('--auto-calibration', result['ferox_base_cmd'])
+
+    def test_custom_headers_included(self):
+        config = {
+            'dir_file_fuzz': {
+                **self.BASE_CONFIG['dir_file_fuzz'],
+                'custom_header': ['Authorization: Bearer token123'],
+            }
+        }
+        result = _prepare(config)
+        cmd = result['ferox_base_cmd']
+        self.assertIn("-H 'Authorization: Bearer token123'", cmd)
+
+    def test_prepare_only_always_returns_ferox_key(self):
+        """prepare_only=True must always return ferox_base_cmd key, value may be None."""
+        result = _prepare({'dir_file_fuzz': {}})
+        self.assertIn('ferox_base_cmd', result,
+                      "prepare_only dict must contain ferox_base_cmd key")
+
 class TestFfufStreamingHeartbeat(TestCase):
     """Bug #7: ffuf must not be routed to Go executor (blocks heartbeats)."""
 
