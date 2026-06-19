@@ -4200,12 +4200,19 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 			if port_list:
 				self.queryset = self.queryset.filter(ip_addresses__ports__number__in=port_list).distinct()
 
-		if has_ip is not None:
-			if has_ip.lower() in ('true', '1', 't', 'y', 'yes'):
-				self.queryset = self.queryset.filter(ip_addresses__isnull=False).distinct()
-			elif has_ip.lower() in ('false', '0', 'f', 'n', 'no'):
-				self.queryset = self.queryset.filter(ip_addresses__isnull=True).distinct()
-
+		self.queryset = (
+			self.queryset
+			.select_related('scan_history', 'target_domain')
+			.prefetch_related(
+				'ip_addresses',
+				'ip_addresses__ports',
+				'waf',
+				'technologies',
+				'directories',
+				'waf_bypass_findings',
+				'screenshots'
+			)
+		)
 		return self.queryset
 
 	def filter_queryset(self, qs):
