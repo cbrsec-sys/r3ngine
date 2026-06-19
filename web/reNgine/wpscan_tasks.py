@@ -367,10 +367,7 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
 
     # Attempt to update WPScan database first before running scans on targets
     update_cmd = "wpscan --update --no-banner"
-    proxy = get_random_proxy()
-    if proxy:
-        update_cmd += f" --proxy {proxy}"
-    logger.info("Updating WPScan database...")
+    logger.info("Updating WPScan database without proxy...")
     try:
         for _ in stream_command(update_cmd, scan_id=self.scan_id, activity_id=self.activity_id):
             pass
