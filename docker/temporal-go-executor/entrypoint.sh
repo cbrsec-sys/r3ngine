@@ -156,6 +156,7 @@ vulnx update
 
 # Configure vigolium to scan all severity levels for known issues
 vigolium config set known_issue_scan.severities "critical,high,medium,low,info" || true
+vigolium config set dynamic-assessment.max_feedback_rounds=3 || true
 
 # wait $INTERNAL_TOOLS_PID
 echo "[entrypoint] Starting Temporal Go Executor..."
