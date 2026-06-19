@@ -104,6 +104,7 @@ import { StartScanModal } from './StartScanModal';
 import { OsintTab } from './OsintTab';
 import { AttackPathsTab } from './AttackPathsTab';
 import { AiExportModal } from './AiExportModal';
+import { ExposureList } from '../../exposures/components/ExposureList';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import PluginComponent from '../../plugins/components/PluginComponent';
 import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
@@ -962,78 +963,78 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
 const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => {
   const { tokens, isLight } = useThemeTokens();
   return (
-  <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color={tokens.accent.error} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-    <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
-      <Table size="small" stickyHeader>
-        <TableHead>
-          <TableRow sx={{ '& th': { borderBottom: `2px solid ${tokens.accent.primary}`, bgcolor: 'background.paper', color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 900, py: 1.5 } }}>
-            <TableCell>TYPE</TableCell>
-            <TableCell>VULNERABILITY</TableCell>
-            <TableCell>SEVERITY</TableCell>
-            <TableCell>VULNERABLE URL</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {(highlights || []).map((v: Vulnerability, idx: number) => (
-            <TableRow
-              key={idx}
-              onClick={() => onVulnClick(v)}
-              sx={{
-                '& td': { borderBottom: 1, borderColor: 'divider', py: 2 },
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-                '&:hover': {
-                  bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.03)',
-                  '& td:nth-of-type(2) p:first-of-type': { color: tokens.accent.primary }
-                }
-              }}
-            >
-              <TableCell>
-                <Box sx={{
-                  bgcolor: isLight ? `${tokens.accent.info}1A` : 'rgba(33,150,243,0.1)',
-                  color: isLight ? tokens.accent.info : '#2196f3',
-                  fontSize: '0.6rem',
-                  fontWeight: 900,
-                  px: 1,
-                  py: 0.5,
-                  borderRadius: 0.5,
-                  display: 'inline-block',
-                  textTransform: 'lowercase'
-                }}>
-                  {Number(v.severity) === 0 ? 'info' : 'vuln'}
-                </Box>
-              </TableCell>
-              <TableCell>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: 'text.primary', mb: 0.5 }}>{v.name}</Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
-                  Discovered: {formatTimeAgo(v.discovered_date || '')}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <SeverityBadge severity={Number(v.severity)} />
-              </TableCell>
-              <TableCell>
-                <Typography sx={{
-                  fontSize: '0.7rem',
-                  color: isLight ? tokens.accent.error : '#ff003c',
-                  fontWeight: 600,
-                  wordBreak: 'break-all'
-                }}>
-                  {v.http_url}
-                </Typography>
-              </TableCell>
+    <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color={tokens.accent.error} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
+        <Table size="small" stickyHeader>
+          <TableHead>
+            <TableRow sx={{ '& th': { borderBottom: `2px solid ${tokens.accent.primary}`, bgcolor: 'background.paper', color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 900, py: 1.5 } }}>
+              <TableCell>TYPE</TableCell>
+              <TableCell>VULNERABILITY</TableCell>
+              <TableCell>SEVERITY</TableCell>
+              <TableCell>VULNERABLE URL</TableCell>
             </TableRow>
-          ))}
-          {(!highlights || highlights.length === 0) && (
-            <TableRow>
-              <TableCell colSpan={4} align="center" sx={{ py: 4, color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.2)' }}>NO VULNERABILITY HIGHLIGHTS</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  </TacticalPanel>
-);
+          </TableHead>
+          <TableBody>
+            {(highlights || []).map((v: Vulnerability, idx: number) => (
+              <TableRow
+                key={idx}
+                onClick={() => onVulnClick(v)}
+                sx={{
+                  '& td': { borderBottom: 1, borderColor: 'divider', py: 2 },
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  '&:hover': {
+                    bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.03)',
+                    '& td:nth-of-type(2) p:first-of-type': { color: tokens.accent.primary }
+                  }
+                }}
+              >
+                <TableCell>
+                  <Box sx={{
+                    bgcolor: isLight ? `${tokens.accent.info}1A` : 'rgba(33,150,243,0.1)',
+                    color: isLight ? tokens.accent.info : '#2196f3',
+                    fontSize: '0.6rem',
+                    fontWeight: 900,
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 0.5,
+                    display: 'inline-block',
+                    textTransform: 'lowercase'
+                  }}>
+                    {Number(v.severity) === 0 ? 'info' : 'vuln'}
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: 'text.primary', mb: 0.5 }}>{v.name}</Typography>
+                  <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
+                    Discovered: {formatTimeAgo(v.discovered_date || '')}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <SeverityBadge severity={Number(v.severity)} />
+                </TableCell>
+                <TableCell>
+                  <Typography sx={{
+                    fontSize: '0.7rem',
+                    color: isLight ? tokens.accent.error : '#ff003c',
+                    fontWeight: 600,
+                    wordBreak: 'break-all'
+                  }}>
+                    {v.http_url}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ))}
+            {(!highlights || highlights.length === 0) && (
+              <TableRow>
+                <TableCell colSpan={4} align="center" sx={{ py: 4, color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.2)' }}>NO VULNERABILITY HIGHLIGHTS</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </TacticalPanel>
+  );
 };
 
 interface SubdomainVulnCounts {
@@ -1218,55 +1219,55 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVuln
 const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
   const { tokens } = useThemeTokens();
   return (
-  <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
-    <Box sx={{ p: 2 }}>
-      {subdomains.length > 0 ? (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {subdomains.map((s: Subdomain, i: number) => (
-            <Box key={i} sx={{ px: 1.5, py: 0.5, bgcolor: `${tokens.accent.primary}0D`, border: `1px solid ${tokens.accent.primary}15`, borderRadius: 1, color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 700 }}>
-              {s.name}
-            </Box>
-          ))}
-        </Box>
-      ) : (
-        <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', fontStyle: 'italic' }}>No subdomains marked as important!</Typography>
-      )}
-    </Box>
-  </TacticalPanel>
-);
+    <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
+      <Box sx={{ p: 2 }}>
+        {subdomains.length > 0 ? (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {subdomains.map((s: Subdomain, i: number) => (
+              <Box key={i} sx={{ px: 1.5, py: 0.5, bgcolor: `${tokens.accent.primary}0D`, border: `1px solid ${tokens.accent.primary}15`, borderRadius: 1, color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 700 }}>
+                {s.name}
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', fontStyle: 'italic' }}>No subdomains marked as important!</Typography>
+        )}
+      </Box>
+    </TacticalPanel>
+  );
 };
 
 const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
   return (
-  <TacticalPanel
-    title="RECON NOTE/TODO"
-    icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.info, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notes.length}</Box>}
-    headerAction={<Plus size={14} color={tokens.accent.primary} style={{ cursor: 'pointer' }} />}
-    sx={{ height: '100%', ...sx }}
-  >
-    <Box sx={{ p: 2 }}>
-      {notes.length > 0 ? (
-        <Stack spacing={1}>
-          {notes.map((n: TodoNote) => (
-            <Box key={n.id} sx={{ p: 1, bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.03)', border: 1, borderColor: 'divider', borderRadius: 1, display: 'flex', gap: 1.5 }}>
-              <Checkbox size="small" checked={n.is_done} sx={{ color: isLight ? 'rgba(0,0,0,0.26)' : 'rgba(255,255,255,0.2)', p: 0 }} />
-              <Box>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: n.is_done ? 'text.disabled' : 'text.primary', textDecoration: n.is_done ? 'line-through' : 'none' }}>{n.title}</Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>{n.description}</Typography>
+    <TacticalPanel
+      title="RECON NOTE/TODO"
+      icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.info, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notes.length}</Box>}
+      headerAction={<Plus size={14} color={tokens.accent.primary} style={{ cursor: 'pointer' }} />}
+      sx={{ height: '100%', ...sx }}
+    >
+      <Box sx={{ p: 2 }}>
+        {notes.length > 0 ? (
+          <Stack spacing={1}>
+            {notes.map((n: TodoNote) => (
+              <Box key={n.id} sx={{ p: 1, bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.03)', border: 1, borderColor: 'divider', borderRadius: 1, display: 'flex', gap: 1.5 }}>
+                <Checkbox size="small" checked={n.is_done} sx={{ color: isLight ? 'rgba(0,0,0,0.26)' : 'rgba(255,255,255,0.2)', p: 0 }} />
+                <Box>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: n.is_done ? 'text.disabled' : 'text.primary', textDecoration: n.is_done ? 'line-through' : 'none' }}>{n.title}</Typography>
+                  <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>{n.description}</Typography>
+                </Box>
               </Box>
-            </Box>
-          ))}
-        </Stack>
-      ) : (
-        <Box>
-          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', fontWeight: 700 }}>No todos or notes...</Typography>
-          <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>You can add todo for individual subdomains or you can also add using + symbol above.</Typography>
-        </Box>
-      )}
-    </Box>
-  </TacticalPanel>
-);
+            ))}
+          </Stack>
+        ) : (
+          <Box>
+            <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', fontWeight: 700 }}>No todos or notes...</Typography>
+            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>You can add todo for individual subdomains or you can also add using + symbol above.</Typography>
+          </Box>
+        )}
+      </Box>
+    </TacticalPanel>
+  );
 };
 
 const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
@@ -1396,6 +1397,7 @@ export const ScanDetailPage = () => {
     { label: 'URLS', icon: LinkIcon },
     { label: 'PARAMETERS', icon: Search },
     { label: 'VULNERABILITIES', icon: ShieldAlert, show: data.vulnerability_count > 0 },
+    { label: 'EXPOSURES', icon: ShieldAlert },
     { label: 'EXPLOITS', icon: Zap, show: data.exploitable_count > 0 },
     { label: 'OSINT', icon: Search, show: data.scan_info.tasks?.includes('osint') },
     { label: 'LEAKS', icon: Shield },
@@ -1634,7 +1636,7 @@ export const ScanDetailPage = () => {
                     <Stack spacing={2.5}>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: isLight ? tokens.accent.error : '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info?.name || 'N/A' }</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: isLight ? tokens.accent.error : '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info?.name || 'N/A'}</Typography>
                       </Box>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
@@ -2240,6 +2242,11 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'URLS' && renderEndpoints()}
                 {tabs[activeTab]?.label === 'PARAMETERS' && renderParameters()}
                 {tabs[activeTab]?.label === 'VULNERABILITIES' && renderVulnerabilities()}
+                {tabs[activeTab]?.label === 'EXPOSURES' && (
+                  <Box sx={{ p: 2 }}>
+                    <ExposureList scan_id={scanId} />
+                  </Box>
+                )}
                 {tabs[activeTab]?.label === 'BUCKETS' && renderBuckets()}
                 {tabs[activeTab]?.label === 'SCREENSHOTS' && <ScreenshotsTab projectSlug={projectSlug} scanId={parseInt(scanId)} />}
                 {tabs[activeTab]?.label === 'OSINT' && renderOSINT()}
@@ -2259,7 +2266,7 @@ export const ScanDetailPage = () => {
                   />
                 )}
 
-                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'PARAMETERS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && !tabs[activeTab]?.isPlugin && (
+                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'PARAMETERS', 'VULNERABILITIES', 'EXPOSURES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && !tabs[activeTab]?.isPlugin && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
                     <Typography sx={{ color: 'text.disabled', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'text.disabled', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>

@@ -610,6 +610,41 @@ class GPTVulnerabilityReport(models.Model):
 		return self.title
 
 
+class Exposure(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, null=True, blank=True)
+	target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE, null=True, blank=True)
+	subdomain = models.ForeignKey(Subdomain, on_delete=models.CASCADE, null=True, blank=True)
+	endpoint = models.ForeignKey(EndPoint, on_delete=models.CASCADE, null=True, blank=True)
+	type = ArrayField(models.CharField(max_length=200), default=list, blank=True) # e.g. ["VPN Gateway", "Database"]
+	
+	EXPOSURE_STATUS_CHOICES = (
+		('open', 'Open'),
+		('verified', 'Verified'),
+		('false_positive', 'False Positive'),
+		('remediated', 'Remediated'),
+	)
+	status = models.CharField(max_length=20, choices=EXPOSURE_STATUS_CHOICES, default='open')
+	first_seen = models.DateTimeField(auto_now_add=True)
+	last_seen = models.DateTimeField(auto_now=True)
+	risk_score = models.FloatField(default=0.0)
+	
+	def __str__(self):
+		target = self.subdomain.name if self.subdomain else (self.target_domain.name if self.target_domain else "Unknown")
+		return f"{self.type} on {target}"
+
+
+class ExposureEvidence(models.Model):
+	id = models.AutoField(primary_key=True)
+	exposure = models.ForeignKey(Exposure, on_delete=models.CASCADE, related_name='evidence')
+	source_tool = models.CharField(max_length=100) # e.g. "httpx", "Katana", "Screenshot"
+	evidence_data = models.JSONField(default=dict, blank=True)
+	timestamp = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		return f"{self.source_tool} evidence for {self.exposure}"
+
+
 class Vulnerability(models.Model):
 	id = models.AutoField(primary_key=True)
 	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, null=True, blank=True)
@@ -624,6 +659,13 @@ class Vulnerability(models.Model):
 		on_delete=models.CASCADE,
 		blank=True,
 		null=True)
+	exposure = models.ForeignKey(
+		Exposure,
+		on_delete=models.SET_NULL,
+		blank=True,
+		null=True,
+		related_name='vulnerabilities'
+	)
 	target_domain = models.ForeignKey(
 		Domain, on_delete=models.CASCADE, null=True, blank=True)
 	template = models.CharField(max_length=100, null=True, blank=True)

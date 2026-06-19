@@ -1546,3 +1546,43 @@ class ScanProfileSerializer(serializers.ModelSerializer):
 		model = ScanProfile
 		fields = '__all__'
 		read_only_fields = ['id', 'is_builtin', 'created_at', 'updated_at']
+
+
+class ExposureEvidenceSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = ExposureEvidence
+		fields = '__all__'
+
+
+class ExposureSerializer(serializers.ModelSerializer):
+	evidence = ExposureEvidenceSerializer(many=True, read_only=True)
+	scan_history = serializers.SerializerMethodField()
+	discovered_date = serializers.SerializerMethodField()
+
+	class Meta:
+		model = Exposure
+		fields = '__all__'
+		depth = 2
+
+	def get_discovered_date(self, obj):
+		if obj.discovered_date:
+			return obj.discovered_date.strftime("%b %d, %Y %H:%M")
+		return None
+
+	def get_scan_history(self, obj):
+		scan_history_dict = {}
+		scan_history = obj.scan_history
+		if scan_history:
+			scan_history_dict = model_to_dict(
+				scan_history, 
+				exclude=['emails', 'employees', 'buckets', 'dorks']
+			)
+			if scan_history.domain:
+				scan_history_dict['domain'] = {
+					'name': scan_history.domain.name,
+				}
+			scan_history_dict['initiated_by'] = MinimalUserSerializer(scan_history.initiated_by).data if scan_history.initiated_by else None
+			scan_history_dict['aborted_by'] = MinimalUserSerializer(scan_history.aborted_by).data if scan_history.aborted_by else None
+			scan_history_dict['completed_ago'] = scan_history.get_completed_ago()
+		return scan_history_dict
+

@@ -87,66 +87,106 @@ def download_js_files(
         list[dict]: Each dict has keys:
             url (str), content (str), size (int), hash (str), content_type (str)
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from startScan.models import Proxy
+    import random
+
     if session is None:
         session = requests.Session()
 
-    proxies = {'http': proxy, 'https': proxy} if proxy else None
+    available_proxies = []
+    use_proxy = False
+    if proxy:
+        available_proxies = [proxy]
+        use_proxy = True
+    else:
+        try:
+            if Proxy.objects.all().exists():
+                proxy_config = Proxy.objects.first()
+                if proxy_config.use_proxy:
+                    use_proxy = True
+                    available_proxies = [p.strip() for p in proxy_config.proxies.splitlines() if p.strip()]
+                    random.shuffle(available_proxies)
+        except Exception as e:
+            logger.error("[CPDE:js_collector] Failed to load proxies: %s", e)
+
     seen_hashes: set[str] = set()
     results: list[dict] = []
+    
+    def download_worker(url):
+        max_retries = min(5, len(available_proxies)) if use_proxy and available_proxies else 1
+        if max_retries < 1:
+            max_retries = 1
+            
+        attempt = 0
+        current_proxy_index = random.randint(0, len(available_proxies) - 1) if available_proxies else 0
 
-    for url in js_urls:
-        try:
-            # HEAD first to check Content-Length before downloading
+        while attempt < max_retries:
+            proxies = None
+            if use_proxy and available_proxies:
+                current_proxy_name = available_proxies[current_proxy_index % len(available_proxies)]
+                proxies = {'http': current_proxy_name, 'https': current_proxy_name}
+                
             try:
-                head = session.head(
-                    url,
-                    timeout=_JS_DOWNLOAD_TIMEOUT,
-                    proxies=proxies,
-                    allow_redirects=True,
-                    verify=False,
-                )
-                content_length = int(head.headers.get('Content-Length', 0))
-                if content_length > _MAX_JS_SIZE_BYTES:
-                    logger.info(
-                        '[CPDE:js_collector] Skipping %s — too large (%d bytes)', url, content_length
-                    )
-                    continue
+                try:
+                    head = session.head(url, timeout=_JS_DOWNLOAD_TIMEOUT, proxies=proxies, allow_redirects=True, verify=False)
+                    content_length = int(head.headers.get('Content-Length', 0))
+                    if content_length > _MAX_JS_SIZE_BYTES:
+                        logger.info('[CPDE:js_collector] Skipping %s — too large (%d bytes)', url, content_length)
+                        return None
+                except Exception:
+                    pass
+
+                resp = session.get(url, timeout=_JS_DOWNLOAD_TIMEOUT, proxies=proxies, stream=True, verify=False)
+                if resp.status_code == 200:
+                    raw_content = b""
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        if len(raw_content) + len(chunk) > _MAX_JS_SIZE_BYTES:
+                            raw_content += chunk[:_MAX_JS_SIZE_BYTES - len(raw_content)]
+                            break
+                        raw_content += chunk
+                    
+                    content = raw_content.decode('utf-8', errors='replace')
+                    file_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+                    
+                    return {
+                        'url': url,
+                        'content': content,
+                        'size': len(raw_content),
+                        'hash': file_hash,
+                        'content_type': resp.headers.get('Content-Type', '')
+                    }
+                elif resp.status_code in [407, 502, 503, 504]:
+                    raise requests.exceptions.ProxyError(f"Proxy returned status code {resp.status_code}")
+                else:
+                    break
+            except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                attempt += 1
+                current_proxy_index += 1
             except Exception:
-                # HEAD not supported by all servers; proceed with GET
-                pass
+                break
+        return None
 
-            resp = session.get(
-                url,
-                timeout=_JS_DOWNLOAD_TIMEOUT,
-                proxies=proxies,
-                stream=False,
-                verify=False,
-            )
-            resp.raise_for_status()
+    MAX_FILES = 500
+    if len(js_urls) > MAX_FILES:
+        logger.warning("[CPDE:js_collector] Capping URLs from %d to %d to prevent stalling", len(js_urls), MAX_FILES)
+        js_urls = list(js_urls)[:MAX_FILES]
 
-            if len(resp.content) > _MAX_JS_SIZE_BYTES:
-                logger.info('[CPDE:js_collector] Skipping %s — content too large', url)
-                continue
-
-            content = resp.text
-            file_hash = hashlib.sha256(content.encode('utf-8', errors='replace')).hexdigest()
-
-            if file_hash in seen_hashes:
-                logger.debug('[CPDE:js_collector] Skipping duplicate JS at %s', url)
-                continue
-            seen_hashes.add(file_hash)
-
-            results.append({
-                'url': url,
-                'content': content,
-                'size': len(resp.content),
-                'hash': file_hash,
-                'content_type': resp.headers.get('Content-Type', ''),
-            })
-            logger.debug('[CPDE:js_collector] Downloaded %s (%d bytes)', url, len(resp.content))
-
-        except requests.RequestException as exc:
-            logger.warning('[CPDE:js_collector] Failed to download %s: %s', url, exc)
+    logger.info("[CPDE:js_collector] Downloading %d JS files in parallel...", len(js_urls))
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(download_worker, url): url for url in js_urls}
+        for future in as_completed(futures):
+            try:
+                res = future.result()
+                if res:
+                    if res['hash'] not in seen_hashes:
+                        seen_hashes.add(res['hash'])
+                        results.append(res)
+                        logger.debug('[CPDE:js_collector] Downloaded %s (%d bytes)', res['url'], res['size'])
+                    else:
+                        logger.debug('[CPDE:js_collector] Skipping duplicate JS at %s', res['url'])
+            except Exception as exc:
+                logger.warning('[CPDE:js_collector] Error in download thread: %s', exc)
 
     logger.info(
         '[CPDE:js_collector] Downloaded %d unique JS files from %d URLs',

@@ -103,6 +103,7 @@ class Neo4jManager:
             "CREATE INDEX graph_endpoint_url IF NOT EXISTS FOR (n:Endpoint) ON (n.url)",
             "CREATE INDEX graph_scan_id IF NOT EXISTS FOR (n:Scan) ON (n.id)",
             "CREATE INDEX graph_vuln_id IF NOT EXISTS FOR (n:Vulnerability) ON (n.id)",
+            "CREATE INDEX graph_exposure_id IF NOT EXISTS FOR (n:Exposure) ON (n.id)",
             "CREATE INDEX graph_domain_name IF NOT EXISTS FOR (n:Domain) ON (n.name)",
             "CREATE INDEX graph_ip_address IF NOT EXISTS FOR (n:IPAddress) ON (n.address)",
         ]
@@ -280,6 +281,25 @@ class Neo4jManager:
                     )
                     endpoint_rows = []
 
+            exposure_rows = []
+            from startScan.models import Exposure
+            exposures_qs = Exposure.objects.filter(scan_history_id=scan_history_id)
+            for row in exposures_qs.values('id', 'type', 'status', 'risk_score', 'subdomain__name').iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                exposure_rows.append({
+                    "exposure_id": row['id'],
+                    "type": row['type'],
+                    "status": row['status'],
+                    "risk_score": row['risk_score'],
+                    "subdomain_name": row['subdomain__name'] or target_name,
+                    "scan_id": scan_history_id
+                })
+                if len(exposure_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_exposures, exposure_rows,
+                        label="exposures", heartbeat_callback=heartbeat,
+                    )
+                    exposure_rows = []
+
             from startScan.models import Parameter
             if Parameter.objects.filter(endpoint__scan_history_id=scan_history_id).exists():
                 for row in Parameter.objects.filter(
@@ -303,6 +323,7 @@ class Neo4jManager:
 
             self._flush_row_buffers(session, [
                 (self._batch_merge_endpoints, endpoint_rows, "endpoints"),
+                (self._batch_merge_exposures, exposure_rows, "exposures"),
                 (self._batch_merge_parameters, param_rows, "parameters"),
             ], heartbeat_callback=heartbeat)
 
@@ -312,7 +333,7 @@ class Neo4jManager:
 
             for row in vulns_qs.values(
                 'id', 'name', 'severity', 'correlation_score',
-                'subdomain__name', 'endpoint__http_url',
+                'subdomain__name', 'endpoint__http_url', 'exposure_id'
             ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
                 if row['subdomain__name']:
                     asset_name = row['subdomain__name']
@@ -329,6 +350,7 @@ class Neo4jManager:
                     "vuln_name": row['name'] or "Unknown Vulnerability",
                     "severity": row['severity'],
                     "score": row['correlation_score'],
+                    "exposure_id": row.get('exposure_id'),
                     "scan_id": scan_history_id,
                     "vuln_id": row['id'],
                 })
@@ -641,6 +663,10 @@ class Neo4jManager:
                 MATCH (a:Subdomain {name: row.asset_name}), (sc:Scan {id: row.scan_id})
                 MERGE (a)-[:HAS_VULNERABILITY]->(v)
                 MERGE (sc)-[:FOUND]->(v)
+                WITH v, row
+                WHERE row.exposure_id IS NOT NULL
+                MATCH (e:Exposure {id: row.exposure_id})
+                MERGE (e)-[:HAS_VULNERABILITY]->(v)
                 """,
                 rows=subdomain_rows,
             )
@@ -655,9 +681,28 @@ class Neo4jManager:
                 MATCH (a:Endpoint {url: row.asset_name}), (sc:Scan {id: row.scan_id})
                 MERGE (a)-[:HAS_VULNERABILITY]->(v)
                 MERGE (sc)-[:FOUND]->(v)
+                WITH v, row
+                WHERE row.exposure_id IS NOT NULL
+                MATCH (e:Exposure {id: row.exposure_id})
+                MERGE (e)-[:HAS_VULNERABILITY]->(v)
                 """,
                 rows=endpoint_rows,
             )
+
+    @staticmethod
+    def _batch_merge_exposures(tx, rows):
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (e:Exposure {id: row.exposure_id})
+            SET e.type = row.type, e.status = row.status, e.risk_score = row.risk_score
+            WITH e, row
+            MATCH (s:Subdomain {name: row.subdomain_name}), (sc:Scan {id: row.scan_id})
+            MERGE (s)-[:HAS_EXPOSURE]->(e)
+            MERGE (sc)-[:FOUND]->(e)
+            """,
+            rows=rows,
+        )
 
     @staticmethod
     def _batch_merge_cves(tx, rows):

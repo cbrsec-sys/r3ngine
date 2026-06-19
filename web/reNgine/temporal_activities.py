@@ -1673,6 +1673,30 @@ def correlate_vulnerabilities_activity(ctx: dict) -> bool:
     return result
 
 
+@activity.defn(name="CorrelateExposuresActivity")
+def correlate_exposures_activity(ctx: dict) -> bool:
+    """Correlate endpoints, subdomains, and screenshots into Exposure assets.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import correlate_exposures
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.warning("[TIER7][CORRELATE_EXPOSURES] Activity starting | scan_id=%s", scan_id)
+    result = _run_task(
+        correlate_exposures,
+        ctx,
+        task_name='correlate_exposures',
+        description='Correlate Exposures',
+        scan_history_id=scan_id
+    )
+    activity.logger.warning("[TIER7][CORRELATE_EXPOSURES] Activity complete | scan_id=%s result=%s", scan_id, result)
+    return result
+
+
 @activity.defn(name="EnrichScanCVEsActivity")
 def enrich_scan_cves_activity(ctx: dict) -> bool:
     """Enrich CVE records linked to vulnerabilities discovered in this scan.

@@ -5193,6 +5193,44 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 
 		return qs
 
+class ExposurePagination(PageNumberPagination):
+	page_size = 10
+	page_size_query_param = 'length'
+	max_page_size = 200
+
+class ExposureViewSet(viewsets.ModelViewSet):
+	pagination_class = ExposurePagination
+	permission_classes = [IsPenetrationTester]
+	serializer_class = ExposureSerializer
+	queryset = Exposure.objects.none()
+
+	def get_queryset(self):
+		req = self.request
+		project = req.query_params.get('project')
+		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_history')
+
+		if project:
+			qs = Exposure.objects.filter(scan_history__domain__project__slug=project)
+		else:
+			qs = Exposure.objects.all()
+
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		elif target_id:
+			qs = qs.filter(scan_history__domain__id=target_id)
+
+		status = req.query_params.get('status')
+		if status:
+			qs = qs.filter(status=status)
+		
+		exp_type = req.query_params.get('type')
+		if exp_type:
+			qs = qs.filter(type=exp_type)
+
+		self.queryset = qs.distinct().order_by('-risk_score')
+		return self.queryset
+
 class ReportSettingsAPIView(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SCAN_REPORT

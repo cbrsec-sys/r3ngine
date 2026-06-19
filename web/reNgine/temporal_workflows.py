@@ -717,6 +717,14 @@ class MasterScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
                             )
+                            await workflow.execute_activity(
+                                "CorrelateExposuresActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
+                            )
                             # Enrich CVEs found during this scan with NVD/EPSS/KEV data
                             # before risk scoring so CVSS and EPSS values are available.
                             await workflow.execute_activity(
@@ -1711,6 +1719,14 @@ class SubScanWorkflow:
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
+                            )
+                            await workflow.execute_activity(
+                                "CorrelateExposuresActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
                             )
                             await workflow.execute_activity(
                                 "CalculateRiskScoresActivity",

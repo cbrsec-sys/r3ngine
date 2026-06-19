@@ -7489,6 +7489,24 @@ def acunetix_scan(
 		return False
 
 
+def correlate_exposures(self, scan_history_id, ctx={}, description=None):
+	"""Correlate exposures and attack surface assets.
+	"""
+	logger.warning("[TIER7][CORRELATE_EXPOSURES] Starting exposure correlation | scan_id=%s", scan_history_id)
+	
+	from startScan.models import ScanHistory
+	from reNgine.exposure_correlation import ExposureCorrelationEngine
+	try:
+		history = ScanHistory.objects.get(id=scan_history_id)
+		engine = ExposureCorrelationEngine(scan_history=history)
+		engine.correlate_exposures()
+		logger.info("[TIER7][CORRELATE_EXPOSURES] Completed exposure correlation for scan_id=%s", scan_history_id)
+	except ScanHistory.DoesNotExist:
+		logger.error("ScanHistory not found: %s", scan_history_id)
+	except Exception as e:
+		logger.error("Error correlating exposures: %s", e)
+
+
 def correlate_vulnerabilities(self, scan_history_id, ctx={}, description=None):
 	"""Correlate discovered technologies with known CVEs and update the graph database.
 
