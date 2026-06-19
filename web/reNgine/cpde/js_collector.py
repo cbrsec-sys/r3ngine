@@ -16,6 +16,9 @@ import os
 import re
 
 import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +103,7 @@ def download_js_files(
                     timeout=_JS_DOWNLOAD_TIMEOUT,
                     proxies=proxies,
                     allow_redirects=True,
+                    verify=False,
                 )
                 content_length = int(head.headers.get('Content-Length', 0))
                 if content_length > _MAX_JS_SIZE_BYTES:
@@ -116,6 +120,7 @@ def download_js_files(
                 timeout=_JS_DOWNLOAD_TIMEOUT,
                 proxies=proxies,
                 stream=False,
+                verify=False,
             )
             resp.raise_for_status()
 

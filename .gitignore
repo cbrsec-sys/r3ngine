@@ -48,7 +48,7 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
-
+.superpowers
 
 # Sphinx documentation
 docs/_build/

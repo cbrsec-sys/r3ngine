@@ -388,8 +388,25 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 					try:
 						_fuzz_url = target_url if target_url.endswith('/') else target_url + '/'
 						fcmd = ffuf_base_cmd + f' -u {_fuzz_url}FUZZ -json'
-						fcmd += f' -x {proxy}' if proxy else ''
-						fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
+						
+						ffuf_proxy = proxy
+						if ffuf_proxy and ffuf_proxy.startswith('socks'):
+							for _ in range(10):
+								new_proxy = get_random_proxy()
+								if not new_proxy:
+									ffuf_proxy = None
+									break
+								if not new_proxy.startswith('http') and not new_proxy.startswith('socks'):
+									new_proxy = 'http://' + new_proxy
+								if new_proxy.startswith('http'):
+									ffuf_proxy = new_proxy
+									break
+							else:
+								ffuf_proxy = None
+								logger.warning('ffuf proxy requirement: failed to find an http/s proxy after 10 retries, bypassing proxy for ffuf')
+							
+						fcmd += f' -x {ffuf_proxy}' if ffuf_proxy else ''
+						fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=ffuf_proxy)
 
 						dirscan = DirectoryScan.objects.create(
 							scanned_date=timezone.now(),

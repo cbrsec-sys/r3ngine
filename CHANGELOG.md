@@ -11,6 +11,12 @@
 
 #### Fixed
 
+- **ffuf Proxy Compatibility**:
+  - Filtered out `socks4` and `socks5` proxies when executing directory fuzzing with `ffuf` to resolve download errors where `ffuf` was rejecting SOCKS proxies format. If a SOCKS proxy is initially selected by the randomizer, `ffuf` will re-fetch and validate an HTTP/S proxy from the pool before executing.
+
+- **CPDE SSL Verification**:
+  - Disabled SSL certificate verification in the Custom Parameter Discovery Engine (CPDE) for JavaScript file downloads and OpenAPI schema probing. This fixes widespread download failures where scanning targets with self-signed certificates threw `[SSL: CERTIFICATE_VERIFY_FAILED]` errors and skipped intelligence extraction.
+
 - **WPScan Reliability**:
   - Removed the randomized proxy assignment from the `wpscan --update` initial sequence. Bouncing the signature update through datacenter proxies frequently caused SSL/connection failures blocking WPScan from launching. Updates now always contact WPScan APIs directly.
 

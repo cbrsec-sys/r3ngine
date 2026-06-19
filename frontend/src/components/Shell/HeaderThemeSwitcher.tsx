@@ -38,12 +38,20 @@ export const HeaderThemeSwitcher: React.FC = () => {
     handleClose();
   };
 
+  const getThemeDotColor = (id: ThemeType) => {
+    switch (id) {
+      case 'hacker': return '#bc13fe'; // Purple
+      case 'modern': return '#0284c7'; // Blue (Enterprise blue)
+      case 'enterprise': return '#94a3b8'; // Gray
+      case 'v3_light': return '#f8fafc'; // Off-white
+      default: return themeDefinitions[id].accent.primary;
+    }
+  };
+
   const themes: { id: ThemeType; label: string; color: string }[] = selectableThemes.map((item) => ({
     ...item,
-    color: themeDefinitions[item.id].accent.primary,
+    color: getThemeDotColor(item.id),
   }));
-
-
   return (
     <>
       <Tooltip title="Switch Theme">
