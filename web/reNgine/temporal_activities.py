@@ -1321,7 +1321,31 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
         all_techs.update(sub.technologies.values_list('name', flat=True))
 
     tech_tags = get_nuclei_tags_from_techs(list(all_techs)) if all_techs else []
-    merged = sorted(set(user_tags) | set(tech_tags))
+    merged_set = set(user_tags) | set(tech_tags)
+
+    # Intelligence: Append specific Nuclei tags if previously discovered vulnerabilities warrant it.
+    from startScan.models import Vulnerability, ScanHistory
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if scan and scan.domain:
+        vulns_qs = Vulnerability.objects.filter(target_domain=scan.domain)
+        if subdomain_id:
+            vulns_qs = vulns_qs.filter(subdomain_id=subdomain_id)
+        
+        # We only need to check names and whether it has CVE relations
+        # Fetching names instead of iterating objects avoids memory overhead
+        vuln_names = ' '.join(vulns_qs.values_list('name', flat=True)).lower()
+        has_cve = vulns_qs.filter(cve_ids__isnull=False).exists() or 'cve-' in vuln_names
+        
+        if 'xss' in vuln_names or 'cross site' in vuln_names:
+            merged_set.add('xss')
+        if 'lfi' in vuln_names or 'local file inclusion' in vuln_names:
+            merged_set.add('lfi')
+        if 'idor' in vuln_names:
+            merged_set.add('idor')
+        if has_cve:
+            merged_set.add('cve')
+            
+    merged = sorted(merged_set)
 
     # Build the full list of template directories to scan for tag counts
     template_dirs = []
