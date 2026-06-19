@@ -427,11 +427,14 @@ def proxy_settings(request, slug):
                 return http.JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
 
     if request.headers.get('Accept') == 'application/json':
+        from reNgine.common_func import get_valid_proxy_count
+
         return http.JsonResponse({
             'use_proxy': proxy.use_proxy if proxy else False,
             'proxies': proxy.proxies if proxy else "",
             'use_proxychains': proxy.use_proxychains if proxy else False,
             'use_tor': proxy.use_tor if proxy else False,
+            'valid_proxy_count': get_valid_proxy_count(proxy),
         })
 
     context['settings_nav_active'] = 'active'
