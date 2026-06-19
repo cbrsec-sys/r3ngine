@@ -1,4 +1,5 @@
 Phase 1 Implementation Plan — Assessment Foundation
+ALL WORK MUST BE DONE IN A v4 BRANCH
 
 Objective
 Transform r3ngine from a scan-centric platform into an assessment-centric platform without breaking any existing functionality.

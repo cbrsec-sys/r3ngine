@@ -1,5 +1,6 @@
 Phase 3 — Evidence Management Platform
 Production-Ready Evidence Collection, Storage, Chain-of-Custody, and Analyst Workflow Architecture
+ALL WORK MUST BE DONE IN A v4 BRANCH
 
 Phase 3 Goal
 Phase 2 introduced:
