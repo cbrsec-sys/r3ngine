@@ -247,7 +247,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     }
   }, []);
 
-  const validProxyCount = proxySettings?.valid_proxy_count ?? 0;
+  const validProxyCount = proxySettings?.proxies 
+    ? proxySettings.proxies.split('\n').filter(p => p.trim() !== '').length 
+    : (proxySettings?.valid_proxy_count ?? 0);
   const proxyModeEnabled = Boolean(proxySettings?.use_proxy);
   const proxyIndicator = React.useMemo(() => {
     if (!proxyModeEnabled) {
