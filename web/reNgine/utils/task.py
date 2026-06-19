@@ -244,7 +244,9 @@ def run_command(
         scan_id=None, 
         activity_id=None,
         remove_ansi_sequence=False,
-        proxy=None
+        proxy=None,
+        timeout=7200,
+        env=None
     ):
     """Run a given command using subprocess module.
 
@@ -370,6 +372,7 @@ def run_command(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 cwd=cwd,
+                env=env,
                 universal_newlines=True,
                 errors='replace',
                 preexec_fn=os.setsid)
@@ -383,6 +386,12 @@ def run_command(
                 if redis_client and soc_config:
                     _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, item)
                 _run_cmd_line_count += 1
+                if _run_cmd_line_count % 10 == 0:
+                    try:
+                        from reNgine.utils.task import activity_heartbeat_safe
+                        activity_heartbeat_safe(f"Command executing... line {_run_cmd_line_count}")
+                    except Exception:
+                        pass
                 if _run_cmd_line_count % 10 == 0 and scan_id:
                     try:
                         from startScan.models import ScanHistory as _SH
@@ -405,7 +414,7 @@ def run_command(
                 # Replace bare 7200 s wait with a polling loop so abort is
                 # detected even if the process is slow to produce output.
                 import time as _time
-                _deadline = _time.monotonic() + 7200
+                _deadline = _time.monotonic() + timeout
                 _timed_out = False
                 while True:
                     try:
