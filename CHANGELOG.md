@@ -1,5 +1,19 @@
 # Changelog
 
+### [v3.6.3]
+
+#### Enhanced
+
+- **Nuclei Batch Tag Counting Optimization**:
+  - Replaced the CLI-based `nuclei -tl` tag template counter with a lightning-fast native Python YAML parser. The previous implementation caused Out-Of-Memory (OOM) Docker kills and 30-second timeouts when enumerating 125,000+ templates. Batch template boundaries are now strictly adhered to and no longer crash the orchestration engine.
+  - Custom templates uploaded via the UI (`NUCLEI_CUSTOM_TEMPLATE`) and secondary template paths (`NUCLEI_TEMPLATE`) are now dynamically discovered and injected into the count loop, fixing a bug where only the default path was sized.
+  - Added an intelligence step to `GatherNucleiTagsActivity`: if previous scanners (e.g. Dalfox or S3Scanner) discovered vulnerabilities like XSS, LFI, or IDOR on the target, Nuclei automatically prepends the `xss`, `lfi`, or `idor` tags to its execution batch. Existing CVE IDs linked to the target also inject the `cve` tag.
+
+#### Fixed
+
+- **WPScan Reliability**:
+  - Removed the randomized proxy assignment from the `wpscan --update` initial sequence. Bouncing the signature update through datacenter proxies frequently caused SSL/connection failures blocking WPScan from launching. Updates now always contact WPScan APIs directly.
+
 ### [v3.6.2]
 
 #### Enhanced
