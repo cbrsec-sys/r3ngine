@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { UseQueryOptions } from '@tanstack/react-query';
 import axios from 'axios';
 import { getCsrfToken } from '../../../api/axiosConfig';
 
@@ -54,6 +55,7 @@ export interface ProxySettings {
   proxies: string;
   use_proxychains: boolean;
   use_tor: boolean;
+  valid_proxy_count?: number;
   skip_validation?: boolean;
 }
 
@@ -162,7 +164,10 @@ export interface FileContentResponse {
 
 
 
-export const useProxySettings = (slug: string) => {
+export const useProxySettings = (
+  slug: string,
+  options?: Omit<UseQueryOptions<ProxySettings>, 'queryKey' | 'queryFn'>
+) => {
   return useQuery<ProxySettings>({
     queryKey: ['proxy-settings', slug],
     queryFn: async () => {
@@ -171,6 +176,7 @@ export const useProxySettings = (slug: string) => {
       });
       return response.data;
     },
+    ...options,
   });
 };
 

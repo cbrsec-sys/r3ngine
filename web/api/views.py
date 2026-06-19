@@ -2628,9 +2628,18 @@ class ProxySettingsAPIView(APIView):
 	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
 
 	def get(self, request):
+		from reNgine.common_func import get_valid_proxy_count
+
 		proxy = Proxy.objects.first()
 		serializer = ProxySerializer(proxy)
-		return Response(serializer.data)
+		payload = dict(serializer.data) if proxy else {
+			'use_proxy': False,
+			'proxies': '',
+			'use_proxychains': False,
+			'use_tor': False,
+		}
+		payload['valid_proxy_count'] = get_valid_proxy_count(proxy)
+		return Response(payload)
 
 	def post(self, request):
 		proxy = Proxy.objects.first()

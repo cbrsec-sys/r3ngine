@@ -24,6 +24,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useProxySettings, useUpdateProxySettings, useFetchProxies, useProxyTaskStatus, useTorStatus } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
@@ -58,6 +59,7 @@ export function parseProxyLine(line: string): string | null {
 export const ProxySettingsPage: React.FC = () => {
   const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const queryClient = useQueryClient();
   const { data: settings, isLoading: isSettingsLoading } = useProxySettings(projectSlug);
   const updateSettings = useUpdateProxySettings(projectSlug);
   const fetchProxies = useFetchProxies(projectSlug);
@@ -102,6 +104,7 @@ export const ProxySettingsPage: React.FC = () => {
       const proxyStr = typeof resultData === 'string' ? resultData : (resultData?.proxies || '');
       setProxyList(proxyStr);
       setUseProxy(true);
+      queryClient.invalidateQueries({ queryKey: ['proxy-settings', projectSlug] });
       setSnackbar({
         open: true,
         message: 'Proxies automatically fetched and saved to database.',
@@ -116,7 +119,7 @@ export const ProxySettingsPage: React.FC = () => {
       });
       setCurrentTaskId(null);
     }
-  }, [taskStatus]);
+  }, [projectSlug, queryClient, taskStatus]);
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });

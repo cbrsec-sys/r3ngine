@@ -308,6 +308,8 @@ class ProxychainsWrapper:
             if check_proxy_robust(proxy_url, timeout=10):
                 return proxy_str
             _log.error('Proxychains proxy %s validation failed.', proxy_url)
+            from reNgine.common_func import remove_proxy_from_pool
+            remove_proxy_from_pool(proxy_url)
             return None
 
         max_workers = min(10, len(test_list))

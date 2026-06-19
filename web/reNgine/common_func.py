@@ -1027,7 +1027,7 @@ def validate_proxies(proxy_text):
 	if not raw_proxies:
 		return ''
 	valid_proxies = []
-	max_workers = min(1000, max(1, len(raw_proxies)))
+	max_workers = min(PROXY_VALIDATION_MAX_WORKERS, max(1, len(raw_proxies)))
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
 		future_to_proxy = {executor.submit(check_proxy_robust, p, PROXY_VALIDATION_TIMEOUT): p for p in raw_proxies}
 		for future in as_completed(future_to_proxy):
@@ -1040,6 +1040,50 @@ def validate_proxies(proxy_text):
 				valid_proxies.append(proxy_name)
 	return '\n'.join(valid_proxies)
 
+
+def _normalize_proxy_pool_line(proxy_line):
+	"""Normalize a proxy line for consistent persistence comparisons."""
+	proxy_line = (proxy_line or '').strip()
+	if not proxy_line:
+		return ''
+	if not proxy_line.startswith('http') and not proxy_line.startswith('socks'):
+		return f"http://{proxy_line}"
+	return proxy_line
+
+
+def get_valid_proxy_count(proxy_obj=None):
+	"""Return the count of persisted non-empty proxy lines."""
+	proxy_obj = proxy_obj or Proxy.objects.first()
+	if not proxy_obj or not proxy_obj.proxies:
+		return 0
+	return len([line for line in proxy_obj.proxies.splitlines() if line.strip()])
+
+
+def remove_proxy_from_pool(proxy_value, proxy_obj=None):
+	"""Remove a proxy from the persisted pool safely and idempotently."""
+	proxy_obj = proxy_obj or Proxy.objects.first()
+	if not proxy_obj or not proxy_obj.proxies:
+		return False
+
+	target = _normalize_proxy_pool_line(proxy_value)
+	if not target:
+		return False
+
+	remaining_lines = []
+	removed = False
+	for line in proxy_obj.proxies.splitlines():
+		stripped = line.strip()
+		if not stripped:
+			continue
+		if not removed and _normalize_proxy_pool_line(stripped) == target:
+			removed = True
+			continue
+		remaining_lines.append(stripped)
+
+	if removed:
+		proxy_obj.proxies = '\n'.join(remaining_lines)
+		proxy_obj.save(update_fields=['proxies'])
+	return removed
 
 
 # Curated pool of modern desktop browser user agents for realistic request spoofing.
@@ -1189,10 +1233,12 @@ def get_random_proxy():
 	result_holder = [None]  # thread-safe single-slot via GIL
 
 	def _check(proxy_url):
-		"""Check a single proxy; mark it failed on the cache if dead."""
+		"""Check a single proxy; mark it failed on the cache and prune from DB if dead."""
 		if check_proxy_robust(proxy_url, timeout=10, server_ip=server_ip):
 			return proxy_url
 		_failed_proxy_cache.add(proxy_url)
+		if remove_proxy_from_pool(proxy_url, _proxy_obj):
+			logger.warning('Removed invalid proxy from pool: %s', proxy_url)
 		return None
 
 	with ThreadPoolExecutor(max_workers=max_workers) as pool:
