@@ -884,116 +884,105 @@ def _detect_server_ip(timeout: int = 5) -> str:
 	return ''
 
 
-def _is_valid_ip(value: str) -> bool:
-	"""Return True if *value* looks like a valid IPv4 or IPv6 address.
-
-	This filters out captive-portal strings like 'Login Required' that could
-	otherwise fool a simple 200-OK JSON check.
+def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''):
+	"""Test if a proxy is truly working and not transparent.
+	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
+	by making a request to a public API and validating that the response is a valid IP address.
 	"""
-	import ipaddress
-	try:
-		ipaddress.ip_address(value)
-		return True
-	except ValueError:
+	proxy_url = proxy_url.strip()
+	if not proxy_url:
 		return False
+	test_proxy = proxy_url
+	if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://', 'socks5h://']):
+		test_proxy = 'http://' + test_proxy
 
+	import ipaddress
 
-def check_proxy_robust(proxy_url, timeout=10, server_ip=''):
-	"""Test if a proxy is truly working and not a transparent/captive-portal proxy.
+	# 9 popular, fast plain-text checkers returning just the raw IP address (eth0.me removed)
+	ALL_CHECKERS = [
+		"https://icanhazip.com",
+		"https://ifconfig.co/ip",
+		"https://api.ip.sb/ip",
+		"https://whatismyip.akamai.com/",
+		"https://checkip.amazonaws.com",
+		"https://ident.me",
+		"https://v4.ident.me",
+		"https://ipecho.net/plain",
+		"https://ipinfo.io/ip",
+	]
 
-	Improvements over the old implementation:
-	  - Both IP-reflection endpoints are checked in *parallel* (short-circuit on
-	    first success) rather than sequentially, halving worst-case latency.
-	  - The returned IP value is validated as a real IPv4 / IPv6 address so that
-	    captive-portal HTML strings cannot produce a false positive.
-	  - When ``server_ip`` is provided (and OpSec transparent-proxy detection is
-	    enabled), the proxy is rejected if its reported IP matches the server's own
-	    outbound IP (i.e. the proxy is transparent and exposes the real source).
+	# Deterministically select two distinct checkers based on proxy_url
+	hash_val = sum(ord(c) for c in proxy_url)
+	idx1 = hash_val % len(ALL_CHECKERS)
+	idx2 = (hash_val + 1) % len(ALL_CHECKERS)
+	check_targets = [ALL_CHECKERS[idx1], ALL_CHECKERS[idx2]]
 
-	Args:
-		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080).
-		timeout (int): Per-request timeout in seconds. Defaults to 10.
-		server_ip (str): The server's own outbound IP string (for transparent-proxy
-			detection). Pass '' to disable the check.
-
-	Returns:
-		bool: True if the proxy forwards traffic correctly, False otherwise.
-	"""
-	import ipaddress as _ipaddr
-	from concurrent.futures import ThreadPoolExecutor, as_completed
-
-	try:
-		proxy_url = proxy_url.strip()
-		if not proxy_url:
-			return False
-		# Normalise – ensure a scheme is present so requests can route correctly
-		test_proxy = proxy_url
-		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-			test_proxy = 'http://' + test_proxy
-
-		proxies = {'http': test_proxy, 'https': test_proxy}
+	def _try_proxy(scheme_proxy):
+		"""Return (reported_ip, errors) for the given proxy URL."""
+		proxies = {'http': scheme_proxy, 'https': scheme_proxy}
 		headers = {
-			'User-Agent': (
-				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-				'(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+			"User-Agent": (
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+				"(KHTML, by Gecko) Chrome/124.0.0.0 Safari/537.36"
 			)
 		}
-
-		# Two independent IP-reflection endpoints checked in parallel.
-		check_targets = [
-			('https://api.ipify.org?format=json', 'ip'),
-			('http://ip-api.com/json',            'query'),
-		]
-
-		def _try_endpoint(url, key):
-			"""Return the reported IP string or raise on failure."""
-			resp = requests.get(
-				url,
-				proxies=proxies,
-				headers=headers,
-				timeout=timeout,
-				allow_redirects=True,
-			)
-			if resp.status_code != 200:
-				raise ValueError(f'HTTP {resp.status_code}')
-			data = resp.json()
-			ip_str = data.get(key, '')
-			if not ip_str:
-				raise ValueError('empty IP field in response')
-			if not _is_valid_ip(ip_str):
-				raise ValueError(f'response IP is not a valid IP address: {ip_str!r}')
-			return ip_str
-
-		reported_ip = None
-		with ThreadPoolExecutor(max_workers=2) as _pool:
-			future_map = {_pool.submit(_try_endpoint, u, k): (u, k) for u, k in check_targets}
-			for fut in as_completed(future_map):
-				try:
-					reported_ip = fut.result()
-					# Cancel the sibling future – we have our answer
-					for other in future_map:
-						if other is not fut:
-							other.cancel()
+		errors = []
+		for url in check_targets:
+			try:
+				response = requests.get(
+					url,
+					proxies=proxies,
+					headers=headers,
+					timeout=timeout,
+					allow_redirects=True
+				)
+				if response.status_code == 200:
+					text = response.text.strip()
+					try:
+						# Validate as a real IPv4 or IPv6 address.
+						# This prevents false positives from captive portals or ISP redirects.
+						ipaddress.ip_address(text)
+						return text, []
+					except ValueError:
+						errors.append(f"Invalid IP format: {text[:50]}")
+				else:
+					errors.append(f"HTTP {response.status_code}")
+			except Exception as exc:
+				errors.append(exc)
+				# If the proxy itself is unreachable or times out, stop checking further targets
+				exc_str = str(exc).lower()
+				if any(k in exc_str for k in ['proxyerror', 'connecttimeout', 'refused', 'unreachable', 'timeout', 'timed out', 'connection reset', 'connection aborted']):
 					break
-				except Exception:
-					continue  # try the other endpoint
+		return None, errors
 
-		if not reported_ip:
-			# Both endpoints failed – proxy is dead or blocking check requests
-			return False
+	# 1) Try with the original scheme
+	reported_ip, errors = _try_proxy(test_proxy)
 
-		# Optional transparent-proxy detection: reject if the proxy simply
-		# forwards our real IP without changing it.
-		if server_ip and reported_ip == server_ip:
-			logger.warning(
-				'Proxy %s is transparent – reported IP %s matches server IP. Rejecting.',
-				proxy_url, reported_ip,
-			)
-			return False
+	# 2) For socks5:// only, retry with socks5h:// (remote DNS via proxy).
+	if not reported_ip and test_proxy.startswith('socks5://'):
+		is_proxy_unreachable = False
+		for err in errors:
+			err_str = str(err).lower()
+			if any(k in err_str for k in ['proxyerror', 'connecttimeout', 'refused', 'unreachable', 'timeout', 'timed out', 'connection reset', 'connection aborted']):
+				is_proxy_unreachable = True
+				break
+		if not is_proxy_unreachable:
+			socks5h_proxy = test_proxy.replace('socks5://', 'socks5h://', 1)
+			logger.debug("check_proxy_robust: retrying with remote DNS via %s", socks5h_proxy)
+			reported_ip, _ = _try_proxy(socks5h_proxy)
 
-		return True
-	except Exception:
+	if not reported_ip:
 		return False
+
+	# Optional transparent-proxy detection
+	if server_ip and reported_ip == server_ip:
+		logger.warning(
+			'Proxy %s is transparent – reported IP %s matches server IP. Rejecting.',
+			proxy_url, reported_ip,
+		)
+		return False
+
+	return True
 
 
 def merge_imported_subdomains(domain, imported_subdomains):
