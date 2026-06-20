@@ -3598,5 +3598,6 @@ def resync_certificate_activity(cert_id: int, job_id: str = None) -> dict:
             "[SCAN]", "ERROR",
             "task=cert_resync cert_id=%s error=%s" % (cert_id, format_exception_for_log(e)),
             level="error",
+            exc_info=True,
         )
-        return {"status": "error", "updated": False, "error": format_exception_for_log(e)}
+        raise
