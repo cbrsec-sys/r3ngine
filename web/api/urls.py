@@ -28,6 +28,7 @@ from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView, RecalculateAt
 from .scan_configuration import ScanConfigurationAPI
 from .config_migration_views import ExportConfig, ImportConfig, ExportScanResults
 from .cert_views import CertificateIntelView
+from .identity_views import IdentityInfraView
 
 
 app_name = 'api'
@@ -517,6 +518,7 @@ urlpatterns = [
         name='apme_attack_trees'
     ),
     path('certs/', CertificateIntelView.as_view(), name='certificate_intel'),
+    path('identity/', IdentityInfraView.as_view(), name='identity_infra'),
     path(
         'action/ad-assessment/from-subdomain/',
         LaunchADAssessmentFromSubdomain.as_view(),
