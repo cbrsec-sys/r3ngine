@@ -2831,6 +2831,34 @@ def run_certificate_intel_activity(scan_history_id: int, job_id: str = None) -> 
         return {"status": "error", "count": 0, "error": format_exception_for_log(e)}
 
 
+@activity.defn(name="run_identity_infra_activity")
+def run_identity_infra_activity(scan_history_id: int, job_id: str = None) -> dict:
+    """
+    Detect identity infrastructure (ADFS, OWA, Exchange, LDAP, SSO) from existing
+    scan data. No tool subprocess — reads only from PostgreSQL.
+    Must run before APME so ingest_identity_infra() has data to read.
+    """
+    from reNgine.identity_tasks import run_identity_intel
+    from reNgine.utils.logger import format_exception_for_log
+
+    logger.log_line("[SCAN]", "START", "task=identity_infra scan_id=%s" % scan_history_id)
+
+    try:
+        records = run_identity_intel(scan_history_id)
+        logger.log_line(
+            "[SCAN]", "COMPLETE",
+            "task=identity_infra scan_id=%s records=%d" % (scan_history_id, len(records)),
+        )
+        return {"status": "ok", "count": len(records)}
+    except Exception as e:
+        logger.log_line(
+            "[SCAN]", "ERROR",
+            "task=identity_infra scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)),
+            level="error",
+        )
+        return {"status": "error", "count": 0, "error": format_exception_for_log(e)}
+
+
 @activity.defn(name="RunLlmApmeActivity")
 def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
     from apme.apme_tasks import run_llm_apme

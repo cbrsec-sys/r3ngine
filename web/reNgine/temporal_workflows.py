@@ -779,6 +779,14 @@ class MasterScanWorkflow:
                                 retry_policy=RetryPolicy(maximum_attempts=2),
                                 task_queue="python-orchestrator-queue",
                             )
+                            # Identity infrastructure detection — must run before APME
+                            await workflow.execute_activity(
+                                "run_identity_infra_activity",
+                                args=[ctx.get("scan_history_id")],
+                                start_to_close_timeout=timedelta(minutes=10),
+                                retry_policy=RetryPolicy(maximum_attempts=2),
+                                task_queue="python-orchestrator-queue",
+                            )
                             # Attack Path Modeling Engine — must be the final analysis step
                             await workflow.execute_activity(
                                 "RunGenericTaskActivity",
@@ -1775,6 +1783,14 @@ class SubScanWorkflow:
                                 args=[ctx.get("scan_history_id")],
                                 start_to_close_timeout=timedelta(minutes=15),
                                 heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=RetryPolicy(maximum_attempts=2),
+                                task_queue="python-orchestrator-queue",
+                            )
+                            # Identity infrastructure detection — must run before APME
+                            await workflow.execute_activity(
+                                "run_identity_infra_activity",
+                                args=[ctx.get("scan_history_id")],
+                                start_to_close_timeout=timedelta(minutes=10),
                                 retry_policy=RetryPolicy(maximum_attempts=2),
                                 task_queue="python-orchestrator-queue",
                             )

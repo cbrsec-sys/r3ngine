@@ -170,6 +170,7 @@ from reNgine.temporal_activities import (
     run_monitoring_check_activity,
     run_llm_apme_activity,
     run_certificate_intel_activity,
+    run_identity_infra_activity,
     recalculate_apme_activity,
     enrich_identities_activity,
     geo_localize_activity,
@@ -505,6 +506,7 @@ class Command(BaseCommand):
                 # New utility / integration activities
                 run_llm_apme_activity,
                 run_certificate_intel_activity,
+                run_identity_infra_activity,
                 recalculate_apme_activity,
                 enrich_identities_activity,
                 geo_localize_activity,
