@@ -82,15 +82,23 @@ def parse_tlsx_json_line(line: str) -> Optional[dict]:
     }
 
 
+def _parse_dt(s: Optional[str]):
+    """Parse an ISO-8601 datetime string, ensuring UTC tzinfo is attached."""
+    if not s:
+        return None
+    dt = parse_datetime(s)
+    if dt and dt.tzinfo is None:
+        dt = dt.replace(tzinfo=dt_timezone.utc)
+    return dt
+
+
 def _is_expired(not_after_str: Optional[str]) -> bool:
     if not not_after_str:
         return False
     from django.utils import timezone
-    dt = parse_datetime(not_after_str)
+    dt = _parse_dt(not_after_str)
     if dt is None:
         return False
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=dt_timezone.utc)
     return dt < timezone.now()
 
 
@@ -165,14 +173,6 @@ def run_certificate_intel(
 
             not_after_str = parsed["not_after"]
             not_before_str = parsed["not_before"]
-
-            def _parse_dt(s: Optional[str]):
-                if not s:
-                    return None
-                dt = parse_datetime(s)
-                if dt and dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=dt_timezone.utc)
-                return dt
 
             subdomain_obj = Subdomain.objects.filter(
                 scan_history_id=scan_history_id,

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import axios from '../../../api/axiosConfig';
 
 export interface CertificateRecord {
   id: number;
@@ -22,15 +22,29 @@ export interface CertificateRecord {
 
 export interface CertificateResponse {
   count: number;
+  page: number;
+  page_size: number;
   results: CertificateRecord[];
 }
 
-export const useCertificates = (scanId: number | undefined) =>
+export const useCertificates = (
+  scanId: number | undefined,
+  page = 1,
+  pageSize = 100,
+  projectSlug?: string,
+) =>
   useQuery<CertificateResponse>({
-    queryKey: ['certificates', scanId],
+    queryKey: ['certificates', scanId, page, pageSize, projectSlug],
     queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('scan_id', String(scanId));
+      params.set('page', String(page));
+      params.set('page_size', String(pageSize));
+      if (projectSlug) {
+        params.set('project', projectSlug);
+      }
       const { data } = await axios.get<CertificateResponse>(
-        `/api/certs/?scan_id=${scanId}`
+        `/api/certs/?${params.toString()}`
       );
       return data;
     },

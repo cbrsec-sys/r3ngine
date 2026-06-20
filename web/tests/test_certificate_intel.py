@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.utils import timezone
+from rolepermissions.roles import assign_role
 from scanEngine.models import EngineType
 from startScan.models import CertificateIntelligence, ScanHistory
 from targetApp.models import Domain
@@ -119,8 +120,9 @@ class TestCertificateActivity(TestCase):
         self.scan = _make_scan(self.domain)
 
     def test_activity_calls_runner(self):
-        from unittest.mock import patch
-        with patch("reNgine.certificate_tasks.run_certificate_intel") as mock_runner:
+        from unittest.mock import patch, MagicMock
+        with patch("reNgine.certificate_tasks.run_certificate_intel") as mock_runner, \
+             patch("temporalio.activity.heartbeat", MagicMock()):
             from reNgine.temporal_activities import run_certificate_intel_activity
             mock_runner.return_value = []
             result = run_certificate_intel_activity(self.scan.id)
@@ -129,8 +131,9 @@ class TestCertificateActivity(TestCase):
             self.assertEqual(result["count"], 0)
 
     def test_activity_returns_count(self):
-        from unittest.mock import patch
-        with patch("reNgine.certificate_tasks.run_certificate_intel") as mock_runner:
+        from unittest.mock import patch, MagicMock
+        with patch("reNgine.certificate_tasks.run_certificate_intel") as mock_runner, \
+             patch("temporalio.activity.heartbeat", MagicMock()):
             from reNgine.temporal_activities import run_certificate_intel_activity
             fake_cert = CertificateIntelligence(host="a.example.com", port=443)
             mock_runner.return_value = [fake_cert]
@@ -300,7 +303,10 @@ class TestCertificateAPI(TestCase):
     def setUp(self):
         from rest_framework.test import APIClient
         from django.contrib.auth.models import User
-        self.user = User.objects.create_user("certuser", password="pass")
+        self.user = User.objects.create_user(
+            "certuser", password="pass", is_superuser=True,
+        )
+        assign_role(self.user, "sys_admin")
         self.client = APIClient()
         # force_authenticate satisfies DRF; force_login satisfies LoginRequiredMiddleware
         self.client.force_authenticate(user=self.user)
@@ -319,12 +325,35 @@ class TestCertificateAPI(TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["count"], 1)
+        self.assertIn("page", data)
+        self.assertIn("page_size", data)
         self.assertEqual(data["results"][0]["host"], "api.example.com")
         self.assertTrue(data["results"][0]["is_expired"])
+
+    def test_pagination_params_accepted(self):
+        resp = self.client.get(f"/api/certs/?scan_id={self.scan.id}&page=1&page_size=10")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["page"], 1)
+        self.assertEqual(data["page_size"], 10)
+
+    def test_invalid_page_param_returns_400(self):
+        resp = self.client.get(f"/api/certs/?scan_id={self.scan.id}&page=abc")
+        self.assertEqual(resp.status_code, 400)
 
     def test_missing_scan_id_returns_400(self):
         resp = self.client.get("/api/certs/")
         self.assertEqual(resp.status_code, 400)
+
+    def test_unprivileged_user_cannot_access(self):
+        from rest_framework.test import APIClient
+        from django.contrib.auth.models import User
+        plain = User.objects.create_user("certguest", password="pass")
+        c = APIClient()
+        c.force_authenticate(user=plain)
+        c.force_login(user=plain)
+        resp = c.get(f"/api/certs/?scan_id={self.scan.id}")
+        self.assertIn(resp.status_code, [401, 403])
 
     def test_unauthenticated_returns_redirect(self):
         # LoginRequiredMiddleware redirects to login before DRF auth runs

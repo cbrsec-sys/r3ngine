@@ -2787,35 +2787,48 @@ def run_certificate_intel_activity(scan_history_id: int, job_id: str = None) -> 
     Runs tlsx -json, parses output, writes CertificateIntelligence records.
     Must run before APME so ingest_certificates() has data to read.
     """
-    from reNgine.certificate_tasks import run_certificate_intel
     import os
+    import re
+    from reNgine.certificate_tasks import run_certificate_intel
+    from reNgine.settings import RENGINE_RESULTS
+    from reNgine.utils.logger import format_exception_for_log
 
     logger.log_line("[SCAN]", "START", "task=cert_intel scan_id=%s" % scan_history_id)
 
     try:
         from startScan.models import ScanHistory
         scan = ScanHistory.objects.select_related("domain").get(id=scan_history_id)
-        results_dir = os.path.join(
-            "/usr/src/app",
-            "scan_results",
-            scan.domain.name,
-            str(scan_history_id),
-        )
+
+        # Sanitize domain name: allow only alphanumeric, hyphens, and dots (Rule 1.4).
+        raw_domain = scan.domain.name or ""
+        safe_domain = re.sub(r"[^a-zA-Z0-9.\-]", "_", raw_domain)
+
+        # Build path, then verify it stays within RENGINE_RESULTS (Rule 1.2).
+        base = os.path.realpath(RENGINE_RESULTS)
+        candidate = os.path.join(RENGINE_RESULTS, "%s_%s" % (safe_domain, scan_history_id))
+        results_dir = os.path.realpath(candidate)
+        if not results_dir.startswith(base + os.sep) and results_dir != base:
+            raise ValueError(
+                "cert_intel results_dir escapes RENGINE_RESULTS: %s" % results_dir
+            )
+
+        activity.heartbeat("cert_intel: starting tlsx for scan_id=%s" % scan_history_id)
         os.makedirs(results_dir, exist_ok=True)
         certs = run_certificate_intel(scan_history_id, results_dir)
+        activity.heartbeat("cert_intel: tlsx complete, certs=%d" % len(certs))
+
         logger.log_line(
             "[SCAN]", "COMPLETE",
             "task=cert_intel scan_id=%s certs=%d" % (scan_history_id, len(certs)),
         )
         return {"status": "ok", "count": len(certs)}
     except Exception as e:
-        from reNgine.utils.logger import format_exception_for_log
         logger.log_line(
             "[SCAN]", "ERROR",
             "task=cert_intel scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)),
             level="error",
         )
-        return {"status": "error", "count": 0, "error": str(e)}
+        return {"status": "error", "count": 0, "error": format_exception_for_log(e)}
 
 
 @activity.defn(name="RunLlmApmeActivity")

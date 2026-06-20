@@ -26,7 +26,7 @@ rules:
         confidence: 0.60
 
   - name: self_signed_cert_to_authenticated_access
-    mitre_id: "T1557"
+    mitre_id: "T1553.004"
     if:
       node.type: Certificate
       node.property: "self_signed:True"
@@ -37,7 +37,7 @@ rules:
         confidence: 0.55
 
   - name: expired_cert_to_lateral_movement
-    mitre_id: "T1557"
+    mitre_id: "T1550"
     if:
       node.type: Certificate
       node.property: "is_expired:True"
@@ -48,7 +48,7 @@ rules:
         confidence: 0.45
 
   - name: mismatched_cert_to_credential_harvesting
-    mitre_id: "T1557"
+    mitre_id: "T1557.002"
     if:
       node.type: Certificate
       node.property: "mismatched:True"

@@ -401,6 +401,7 @@ class Neo4jManager:
 
             # Certificate Intelligence sync
             from startScan.models import CertificateIntelligence
+            cert_count = 0
             cert_rows = []
             for row in CertificateIntelligence.objects.filter(
                 scan_history_id=scan_history_id
@@ -421,6 +422,7 @@ class Neo4jManager:
                     "has_weak_cipher": bool(row["has_weak_cipher"]),
                     "scan_id": scan_history_id,
                 })
+                cert_count += 1
                 if len(cert_rows) >= GRAPH_SYNC_BATCH_SIZE:
                     self._batch_execute(
                         session, self._batch_merge_certificates, cert_rows,
@@ -438,7 +440,7 @@ class Neo4jManager:
             f"[Neo4j] sync_scan_results scan_id={scan_history_id}: "
             f"{subdomain_count} subdomains, {endpoint_count} endpoints, "
             f"{param_count} params, {tech_count} techs, "
-            f"{vuln_count} vulns, {cve_count} CVEs synced."
+            f"{vuln_count} vulns, {cve_count} CVEs, {cert_count} certs synced."
         )
 
     @staticmethod
