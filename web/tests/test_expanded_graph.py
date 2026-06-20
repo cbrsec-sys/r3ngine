@@ -96,7 +96,6 @@ class TestAPIIntelligenceIngestion(TestCase):
                 target_domain=self.domain,
                 subdomain=self.sub,
                 http_url=f"https://api.example.com{path}",
-                http_method="GET",
                 http_status=200,
             )
         EndPoint.objects.create(
@@ -104,7 +103,6 @@ class TestAPIIntelligenceIngestion(TestCase):
             target_domain=self.domain,
             subdomain=self.sub,
             http_url="https://api.example.com/graphql",
-            http_method="POST",
             http_status=200,
             content_type="application/json",
         )

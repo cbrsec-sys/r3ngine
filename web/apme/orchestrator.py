@@ -98,6 +98,21 @@ class APMEOrchestrator:
         all_nodes.extend(identity_nodes)
         all_edges.extend(identity_edges)
 
+        # API intelligence ingestion (Plan 3)
+        from apme.ingestion.api_intelligence import ingest_api_intelligence
+        api_nodes, api_edges = ingest_api_intelligence(target_id)
+        all_nodes.extend(api_nodes)
+        all_edges.extend(api_edges)
+
+        # Organization and Application nodes (Plan 3)
+        from apme.ingestion.graph_expansion import ingest_organizations, ingest_applications
+        org_nodes, org_edges = ingest_organizations(target_id)
+        all_nodes.extend(org_nodes)
+        all_edges.extend(org_edges)
+        app_nodes, app_edges = ingest_applications(target_id)
+        all_nodes.extend(app_nodes)
+        all_edges.extend(app_edges)
+
         # Inject virtual goal nodes (Objectives) to ensure rules have targets
         goal_nodes = self._generate_virtual_goal_nodes(scan_history_id)
         all_nodes.extend(goal_nodes)
