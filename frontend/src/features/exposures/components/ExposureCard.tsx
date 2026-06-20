@@ -4,6 +4,12 @@ import type { Exposure } from '../types';
 import { useThemeTokens } from '@/theme/useThemeTokens';
 import { useMutateExposureStatus } from '../api/useExposures';
 
+function deriveAssetSummary(evidence: Exposure['evidence']): string | null {
+  if (!evidence || evidence.length === 0) return null;
+  const d = evidence[0].evidence_data;
+  return (d?.url ?? d?.name ?? d?.host ?? d?.value ?? d?.target) as string | null ?? null;
+}
+
 interface ExposureCardProps {
   exposure: Exposure;
   onClick: (exposure: Exposure) => void;
@@ -12,6 +18,7 @@ interface ExposureCardProps {
 export const ExposureCard: React.FC<ExposureCardProps> = ({ exposure, onClick }) => {
   const { tokens } = useThemeTokens();
   const mutateStatus = useMutateExposureStatus();
+  const assetSummary = deriveAssetSummary(exposure.evidence);
 
   const handleResolve = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -75,6 +82,24 @@ export const ExposureCard: React.FC<ExposureCardProps> = ({ exposure, onClick })
           }} 
         />
       </Stack>
+
+      {assetSummary && (
+        <Typography
+          noWrap
+          variant="caption"
+          sx={{
+            display: 'block',
+            mt: 1,
+            mb: 1,
+            color: 'text.secondary',
+            fontFamily: 'monospace',
+            fontSize: '0.72rem',
+          }}
+          title={assetSummary}
+        >
+          {assetSummary}
+        </Typography>
+      )}
 
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
         Status:{' '}
