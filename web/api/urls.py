@@ -36,6 +36,11 @@ from .scan_configuration import ScanConfigurationAPI
 from .config_migration_views import ExportConfig, ImportConfig, ExportScanResults
 from .cert_views import CertificateIntelView
 from .identity_views import IdentityInfraView
+from .identity_mobile_views import (
+    IdentityMobileDetailView,
+    IdentityConfirmView,
+    IdentityDismissView,
+)
 from .graph_intel_views import FullChainGraphView, ChainNodesByTypeView
 from .exposure_mobile_views import (
     ExposureMobileListView,
@@ -558,6 +563,10 @@ urlpatterns = [
     path('certificates/<int:pk>/flag/', CertificateFlagView.as_view(), name='certificates_flag'),
     path('certificates/<int:pk>/', CertificateMobileDetailView.as_view(), name='certificates_mobile_detail'),
     path('identity/', IdentityInfraView.as_view(), name='identity_infra'),
+    # Identity mobile views (confirm/dismiss before <int:pk> so literals are matched first)
+    path('identity/<int:pk>/confirm/', IdentityConfirmView.as_view(), name='identity_confirm'),
+    path('identity/<int:pk>/dismiss/', IdentityDismissView.as_view(), name='identity_dismiss'),
+    path('identity/<int:pk>/', IdentityMobileDetailView.as_view(), name='identity_mobile_detail'),
     path(
         'action/ad-assessment/from-subdomain/',
         LaunchADAssessmentFromSubdomain.as_view(),
