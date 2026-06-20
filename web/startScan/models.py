@@ -634,6 +634,54 @@ class Exposure(models.Model):
 		return f"{self.type} on {target}"
 
 
+class CertificateIntelligence(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='certificate_intel',
+	)
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True,
+	)
+	subdomain = models.ForeignKey(
+		'Subdomain', on_delete=models.CASCADE, null=True, blank=True,
+		related_name='certificates',
+	)
+	host = models.CharField(max_length=1000)
+	port = models.IntegerField(default=443)
+	subject_cn = models.CharField(max_length=500, null=True, blank=True)
+	subject_an = ArrayField(
+		models.CharField(max_length=500), default=list, blank=True
+	)
+	issuer_cn = models.CharField(max_length=500, null=True, blank=True)
+	issuer_org = models.CharField(max_length=500, null=True, blank=True)
+	not_before = models.DateTimeField(null=True, blank=True)
+	not_after = models.DateTimeField(null=True, blank=True)
+	tls_version = models.CharField(max_length=20, null=True, blank=True)
+	cipher = models.CharField(max_length=300, null=True, blank=True)
+	fingerprint_sha256 = models.CharField(
+		max_length=100, null=True, blank=True, db_index=True
+	)
+	self_signed = models.BooleanField(default=False)
+	mismatched = models.BooleanField(default=False)
+	is_expired = models.BooleanField(default=False)
+	has_weak_cipher = models.BooleanField(default=False)
+	trust_chain = models.JSONField(default=list, blank=True)
+	raw_json = models.JSONField(default=dict, blank=True)
+
+	class Meta:
+		constraints = [
+			models.UniqueConstraint(
+				fields=['target_domain', 'fingerprint_sha256'],
+				name='unique_cert_per_domain',
+				condition=models.Q(fingerprint_sha256__isnull=False),
+			),
+		]
+
+	def __str__(self) -> str:
+		return f"{self.host}:{self.port} ({self.subject_cn or 'unknown CN'})"
+
+
 class ExposureEvidence(models.Model):
 	id = models.AutoField(primary_key=True)
 	exposure = models.ForeignKey(Exposure, on_delete=models.CASCADE, related_name='evidence')
