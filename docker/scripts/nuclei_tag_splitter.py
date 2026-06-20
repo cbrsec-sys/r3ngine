@@ -60,7 +60,7 @@ def replace_tag_in_text(content, old_tag, new_tag):
 
 def main():
     templates_dir = os.getenv("NUCLEI_TEMPLATES_DIR", "/root/nuclei-templates")
-    max_templates = int(os.getenv("NUCLEI_MAX_TEMPLATES_PER_BATCH", "100"))
+    max_templates = int(os.getenv("NUCLEI_MAX_TEMPLATES_PER_BATCH", "60"))
     manifest_path = os.getenv("NUCLEI_SPLIT_TAGS_MANIFEST", "/root/nuclei-templates/split_tags.json")
 
     print(f"Scanning templates in {templates_dir}...")
