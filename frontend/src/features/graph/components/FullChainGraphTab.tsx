@@ -31,10 +31,10 @@ const NODE_TYPE_META: Record<
   string,
   { label: string; icon: React.ReactNode; color: string }
 > = {
-  Organization:  { label: 'Organization',   icon: <Building2 size={14} />,     color: '#f59e0b' },
+  Organization:  { label: 'Organization',   icon: <Building2 size={14} />,     color: '#d97706' },
   Subdomain:     { label: 'Subdomain',      icon: <Globe size={14} />,         color: '#3b82f6' },
   IPAddress:     { label: 'IP Address',     icon: <Server size={14} />,        color: '#6b7280' },
-  Application:   { label: 'Application',   icon: <Code size={14} />,          color: '#10b981' },
+  Application:   { label: 'Application',   icon: <Code size={14} />,          color: '#0d9488' },
   Technology:    { label: 'Technology',    icon: <Server size={14} />,        color: '#8b5cf6' },
   Certificate:   { label: 'Certificate',   icon: <Shield size={14} />,        color: '#06b6d4' },
   IdentityInfra: { label: 'Identity',      icon: <Key size={14} />,           color: '#a855f7' },

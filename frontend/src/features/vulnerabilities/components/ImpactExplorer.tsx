@@ -51,8 +51,8 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
     certificateNode:  '#06b6d4',
     identityNode:     '#a855f7',
     apiEndpointNode:  '#ec4899',
-    applicationNode:  '#10b981',
-    organizationNode: '#f59e0b',
+    applicationNode:  '#0d9488',
+    organizationNode: '#d97706',
   };
 
   const { data: graphData, isLoading: isGraphDataLoading } = useImpactGraphData(projectSlug, vulnId);
