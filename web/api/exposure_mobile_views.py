@@ -75,7 +75,7 @@ class ExposureMobileListView(APIView):
         filter_status = request.query_params.get('status')
 
         qs = Exposure.objects.select_related('subdomain', 'endpoint').prefetch_related(
-            'evidence', 'vulnerabilities'
+            'evidence', 'vulnerabilities', 'subdomain__ip_addresses'
         )
 
         if scan_id:
@@ -95,7 +95,7 @@ class ExposureMobileListView(APIView):
                 )
             qs = qs.filter(status=filter_status)
 
-        return Response([_serialize_exposure(e) for e in qs.order_by('-first_seen')])
+        return Response([_serialize_exposure(e) for e in qs.order_by('-first_seen')[:200]])
 
 
 class ExposureMobileDetailView(APIView):
@@ -108,7 +108,7 @@ class ExposureMobileDetailView(APIView):
             obj = (
                 Exposure.objects
                 .select_related('subdomain', 'endpoint')
-                .prefetch_related('evidence', 'vulnerabilities')
+                .prefetch_related('evidence', 'vulnerabilities', 'subdomain__ip_addresses')
                 .get(pk=pk)
             )
         except Exposure.DoesNotExist:
@@ -173,7 +173,7 @@ class ExposureStatusUpdateView(APIView):
             obj = (
                 Exposure.objects
                 .select_related('subdomain', 'endpoint')
-                .prefetch_related('evidence', 'vulnerabilities')
+                .prefetch_related('evidence', 'vulnerabilities', 'subdomain__ip_addresses')
                 .get(pk=pk)
             )
         except Exposure.DoesNotExist:
@@ -196,30 +196,23 @@ class ExposureBulkStatusView(APIView):
         new_status = request.data.get('status')
 
         if not isinstance(ids, list) or not ids:
-            return Response(
-                {'error': 'ids must be a non-empty list'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({'error': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+        if not new_status:
+            return Response({'error': 'status is required'}, status=status.HTTP_400_BAD_REQUEST)
         if new_status not in _VALID_STATUSES:
-            return Response(
-                {'error': f'Invalid status: {new_status}'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({'error': f'Invalid status: {new_status}'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(ids) > 100:
+            return Response({'error': 'Maximum 100 IDs per request'}, status=status.HTTP_400_BAD_REQUEST)
 
-        updated = []
-        rejected = []
-        for eid in ids:
-            try:
-                obj = Exposure.objects.get(pk=int(eid))
-                obj.status = new_status
-                obj.save(update_fields=['status'])
-                updated.append(obj.id)
-            except (Exposure.DoesNotExist, ValueError, TypeError):
-                rejected.append(eid)
+        try:
+            int_ids = [int(i) for i in ids]
+        except (ValueError, TypeError):
+            return Response({'error': 'ids must be integers'}, status=status.HTTP_400_BAD_REQUEST)
 
-        logger.info(
-            'ExposureBulkStatusView: updated=%s rejected=%s',
-            len(updated),
-            len(rejected),
-        )
+        exists_ids = set(Exposure.objects.filter(pk__in=int_ids).values_list('id', flat=True))
+        Exposure.objects.filter(pk__in=exists_ids).update(status=new_status)
+        updated = list(exists_ids)
+        rejected = [i for i in int_ids if i not in exists_ids]
+
+        logger.info('ExposureBulkStatusView: updated=%s rejected=%s', len(updated), len(rejected))
         return Response({'updated': updated, 'rejected': rejected})

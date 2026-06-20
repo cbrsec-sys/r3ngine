@@ -45,7 +45,7 @@ class CertificateMobileListView(APIView):
                     {'error': 'scan_id must be an integer'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        return Response([_serialize_cert(c) for c in qs])
+        return Response([_serialize_cert(c) for c in qs[:200]])
 
 
 class CertificateMobileDetailView(APIView):
