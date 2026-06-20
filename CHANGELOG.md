@@ -1,5 +1,17 @@
 # Changelog
 
+### [v3.7.0]
+
+#### Enhanced
+
+- **Distributed Remote Worker Infrastructure**:
+  - Implemented the `ScanWorker` model and Settings UI (`RemoteWorkersPage`) for managing isolated remote workers with user-defined `auth_token` secrets.
+  - Added dynamic `--worker-name`, `--worker-token`, and `--r3ngine-url` arguments to `run_temporal_orchestrator.py` allowing headless worker deployment.
+  - Developed a resilient, non-blocking `requests` + `asyncio.to_thread` heartbeat loop for workers to report health status to the central server.
+  - Built `WorkerHeartbeatAPIView` employing `constant_time_compare` to securely authenticate worker payloads.
+  - Enhanced `InitiateScan` and `InitiateSubTask` views to validate the health (heartbeat within 5 mins) and active state of remote workers before routing scans to their isolated task queues.
+  - Added standalone `docker-compose.worker.yml` and `up-worker` / `down-worker` targets to `Makefile` and `make.bat` for seamless scaling.
+
 ### [v3.6.3]
 
 #### Enhanced
