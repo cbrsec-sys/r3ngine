@@ -621,10 +621,13 @@ class Exposure(models.Model):
 	EXPOSURE_STATUS_CHOICES = (
 		('open', 'Open'),
 		('verified', 'Verified'),
+		('accepted', 'Accepted'),
 		('false_positive', 'False Positive'),
 		('remediated', 'Remediated'),
+		('resolved', 'Resolved'),
 	)
 	status = models.CharField(max_length=20, choices=EXPOSURE_STATUS_CHOICES, default='open')
+	status_note = models.TextField(blank=True, default='')
 	first_seen = models.DateTimeField(auto_now_add=True)
 	last_seen = models.DateTimeField(auto_now=True)
 	risk_score = models.FloatField(default=0.0)
@@ -668,6 +671,8 @@ class CertificateIntelligence(models.Model):
 	has_weak_cipher = models.BooleanField(default=False)
 	trust_chain = models.JSONField(default=list, blank=True)
 	raw_json = models.JSONField(default=dict, blank=True)
+	flag_type = models.CharField(max_length=50, blank=True, null=True)
+	flag_note = models.TextField(blank=True, null=True)
 
 	class Meta:
 		constraints = [
@@ -725,6 +730,9 @@ class IdentityInfraDiscovery(models.Model):
 	confidence_score = models.FloatField(default=0.5)
 	is_externally_accessible = models.BooleanField(default=True)
 	additional_signals = models.JSONField(default=dict, blank=True)
+	confirmed = models.BooleanField(null=True)
+	dismissed = models.BooleanField(null=True)
+	dismiss_reason = models.TextField(blank=True, null=True)
 
 	class Meta:
 		unique_together = [("scan_history", "host", "infra_type")]
@@ -939,6 +947,8 @@ class ImpactAssessment(models.Model):
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+	dismissed = models.BooleanField(default=False)
+	dismiss_reason = models.TextField(blank=True, null=True)
 
 	class Meta:
 		# Enforce one ImpactAssessment per Vulnerability to prevent
