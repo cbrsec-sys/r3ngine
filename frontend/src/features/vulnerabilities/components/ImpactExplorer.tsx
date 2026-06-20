@@ -39,15 +39,20 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
   const { tokens, isLight } = useThemeTokens();
 
   const graphColors = {
-    nodeBg:        isLight ? '#e2e8f0' : '#1e293b',
-    nodeText:      isLight ? '#0f172a' : '#ffffff',
-    nodeBorder:    tokens.accent.primary,
-    edge:          tokens.accent.primary,
-    domainNode:    '#0ea5e9',
-    vulnNode:      '#ef4444',
-    subdomainNode: '#10b981',
-    ipNode:        '#f59e0b',
-    canvasBg:      isLight ? '#f8fafc' : '#0f172a',
+    nodeBg:           isLight ? '#e2e8f0' : '#1e293b',
+    nodeText:         isLight ? '#0f172a' : '#ffffff',
+    nodeBorder:       tokens.accent.primary,
+    edge:             tokens.accent.primary,
+    domainNode:       '#0ea5e9',
+    vulnNode:         '#ef4444',
+    subdomainNode:    '#10b981',
+    ipNode:           '#f59e0b',
+    canvasBg:         isLight ? '#f8fafc' : '#0f172a',
+    certificateNode:  '#06b6d4',
+    identityNode:     '#a855f7',
+    apiEndpointNode:  '#ec4899',
+    applicationNode:  '#10b981',
+    organizationNode: '#f59e0b',
   };
 
   const { data: graphData, isLoading: isGraphDataLoading } = useImpactGraphData(projectSlug, vulnId);
@@ -113,6 +118,26 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
         {
           selector: 'node[type = "IpAddress"]',
           style: { 'background-color': graphColors.ipNode }
+        },
+        {
+          selector: 'node[type = "Certificate"]',
+          style: { 'background-color': graphColors.certificateNode }
+        },
+        {
+          selector: 'node[type = "IdentityInfra"]',
+          style: { 'background-color': graphColors.identityNode }
+        },
+        {
+          selector: 'node[type = "APIEndpoint"]',
+          style: { 'background-color': graphColors.apiEndpointNode }
+        },
+        {
+          selector: 'node[type = "Application"]',
+          style: { 'background-color': graphColors.applicationNode }
+        },
+        {
+          selector: 'node[type = "Organization"]',
+          style: { 'background-color': graphColors.organizationNode }
         },
         {
           selector: 'edge',

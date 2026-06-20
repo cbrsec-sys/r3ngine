@@ -56,10 +56,17 @@ def collect_api_intelligence(scan_history_id: int) -> List:
     """
     Phase 1: Cluster EndPoint records and write APIIntelligenceProfile records.
 
-    Groups endpoints by (subdomain, path-prefix, api_type). Writes one
+    Groups endpoints by (base_url, api_type), where base_url is scheme + host
+    + first two path segments. (The subdomain is therefore encoded inside
+    base_url's netloc — no need to key it separately.) Writes one
     APIIntelligenceProfile per distinct cluster.
     """
-    from startScan.models import ScanHistory, EndPoint, APIIntelligenceProfile
+    from startScan.models import (
+        ScanHistory,
+        EndPoint,
+        APIIntelligenceProfile,
+        Subdomain as SubdomainModel,
+    )
 
     try:
         scan = ScanHistory.objects.select_related("domain").get(id=scan_history_id)
@@ -90,16 +97,19 @@ def collect_api_intelligence(scan_history_id: int) -> List:
             "status": ep.http_status or 0,
         })
 
+    # Pre-fetch every subdomain for the scan once. Avoids one .first() roundtrip
+    # per cluster (could be hundreds for an API-heavy target).
+    subdomain_index: Dict[str, "SubdomainModel"] = {
+        s.name: s for s in SubdomainModel.objects.filter(
+            scan_history_id=scan_history_id
+        ).only("id", "name")
+    }
+
     results = []
 
     for (base_url, api_type), ep_list in clusters.items():
         subdomain_name = urllib.parse.urlparse(base_url).hostname
-        subdomain_obj = None
-        if subdomain_name:
-            from startScan.models import Subdomain as SubdomainModel
-            subdomain_obj = SubdomainModel.objects.filter(
-                scan_history_id=scan_history_id, name=subdomain_name
-            ).first()
+        subdomain_obj = subdomain_index.get(subdomain_name) if subdomain_name else None
 
         obj, _ = APIIntelligenceProfile.objects.update_or_create(
             scan_history=scan,

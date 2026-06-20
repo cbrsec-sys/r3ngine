@@ -11,6 +11,18 @@ GRAPH_SYNC_BATCH_SIZE = 500
 # ORM read chunk — separate from Neo4j batch size.
 GRAPH_SYNC_ORM_CHUNK = 2000
 
+# Caps for the read-side full-chain query (one cap per query, not cartesian).
+GRAPH_CHAIN_NODE_LIMIT = 2000
+GRAPH_CHAIN_EDGE_LIMIT = 5000
+
+# Node labels surfaced by the expanded-graph queries. Keep in sync with the
+# allowlist referenced in `web/api/graph_intel_views.py`.
+GRAPH_CHAIN_ALLOWED_LABELS = frozenset([
+    "Organization", "Subdomain", "IPAddress", "Application",
+    "Technology", "Certificate", "IdentityInfra", "APIEndpoint",
+    "APMENode", "Vulnerability", "CVE",
+])
+
 
 def _chunk_list(items, size=GRAPH_SYNC_BATCH_SIZE):
     """Yield fixed-size slices from a list."""
@@ -517,6 +529,34 @@ class Neo4jManager:
                     label="applications", heartbeat_callback=heartbeat,
                 )
 
+            # Organization node (single row from Domain.project FK, if set)
+            from startScan.models import ScanHistory as ScanHistoryModel
+            scan = (
+                ScanHistoryModel.objects
+                .select_related("domain__project")
+                .only(
+                    "id",
+                    "domain__id",
+                    "domain__project__id",
+                    "domain__project__slug",
+                    "domain__project__name",
+                )
+                .filter(id=scan_history_id)
+                .first()
+            )
+            project = getattr(getattr(scan, "domain", None), "project", None)
+            if project is not None:
+                slug = getattr(project, "slug", None) or getattr(project, "name", "unknown")
+                org_rows = [{
+                    "slug": slug,
+                    "name": getattr(project, "name", slug),
+                    "scan_id": scan_history_id,
+                }]
+                self._batch_execute(
+                    session, self._batch_merge_organizations, org_rows,
+                    label="organizations", heartbeat_callback=heartbeat,
+                )
+
         heartbeat(f"neo4j scan_id={scan_history_id} complete")
         logger.info(
             f"[Neo4j] sync_scan_results scan_id={scan_history_id}: "
@@ -934,32 +974,21 @@ class Neo4jManager:
         Traverses: Organization → Subdomain → Application → APIEndpoint →
                    IdentityInfra/Certificate
 
-        Returns {"nodes": [...], "edges": [...]} serialisable dicts.
-        scan_id is always passed as a Cypher parameter — never interpolated.
+        Runs two parameterised queries to avoid a (n × r × m) cartesian
+        truncation: one for nodes (capped at GRAPH_CHAIN_NODE_LIMIT) and one
+        for edges (capped at GRAPH_CHAIN_EDGE_LIMIT). Edges are deduped on
+        (from, to, type). scan_id and the label allowlist are always passed
+        as Cypher parameters — never interpolated.
         """
         if not self.driver:
             return {"nodes": [], "edges": []}
 
-        ALLOWED_NODE_TYPES = frozenset([
-            "Organization", "Subdomain", "IPAddress", "Application",
-            "Technology", "Certificate", "IdentityInfra", "APIEndpoint",
-            "APMENode", "Vulnerability", "CVE",
-        ])
-        cypher = """
-            MATCH (sc:Scan {id: $scan_id})-[:FOUND]->(n)
-            WHERE any(label IN labels(n)
-                  WHERE label IN ['Organization','Subdomain','IPAddress','Application',
-                                  'Technology','Certificate','IdentityInfra','APIEndpoint',
-                                  'APMENode','Vulnerability','CVE'])
-            OPTIONAL MATCH (n)-[r]->(m)
-            RETURN n, r, m
-            LIMIT 1000
-        """
+        allowed_labels = list(GRAPH_CHAIN_ALLOWED_LABELS)
         chain_color_map = {
-            "Organization":  "#f59e0b",
+            "Organization":  "#d97706",
             "Subdomain":     "#3b82f6",
             "IPAddress":     "#6b7280",
-            "Application":   "#10b981",
+            "Application":   "#0d9488",
             "Technology":    "#8b5cf6",
             "Certificate":   "#06b6d4",
             "IdentityInfra": "#a855f7",
@@ -969,34 +998,74 @@ class Neo4jManager:
             "APMENode":      "#64748b",
         }
 
+        node_cypher = (
+            "MATCH (sc:Scan {id: $scan_id})-[:FOUND]->(n) "
+            "WHERE any(label IN labels(n) WHERE label IN $allowed_labels) "
+            "RETURN n "
+            "LIMIT $limit"
+        )
+        edge_cypher = (
+            "MATCH (sc:Scan {id: $scan_id})-[:FOUND]->(n)-[r]->(m) "
+            "WHERE any(label IN labels(n) WHERE label IN $allowed_labels) "
+            "  AND any(label IN labels(m) WHERE label IN $allowed_labels) "
+            "RETURN n, r, m "
+            "LIMIT $limit"
+        )
+
         nodes_map: dict = {}
         edges_list: list = []
+        seen_edges: set = set()
 
         with self.driver.session() as session:
-            result = session.run(cypher, scan_id=scan_id)
-            for record in result:
+            node_result = session.run(
+                node_cypher,
+                scan_id=scan_id,
+                allowed_labels=allowed_labels,
+                limit=GRAPH_CHAIN_NODE_LIMIT,
+            )
+            for record in node_result:
+                n = record.get("n")
+                if n is None:
+                    continue
+                node_id = str(n.element_id)
+                if node_id in nodes_map:
+                    continue
+                labels = list(n.labels)
+                node_type = next(
+                    (lbl for lbl in labels if lbl in GRAPH_CHAIN_ALLOWED_LABELS),
+                    "Unknown",
+                )
+                nodes_map[node_id] = {
+                    "id": node_id,
+                    "type": node_type,
+                    "color": chain_color_map.get(node_type, "#94a3b8"),
+                    "properties": dict(n),
+                }
+
+            edge_result = session.run(
+                edge_cypher,
+                scan_id=scan_id,
+                allowed_labels=allowed_labels,
+                limit=GRAPH_CHAIN_EDGE_LIMIT,
+            )
+            for record in edge_result:
                 n = record.get("n")
                 r = record.get("r")
                 m = record.get("m")
-                if n is not None:
-                    node_id = str(n.element_id)
-                    if node_id not in nodes_map:
-                        labels = list(n.labels)
-                        node_type = next(
-                            (lbl for lbl in labels if lbl in ALLOWED_NODE_TYPES), "Unknown"
-                        )
-                        nodes_map[node_id] = {
-                            "id": node_id,
-                            "type": node_type,
-                            "color": chain_color_map.get(node_type, "#94a3b8"),
-                            "properties": dict(n),
-                        }
-                if r is not None and m is not None:
-                    edges_list.append({
-                        "from": str(n.element_id) if n else None,
-                        "to": str(m.element_id),
-                        "type": r.type,
-                    })
+                if n is None or m is None or r is None:
+                    continue
+                from_id = str(n.element_id)
+                to_id = str(m.element_id)
+                rel_type = r.type
+                edge_key = (from_id, to_id, rel_type)
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
+                edges_list.append({
+                    "from": from_id,
+                    "to": to_id,
+                    "type": rel_type,
+                })
 
         return {"nodes": list(nodes_map.values()), "edges": edges_list}
 
@@ -1209,8 +1278,8 @@ class Neo4jManager:
             "Certificate":   "#06b6d4",
             "IdentityInfra": "#a855f7",
             "APIEndpoint":   "#ec4899",
-            "Application":   "#10b981",
-            "Organization":  "#f59e0b",
+            "Application":   "#0d9488",
+            "Organization":  "#d97706",
         }
 
         with self.driver.session() as session:

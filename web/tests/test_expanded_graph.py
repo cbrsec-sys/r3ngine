@@ -140,6 +140,49 @@ class TestAPIIntelligenceIngestion(TestCase):
         nodes, edges = ingest_api_intelligence(self.domain.id)
         self.assertEqual(nodes, [])
 
+    def test_collect_does_not_query_subdomain_per_cluster(self):
+        """collect_api_intelligence must build a single subdomain index, not query per cluster."""
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+        from apme.ingestion.api_intelligence import collect_api_intelligence
+        from startScan.models import EndPoint, Subdomain
+
+        # Seed 5 more subdomains, each with 3 distinct path prefixes -> 15 extra clusters.
+        for i in range(5):
+            sub = Subdomain.objects.create(
+                scan_history=self.scan,
+                target_domain=self.domain,
+                name=f"sub{i}.api.example.com",
+                http_url=f"https://sub{i}.api.example.com/",
+            )
+            for path in ["/v1/a", "/v2/b", "/v3/c"]:
+                EndPoint.objects.create(
+                    scan_history=self.scan,
+                    target_domain=self.domain,
+                    subdomain=sub,
+                    http_url=f"https://sub{i}.api.example.com{path}",
+                    http_status=200,
+                )
+
+        # Warm the profile rows so a second pass exercises update branch consistently.
+        collect_api_intelligence(self.scan.id)
+
+        # Count SELECTs against the Subdomain table during the second pass.
+        with CaptureQueriesContext(connection) as ctx:
+            collect_api_intelligence(self.scan.id)
+
+        subdomain_selects = [
+            q["sql"] for q in ctx.captured_queries
+            if "FROM " in q["sql"] and "startscan_subdomain" in q["sql"].lower()
+        ]
+        # The single prefetched index = exactly one SELECT against Subdomain.
+        # The old N+1 path would issue one per cluster (~16 here).
+        self.assertLessEqual(
+            len(subdomain_selects), 2,
+            f"Expected ≤2 Subdomain SELECTs (the prefetched index); got "
+            f"{len(subdomain_selects)}. Possible N+1 regression."
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Task 3: Organization + Application Graph Nodes
@@ -184,6 +227,13 @@ class TestGraphExpansionIngestion(TestCase):
         nodes, _ = ingest_organizations(self.domain.id)
         org_nodes = [n for n in nodes if n.type == "Organization"]
         self.assertIsInstance(org_nodes, list)
+
+    def test_ingest_organizations_missing_target_returns_empty(self):
+        from apme.ingestion.graph_expansion import ingest_organizations
+        # A target_id that does not exist must return ([], []) cleanly.
+        nodes, edges = ingest_organizations(999999)
+        self.assertEqual(nodes, [])
+        self.assertEqual(edges, [])
 
     def test_ingest_empty_subdomain_set_returns_empty(self):
         from startScan.models import Subdomain
@@ -314,6 +364,112 @@ class TestNeo4jExpandedSync(TestCase):
             self.assertTrue(mock_tx.run.called)
             cypher = mock_tx.run.call_args[0][0]
             self.assertIn("Application", cypher)
+
+    def test_batch_merge_organizations_calls_run(self):
+        from unittest.mock import MagicMock, patch
+        with patch("reNgine.utils.graph.Neo4jManager.__init__", return_value=None):
+            from reNgine.utils.graph import Neo4jManager
+            mock_tx = MagicMock()
+            rows = [{"slug": "acme-corp", "name": "ACME Corp",
+                     "scan_id": self.scan.id}]
+            Neo4jManager._batch_merge_organizations(mock_tx, rows)
+            self.assertTrue(mock_tx.run.called)
+            cypher = mock_tx.run.call_args[0][0]
+            self.assertIn("Organization", cypher)
+
+    def test_full_chain_uses_two_passes(self):
+        """get_full_chain_graph must issue separate node and edge queries."""
+        from unittest.mock import MagicMock, patch
+        with patch("reNgine.utils.graph.Neo4jManager.__init__", return_value=None):
+            from reNgine.utils.graph import Neo4jManager
+            mgr = Neo4jManager()
+            mgr.driver = MagicMock()
+            session_ctx = mgr.driver.session.return_value.__enter__.return_value
+            session_ctx.run = MagicMock(return_value=iter([]))
+
+            result = mgr.get_full_chain_graph(self.scan.id)
+
+            self.assertEqual(session_ctx.run.call_count, 2)
+            first_query = session_ctx.run.call_args_list[0][0][0]
+            second_query = session_ctx.run.call_args_list[1][0][0]
+            self.assertIn("RETURN n", first_query)
+            self.assertNotIn("OPTIONAL MATCH", first_query)
+            self.assertIn("RETURN n, r, m", second_query)
+            self.assertEqual(result, {"nodes": [], "edges": []})
+
+    def test_full_chain_dedupes_edges(self):
+        """Duplicate (from, to, type) edges must appear only once in the response."""
+        from unittest.mock import MagicMock, patch
+
+        class FakeNode:
+            def __init__(self, eid, label):
+                self.element_id = eid
+                self.labels = [label]
+            def __iter__(self):
+                return iter([])
+            def keys(self):
+                return []
+            def items(self):
+                return []
+
+        class FakeRel:
+            def __init__(self, rtype):
+                self.type = rtype
+
+        n_a = FakeNode("n1", "Subdomain")
+        n_b = FakeNode("n2", "Application")
+        rel = FakeRel("DEPENDS_ON")
+
+        edge_record_a = {"n": n_a, "r": rel, "m": n_b}
+        edge_record_b = {"n": n_a, "r": rel, "m": n_b}  # exact duplicate
+
+        with patch("reNgine.utils.graph.Neo4jManager.__init__", return_value=None):
+            from reNgine.utils.graph import Neo4jManager
+            mgr = Neo4jManager()
+            mgr.driver = MagicMock()
+            session_ctx = mgr.driver.session.return_value.__enter__.return_value
+            session_ctx.run = MagicMock(side_effect=[
+                iter([]),  # node pass — empty
+                iter([     # edge pass — duplicate edge
+                    type("Rec", (), {"get": staticmethod(lambda k, _r=edge_record_a: _r.get(k))})(),
+                    type("Rec", (), {"get": staticmethod(lambda k, _r=edge_record_b: _r.get(k))})(),
+                ]),
+            ])
+
+            result = mgr.get_full_chain_graph(self.scan.id)
+            self.assertEqual(len(result["edges"]), 1)
+            self.assertEqual(result["edges"][0]["type"], "DEPENDS_ON")
+
+    def test_organization_sync_query_resolves_project_fk(self):
+        """The ORM query used by sync_scan_results must surface Domain.project as expected."""
+        from django.utils import timezone
+        from dashboard.models import Project
+        from startScan.models import ScanHistory as ScanHistoryModel
+
+        project = Project.objects.create(
+            name="ACME Org", slug="acme-org",
+            insert_date=timezone.now(),
+        )
+        self.domain.project = project
+        self.domain.save(update_fields=["project"])
+
+        scan = (
+            ScanHistoryModel.objects
+            .select_related("domain__project")
+            .only(
+                "id",
+                "domain__id",
+                "domain__project__id",
+                "domain__project__slug",
+                "domain__project__name",
+            )
+            .filter(id=self.scan.id)
+            .first()
+        )
+        resolved = getattr(getattr(scan, "domain", None), "project", None)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.slug, "acme-org")
+        self.assertEqual(resolved.name, "ACME Org")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

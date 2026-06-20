@@ -29,10 +29,10 @@ def ingest_organizations(target_id: int) -> Tuple[List[Node], List[Edge]]:
     nodes: List[Node] = []
     edges: List[Edge] = []
 
+    from targetApp.models import Domain as TargetDomain
     try:
-        from targetApp.models import Domain as TargetDomain
         domain = TargetDomain.objects.select_related("project").get(id=target_id)
-    except Exception:
+    except TargetDomain.DoesNotExist:
         return [], []
 
     project = getattr(domain, "project", None)
