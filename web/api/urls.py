@@ -44,6 +44,12 @@ from .exposure_mobile_views import (
     ExposureStatusUpdateView,
     ExposureBulkStatusView,
 )
+from .cert_mobile_views import (
+    CertificateMobileListView,
+    CertificateMobileDetailView,
+    CertificateResyncView,
+    CertificateFlagView,
+)
 
 
 app_name = 'api'
@@ -546,6 +552,11 @@ urlpatterns = [
         name='apme_attack_trees'
     ),
     path('certs/', CertificateIntelView.as_view(), name='certificate_intel'),
+    # Certificate mobile views (order matters: resync/flag before <int:pk>)
+    path('certificates/', CertificateMobileListView.as_view(), name='certificates_mobile_list'),
+    path('certificates/<int:pk>/resync/', CertificateResyncView.as_view(), name='certificates_resync'),
+    path('certificates/<int:pk>/flag/', CertificateFlagView.as_view(), name='certificates_flag'),
+    path('certificates/<int:pk>/', CertificateMobileDetailView.as_view(), name='certificates_mobile_detail'),
     path('identity/', IdentityInfraView.as_view(), name='identity_infra'),
     path(
         'action/ad-assessment/from-subdomain/',
