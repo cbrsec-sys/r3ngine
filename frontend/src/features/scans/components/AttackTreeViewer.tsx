@@ -68,6 +68,20 @@ const TreeNode: React.FC<{ node: AttackTreeNode }> = ({ node }) => {
           {node.skill && (
             <Chip size="small" label={`Skill: ${node.skill}`} sx={{ height: 16, fontSize: '0.6rem', bgcolor: 'transparent', border: '1px solid', borderColor: 'divider' }} />
           )}
+          {node.detectability && (
+            <Chip
+              size="small"
+              label={`Detect: ${node.detectability}`}
+              sx={{
+                height: 16,
+                fontSize: '0.6rem',
+                bgcolor: 'transparent',
+                border: '1px solid',
+                borderColor: 'divider',
+                color: 'text.secondary',
+              }}
+            />
+          )}
         </Stack>
         {node.mitigation && (
           <Box sx={{ mt: 1, p: 1, bgcolor: `${tokens.accent.success}10`, borderRadius: 1, borderLeft: `2px solid ${tokens.accent.success}` }}>
