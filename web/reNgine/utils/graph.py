@@ -107,6 +107,7 @@ class Neo4jManager:
             "CREATE INDEX graph_domain_name IF NOT EXISTS FOR (n:Domain) ON (n.name)",
             "CREATE INDEX graph_ip_address IF NOT EXISTS FOR (n:IPAddress) ON (n.address)",
             "CREATE INDEX graph_cert_fp IF NOT EXISTS FOR (n:Certificate) ON (n.fingerprint_sha256)",
+            "CREATE INDEX graph_identity_infra IF NOT EXISTS FOR (n:IdentityInfra) ON (n.host)",
         ]
         for statement in index_statements:
             try:
@@ -435,12 +436,42 @@ class Neo4jManager:
                     label="certificates", heartbeat_callback=heartbeat,
                 )
 
+            # Identity Infrastructure sync
+            from startScan.models import IdentityInfraDiscovery
+            identity_count = 0
+            identity_rows = []
+            for row in IdentityInfraDiscovery.objects.filter(
+                scan_history_id=scan_history_id
+            ).values(
+                "host", "infra_type", "is_externally_accessible", "confidence_score",
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                identity_rows.append({
+                    "host": row["host"],
+                    "infra_type": row["infra_type"],
+                    "is_externally_accessible": bool(row["is_externally_accessible"]),
+                    "confidence_score": float(row["confidence_score"]),
+                    "scan_id": scan_history_id,
+                })
+                identity_count += 1
+                if len(identity_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_identity_infra, identity_rows,
+                        label="identity_infra", heartbeat_callback=heartbeat,
+                    )
+                    identity_rows = []
+            if identity_rows:
+                self._batch_execute(
+                    session, self._batch_merge_identity_infra, identity_rows,
+                    label="identity_infra", heartbeat_callback=heartbeat,
+                )
+
         heartbeat(f"neo4j scan_id={scan_history_id} complete")
         logger.info(
             f"[Neo4j] sync_scan_results scan_id={scan_history_id}: "
             f"{subdomain_count} subdomains, {endpoint_count} endpoints, "
             f"{param_count} params, {tech_count} techs, "
-            f"{vuln_count} vulns, {cve_count} CVEs, {cert_count} certs synced."
+            f"{vuln_count} vulns, {cve_count} CVEs, {cert_count} certs, "
+            f"{identity_count} identity_infra synced."
         )
 
     @staticmethod
@@ -782,6 +813,22 @@ class Neo4jManager:
             rows=rows,
         )
 
+    @staticmethod
+    def _batch_merge_identity_infra(tx, rows):
+        """Merge IdentityInfraDiscovery nodes in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (ii:IdentityInfra {host: row.host, infra_type: row.infra_type, scan_id: row.scan_id})
+            SET ii.is_externally_accessible = row.is_externally_accessible,
+                ii.confidence_score = row.confidence_score
+            WITH ii, row
+            MATCH (sc:Scan {id: row.scan_id})
+            MERGE (sc)-[:FOUND]->(ii)
+            """,
+            rows=rows,
+        )
+
     def ingest_stress_telemetry(self, endpoint_url, scan_id, telemetry_data):
         """
         telemetry_data = {
@@ -955,6 +1002,7 @@ class Neo4jManager:
             "CVE": "#7c3aed",
             "StressTest": "#14b8a6",
             "Certificate": "#06b6d4",
+            "IdentityInfra": "#a855f7",
         }
 
         with self.driver.session() as session:
