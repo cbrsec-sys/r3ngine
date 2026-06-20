@@ -128,7 +128,9 @@ export interface AttackTreeResponse {
 }
 
 const fetchAttackTree = async (scanId: number, targetId: string): Promise<AttackTreeResponse> => {
-  const { data } = await axios.get(`/api/apme/attack-trees/${scanId}/${targetId}/`);
+  const { data } = await axios.get(
+    `/api/apme/attack-trees/${scanId}/${encodeURIComponent(targetId)}/`
+  );
   return data;
 };
 
