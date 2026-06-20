@@ -92,6 +92,12 @@ class APMEOrchestrator:
         all_nodes.extend(cert_nodes)
         all_edges.extend(cert_edges)
 
+        # Identity infrastructure ingestion (Plan 2)
+        from apme.ingestion.identity_infra import ingest_identity_infra
+        identity_nodes, identity_edges = ingest_identity_infra(target_id)
+        all_nodes.extend(identity_nodes)
+        all_edges.extend(identity_edges)
+
         # Inject virtual goal nodes (Objectives) to ensure rules have targets
         goal_nodes = self._generate_virtual_goal_nodes(scan_history_id)
         all_nodes.extend(goal_nodes)
