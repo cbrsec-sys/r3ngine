@@ -3560,3 +3560,43 @@ def extract_auth_for_url_activity(ctx: dict) -> dict:
         logger.log_line("[AUTH_EXTRACT]", "ERROR", format_exception_for_log(exc),
                         level="error", exc_info=True)
         raise
+
+
+@activity.defn(name="resync_certificate_activity")
+def resync_certificate_activity(cert_id: int, job_id: str = None) -> dict:
+    """
+    Re-probe a single CertificateIntelligence record's host via tlsx.
+
+    Called by CertificateResyncWorkflow in response to mobile resync requests.
+    Idempotent: re-running produces at most one DB write per tlsx result line.
+    """
+    from reNgine.certificate_tasks import resync_single_certificate
+    from reNgine.utils.logger import format_exception_for_log
+
+    logger.log_line("[SCAN]", "START", "task=cert_resync cert_id=%s" % cert_id)
+
+    try:
+        activity.heartbeat("cert_resync: probing cert_id=%s" % cert_id)
+        result = resync_single_certificate(cert_id)
+        activity.heartbeat("cert_resync: complete cert_id=%s" % cert_id)
+
+        if result is None:
+            logger.log_line(
+                "[SCAN]", "COMPLETE",
+                "task=cert_resync cert_id=%s result=no_data" % cert_id,
+            )
+            return {"status": "ok", "updated": False}
+
+        logger.log_line(
+            "[SCAN]", "COMPLETE",
+            "task=cert_resync cert_id=%s result=updated" % cert_id,
+        )
+        return {"status": "ok", "updated": True}
+
+    except Exception as e:
+        logger.log_line(
+            "[SCAN]", "ERROR",
+            "task=cert_resync cert_id=%s error=%s" % (cert_id, format_exception_for_log(e)),
+            level="error",
+        )
+        return {"status": "error", "updated": False, "error": format_exception_for_log(e)}

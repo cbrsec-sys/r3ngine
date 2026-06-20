@@ -3120,3 +3120,19 @@ class RecalculateApmeWorkflow:
             task_queue="python-orchestrator-queue",
         )
 
+
+@workflow.defn(name="CertificateResyncWorkflow")
+class CertificateResyncWorkflow:
+    """Workflow to re-probe a single certificate's host via tlsx on demand."""
+
+    @workflow.run
+    async def run(self, cert_id: int, job_id: str = None) -> dict:
+        return await workflow.execute_activity(
+            "resync_certificate_activity",
+            args=[cert_id, job_id],
+            start_to_close_timeout=timedelta(minutes=5),
+            heartbeat_timeout=timedelta(minutes=2),
+            retry_policy=RetryPolicy(maximum_attempts=2),
+            task_queue="python-orchestrator-queue",
+        )
+
