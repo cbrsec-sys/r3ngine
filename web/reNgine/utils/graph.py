@@ -106,6 +106,7 @@ class Neo4jManager:
             "CREATE INDEX graph_exposure_id IF NOT EXISTS FOR (n:Exposure) ON (n.id)",
             "CREATE INDEX graph_domain_name IF NOT EXISTS FOR (n:Domain) ON (n.name)",
             "CREATE INDEX graph_ip_address IF NOT EXISTS FOR (n:IPAddress) ON (n.address)",
+            "CREATE INDEX graph_cert_fp IF NOT EXISTS FOR (n:Certificate) ON (n.fingerprint_sha256)",
         ]
         for statement in index_statements:
             try:
@@ -397,6 +398,40 @@ class Neo4jManager:
                 (self._batch_merge_vulnerabilities, vuln_rows, "vulnerabilities"),
                 (self._batch_merge_cves, cve_rows, "cves"),
             ], heartbeat_callback=heartbeat)
+
+            # Certificate Intelligence sync
+            from startScan.models import CertificateIntelligence
+            cert_rows = []
+            for row in CertificateIntelligence.objects.filter(
+                scan_history_id=scan_history_id
+            ).values(
+                "host", "port", "subject_cn", "fingerprint_sha256",
+                "is_expired", "self_signed", "has_weak_cipher",
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                fp = row.get("fingerprint_sha256")
+                if not fp:
+                    continue
+                cert_rows.append({
+                    "host": row["host"],
+                    "port": row["port"],
+                    "subject_cn": row["subject_cn"] or "",
+                    "fingerprint_sha256": fp,
+                    "is_expired": bool(row["is_expired"]),
+                    "self_signed": bool(row["self_signed"]),
+                    "has_weak_cipher": bool(row["has_weak_cipher"]),
+                    "scan_id": scan_history_id,
+                })
+                if len(cert_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_certificates, cert_rows,
+                        label="certificates", heartbeat_callback=heartbeat,
+                    )
+                    cert_rows = []
+            if cert_rows:
+                self._batch_execute(
+                    session, self._batch_merge_certificates, cert_rows,
+                    label="certificates", heartbeat_callback=heartbeat,
+                )
 
         heartbeat(f"neo4j scan_id={scan_history_id} complete")
         logger.info(
@@ -724,6 +759,27 @@ class Neo4jManager:
             rows=rows,
         )
 
+    @staticmethod
+    def _batch_merge_certificates(tx, rows):
+        """Merge all CertificateIntelligence nodes for a scan in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (cert:Certificate {fingerprint_sha256: row.fingerprint_sha256, scan_id: row.scan_id})
+            SET cert.host = row.host,
+                cert.port = row.port,
+                cert.subject_cn = row.subject_cn,
+                cert.is_expired = row.is_expired,
+                cert.self_signed = row.self_signed,
+                cert.has_weak_cipher = row.has_weak_cipher
+            WITH cert, row
+            MATCH (s:Subdomain {name: row.host}), (sc:Scan {id: row.scan_id})
+            MERGE (cert)-[:PROTECTS]->(s)
+            MERGE (sc)-[:FOUND]->(cert)
+            """,
+            rows=rows,
+        )
+
     def ingest_stress_telemetry(self, endpoint_url, scan_id, telemetry_data):
         """
         telemetry_data = {
@@ -896,6 +952,7 @@ class Neo4jManager:
             "Technology": "#facc15",
             "CVE": "#7c3aed",
             "StressTest": "#14b8a6",
+            "Certificate": "#06b6d4",
         }
 
         with self.driver.session() as session:

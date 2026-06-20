@@ -256,3 +256,41 @@ class TestCertificateRules(TestCase):
         )
         edges = self.engine.apply(cert_node, [cert_node] + self.goal_nodes)
         self.assertEqual(len(edges), 0)
+
+
+class TestNeo4jCertSync(TestCase):
+    def setUp(self):
+        self.domain = Domain.objects.create(name="neo4j.example.com")
+        self.scan = _make_scan(self.domain)
+        from startScan.models import Subdomain
+        self.sub = Subdomain.objects.create(
+            scan_history=self.scan, target_domain=self.domain, name="neo4j.example.com",
+        )
+        CertificateIntelligence.objects.create(
+            scan_history=self.scan, target_domain=self.domain, subdomain=self.sub,
+            host="neo4j.example.com", port=443,
+            fingerprint_sha256="neo4j001",
+            subject_cn="neo4j.example.com",
+            is_expired=False, self_signed=False, has_weak_cipher=False,
+        )
+
+    def test_batch_merge_certificates_cypher(self):
+        from unittest.mock import MagicMock, patch
+        with patch("reNgine.utils.graph.Neo4jManager.__init__", return_value=None):
+            from reNgine.utils.graph import Neo4jManager
+            mock_tx = MagicMock()
+            rows = [{
+                "host": "neo4j.example.com",
+                "port": 443,
+                "subject_cn": "neo4j.example.com",
+                "fingerprint_sha256": "neo4j001",
+                "is_expired": False,
+                "self_signed": False,
+                "has_weak_cipher": False,
+                "scan_id": self.scan.id,
+            }]
+            Neo4jManager._batch_merge_certificates(mock_tx, rows)
+            self.assertTrue(mock_tx.run.called)
+            cypher = mock_tx.run.call_args[0][0]
+            self.assertIn("Certificate", cypher)
+            self.assertIn("MERGE", cypher)
