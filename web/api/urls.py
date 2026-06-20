@@ -25,6 +25,13 @@ from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
 from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIView
 from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView, RecalculateAttackPathsAPIView, AttackPathExplanationAPIView, AttackTreeAPIView
+from .apme_mobile_views import (
+    RiskSummaryMobileView,
+    ImpactDetailMobileView,
+    RegenerateImpactMobileView,
+    AttackTreeMobileView,
+    DismissPathMobileView,
+)
 from .scan_configuration import ScanConfigurationAPI
 from .config_migration_views import ExportConfig, ImportConfig, ExportScanResults
 from .cert_views import CertificateIntelView
@@ -495,6 +502,11 @@ urlpatterns = [
         ParameterSummaryView.as_view(),
         name='parameters_summary'
     ),
+    path('apme/risk-summary/', RiskSummaryMobileView.as_view(), name='apme_risk_summary_mobile'),
+    path('apme/tree/<str:target_id>/', AttackTreeMobileView.as_view(), name='apme_tree_mobile'),
+    path('apme/impact/regenerate/', RegenerateImpactMobileView.as_view(), name='apme_impact_regenerate'),
+    path('apme/impact/<str:path_id>/', ImpactDetailMobileView.as_view(), name='apme_impact_detail'),
+    path('apme/path/<str:path_id>/dismiss/', DismissPathMobileView.as_view(), name='apme_path_dismiss'),
     path(
         'apme/paths/',
         AttackPathsAPIView.as_view(),
