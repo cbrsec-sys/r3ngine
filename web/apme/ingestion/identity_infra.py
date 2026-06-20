@@ -16,6 +16,21 @@ from apme.ingestion.correlation import ExposureCorrelator
 
 logger = logging.getLogger(__name__)
 
+# Ports known to be associated with each identity infrastructure type.
+# Constrains AUTHENTICATES_VIA edges to semantically correct service nodes.
+_INFRA_PORTS: dict = {
+    "adfs": [443],
+    "owa": [443, 80],
+    "exchange": [443, 80],
+    "ldap": [389, 636, 3268, 3269],
+    "sso": [443, 80],
+    "saml_idp": [443, 80],
+    "vpn_portal": [443, 8443],
+    "ntlm_endpoint": [443, 80],
+    "generic_auth_portal": [443, 80, 8080, 8443],
+}
+_DEFAULT_PORTS = [443, 80]
+
 # Maps IdentityInfraDiscovery.infra_type → APME Node.subtype
 _INFRA_TYPE_TO_SUBTYPE: dict = {
     "adfs": "adfs",
@@ -83,10 +98,12 @@ def ingest_identity_infra(target_id: int) -> Tuple[List[Node], List[Edge]]:
         )
         nodes.append(node)
 
-        # AUTHENTICATES_VIA edges: service nodes (via subdomain IPs) → this identity infra
+        # AUTHENTICATES_VIA edges: service nodes (via subdomain IPs) → this identity infra.
+        # Use only the ports semantically associated with this infra type.
         if rec.subdomain:
+            ports = _INFRA_PORTS.get(rec.infra_type, _DEFAULT_PORTS)
             for ip_obj in rec.subdomain.ip_addresses.all():
-                for port in [80, 443, 8080, 8443]:
+                for port in ports:
                     service_id = _make_id("service", "%s:%d" % (ip_obj.address, port))
                     try:
                         edges.append(Edge(

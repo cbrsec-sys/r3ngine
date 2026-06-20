@@ -81,11 +81,15 @@ def classify_url(url: str) -> Optional[Tuple[str, float]]:
     if parsed.scheme in ("ldap", "ldaps"):
         return "ldap", 0.95
 
-    # Match against path + query string
-    target = (parsed.path or "") + (("?" + parsed.query) if parsed.query else "")
+    # Match against path + query string only.
+    # LDAP port patterns (:389/, :636/) live in the netloc, so include it for ldap checks.
+    path_query = (parsed.path or "") + (("?" + parsed.query) if parsed.query else "")
     best: Optional[Tuple[str, float]] = None
     for pattern, infra_type, confidence in IDENTITY_URL_PATTERNS:
-        if pattern.search(target) or pattern.search(url):
+        # For LDAP port patterns the interesting part is the netloc; for all others
+        # restrict matching to path+query to avoid false-positives from redirect URLs.
+        search_target = (parsed.netloc + path_query) if infra_type == "ldap" else path_query
+        if pattern.search(search_target):
             if best is None or confidence > best[1]:
                 best = (infra_type, confidence)
     return best
@@ -177,7 +181,7 @@ def run_identity_intel(scan_history_id: int) -> List["IdentityInfraDiscovery"]:
         return []
 
     domain = scan.domain
-    results: List = []
+    results: List[IdentityInfraDiscovery] = []
 
     # Per-host signals accumulator: host → [(infra_type, confidence, detection_method)]
     host_signals: Dict[str, List[Tuple[str, float, str]]] = {}
@@ -223,6 +227,12 @@ def run_identity_intel(scan_history_id: int) -> List["IdentityInfraDiscovery"]:
                 (match[0], match[1], "url_pattern")
             )
 
+    # Pre-load all referenced subdomain objects in one query to avoid N+1.
+    _sub_ids = [v["subdomain_id"] for v in host_meta.values() if "subdomain_id" in v]
+    _subdomain_by_id: Dict[int, Subdomain] = {
+        s.id: s for s in Subdomain.objects.filter(id__in=_sub_ids)
+    }
+
     # --- Persist results
     for host, signals in host_signals.items():
         merged = _merge_signals(signals)
@@ -235,12 +245,7 @@ def run_identity_intel(scan_history_id: int) -> List["IdentityInfraDiscovery"]:
             continue
 
         meta = host_meta.get(host, {})
-        subdomain_obj = None
-        if "subdomain_id" in meta:
-            try:
-                subdomain_obj = Subdomain.objects.get(id=meta["subdomain_id"])
-            except Subdomain.DoesNotExist:
-                pass
+        subdomain_obj = _subdomain_by_id.get(meta.get("subdomain_id"))
 
         defaults = {
             "target_domain": domain,

@@ -42,9 +42,17 @@ class IdentityInfraView(APIView):
 
         qs = IdentityInfraDiscovery.objects.filter(scan_history_id=scan_id)
 
-        # Scope to project to prevent cross-project IDOR
+        # Scope to project when provided — prevents cross-project IDOR for callers that
+        # supply a project slug.  Without it, IsAuditor is the only guard (same posture as
+        # apme_views.py and cert_views.py).  TODO: make project_slug required once all
+        # frontend callers are confirmed to pass it.
         if project_slug:
             qs = qs.filter(scan_history__domain__project__slug=project_slug)
+        else:
+            logger.warning(
+                "identity_views: scan_id=%s requested without project scoping",
+                scan_id,
+            )
 
         qs = qs.order_by("-confidence_score", "infra_type", "host")
 

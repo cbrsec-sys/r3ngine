@@ -16,7 +16,7 @@ rules:
         confidence: 0.82
 
   - name: owa_external_to_account_takeover
-    mitre_id: "T1078"
+    mitre_id: "T1078.002"
     if:
       node.type: IdentityInfra
       node.subtype: owa
@@ -64,7 +64,7 @@ rules:
         confidence: 0.68
 
   - name: generic_auth_portal_to_authenticated_access
-    mitre_id: "T1078"
+    mitre_id: "T1078.001"
     if:
       node.type: IdentityInfra
       node.subtype: generic
