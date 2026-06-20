@@ -65,3 +65,49 @@ class TestCertificateIntelligenceModel(TestCase):
             has_weak_cipher=True,
         )
         self.assertTrue(cert.has_weak_cipher)
+
+
+class TestCertificateParser(TestCase):
+    def test_parse_valid_tlsx_json_line(self):
+        from reNgine.certificate_tasks import parse_tlsx_json_line
+        line = (
+            '{"host":"example.com","ip":"1.2.3.4","port":443,'
+            '"tls_version":"tls13","cipher":"TLS_AES_256_GCM_SHA384",'
+            '"not_before":"2024-01-01T00:00:00Z","not_after":"2025-01-01T00:00:00Z",'
+            '"subject_cn":"example.com","subject_an":["example.com","www.example.com"],'
+            '"issuer_cn":"R3","issuer_org":["Let\'s Encrypt"],'
+            '"fingerprint_hash":{"sha256":"aabbccdd"},'
+            '"self_signed":false,"mismatched":false}'
+        )
+        result = parse_tlsx_json_line(line)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["host"], "example.com")
+        self.assertEqual(result["subject_cn"], "example.com")
+        self.assertEqual(result["fingerprint_sha256"], "aabbccdd")
+        self.assertFalse(result["self_signed"])
+
+    def test_parse_invalid_json_returns_none(self):
+        from reNgine.certificate_tasks import parse_tlsx_json_line
+        result = parse_tlsx_json_line("not json at all")
+        self.assertIsNone(result)
+
+    def test_parse_empty_line_returns_none(self):
+        from reNgine.certificate_tasks import parse_tlsx_json_line
+        result = parse_tlsx_json_line("")
+        self.assertIsNone(result)
+
+    def test_is_weak_cipher_rc4(self):
+        from reNgine.certificate_tasks import is_weak_cipher
+        self.assertTrue(is_weak_cipher("TLS_RSA_WITH_RC4_128_SHA"))
+
+    def test_is_weak_cipher_3des(self):
+        from reNgine.certificate_tasks import is_weak_cipher
+        self.assertTrue(is_weak_cipher("TLS_RSA_WITH_3DES_EDE_CBC_SHA"))
+
+    def test_is_strong_cipher(self):
+        from reNgine.certificate_tasks import is_weak_cipher
+        self.assertFalse(is_weak_cipher("TLS_AES_256_GCM_SHA384"))
+
+    def test_is_weak_cipher_null(self):
+        from reNgine.certificate_tasks import is_weak_cipher
+        self.assertTrue(is_weak_cipher("TLS_NULL_WITH_NULL_NULL"))
