@@ -191,3 +191,68 @@ class TestCertificateIngestion(TestCase):
         nodes, edges = ingest_certificates(self.domain.id)
         self.assertEqual(nodes, [])
         self.assertEqual(edges, [])
+
+
+class TestCertificateRules(TestCase):
+    def setUp(self):
+        from apme.engine.rules_engine import RulesEngine
+        from apme.models.node import Node
+        rules_path = "apme/config/rules/v_certificate_intel.yaml"
+        self.engine = RulesEngine(rules_file=rules_path)
+        self.goal_nodes = [
+            Node(id="goal::capability::credential_harvesting", type="Capability",
+                 subtype="credential_harvesting", confidence=1.0, source="APME:virtual_goal"),
+            Node(id="goal::capability::phishing_amplification", type="Capability",
+                 subtype="phishing_amplification", confidence=1.0, source="APME:virtual_goal"),
+            Node(id="goal::capability::authenticated_access", type="Capability",
+                 subtype="authenticated_access", confidence=1.0, source="APME:virtual_goal"),
+            Node(id="goal::capability::lateral_movement", type="Capability",
+                 subtype="lateral_movement", confidence=1.0, source="APME:virtual_goal"),
+        ]
+
+    def test_weak_cipher_fires_credential_harvesting(self):
+        from apme.models.node import Node
+        cert_node = Node(
+            id="cert::weakabc",
+            type="Certificate", subtype="x509",
+            confidence=0.75, source="reNgine:certificate_intel",
+            properties={"has_weak_cipher": True, "is_expired": False, "self_signed": False},
+        )
+        edges = self.engine.apply(cert_node, [cert_node] + self.goal_nodes)
+        subtypes = [e.to_id.split("::")[-1] for e in edges]
+        self.assertIn("credential_harvesting", subtypes)
+
+    def test_expired_cert_fires_phishing_amplification(self):
+        from apme.models.node import Node
+        cert_node = Node(
+            id="cert::expiredabc",
+            type="Certificate", subtype="x509",
+            confidence=0.6, source="reNgine:certificate_intel",
+            properties={"is_expired": True, "has_weak_cipher": False, "self_signed": False},
+        )
+        edges = self.engine.apply(cert_node, [cert_node] + self.goal_nodes)
+        subtypes = [e.to_id.split("::")[-1] for e in edges]
+        self.assertIn("phishing_amplification", subtypes)
+
+    def test_self_signed_fires_authenticated_access(self):
+        from apme.models.node import Node
+        cert_node = Node(
+            id="cert::selfabc",
+            type="Certificate", subtype="x509",
+            confidence=0.6, source="reNgine:certificate_intel",
+            properties={"self_signed": True, "is_expired": False, "has_weak_cipher": False},
+        )
+        edges = self.engine.apply(cert_node, [cert_node] + self.goal_nodes)
+        subtypes = [e.to_id.split("::")[-1] for e in edges]
+        self.assertIn("authenticated_access", subtypes)
+
+    def test_clean_cert_fires_no_rules(self):
+        from apme.models.node import Node
+        cert_node = Node(
+            id="cert::cleanabc",
+            type="Certificate", subtype="x509",
+            confidence=1.0, source="reNgine:certificate_intel",
+            properties={"is_expired": False, "self_signed": False, "has_weak_cipher": False},
+        )
+        edges = self.engine.apply(cert_node, [cert_node] + self.goal_nodes)
+        self.assertEqual(len(edges), 0)
