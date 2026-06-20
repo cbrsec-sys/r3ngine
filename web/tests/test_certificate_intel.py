@@ -136,3 +136,58 @@ class TestCertificateActivity(TestCase):
             mock_runner.return_value = [fake_cert]
             result = run_certificate_intel_activity(self.scan.id)
             self.assertEqual(result["count"], 1)
+
+
+class TestCertificateIngestion(TestCase):
+    def setUp(self):
+        self.domain = Domain.objects.create(name="ingest.example.com")
+        self.scan = _make_scan(self.domain)
+        from startScan.models import Subdomain
+        self.sub = Subdomain.objects.create(
+            scan_history=self.scan,
+            target_domain=self.domain,
+            name="ingest.example.com",
+        )
+        CertificateIntelligence.objects.create(
+            scan_history=self.scan,
+            target_domain=self.domain,
+            subdomain=self.sub,
+            host="ingest.example.com",
+            port=443,
+            subject_cn="ingest.example.com",
+            fingerprint_sha256="ingest001",
+            self_signed=False,
+            is_expired=False,
+            has_weak_cipher=False,
+        )
+
+    def test_ingest_returns_certificate_node(self):
+        from apme.ingestion.certificates import ingest_certificates
+        nodes, edges = ingest_certificates(self.domain.id)
+        cert_nodes = [n for n in nodes if n.type == "Certificate"]
+        self.assertEqual(len(cert_nodes), 1)
+        self.assertEqual(cert_nodes[0].subtype, "x509")
+
+    def test_ingest_expired_cert_has_low_confidence(self):
+        from apme.ingestion.certificates import ingest_certificates
+        CertificateIntelligence.objects.create(
+            scan_history=self.scan,
+            target_domain=self.domain,
+            subdomain=self.sub,
+            host="ingest.example.com",
+            port=8443,
+            fingerprint_sha256="expiredX01",
+            is_expired=True,
+            self_signed=False,
+        )
+        nodes, _ = ingest_certificates(self.domain.id)
+        expired = [n for n in nodes if n.properties.get("is_expired")]
+        self.assertTrue(len(expired) >= 1)
+        self.assertLess(expired[0].confidence, 1.0)
+
+    def test_ingest_empty_returns_empty(self):
+        from apme.ingestion.certificates import ingest_certificates
+        CertificateIntelligence.objects.all().delete()
+        nodes, edges = ingest_certificates(self.domain.id)
+        self.assertEqual(nodes, [])
+        self.assertEqual(edges, [])

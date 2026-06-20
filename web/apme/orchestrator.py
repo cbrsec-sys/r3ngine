@@ -86,6 +86,12 @@ class APMEOrchestrator:
         all_nodes.extend(tech_nodes)
         all_edges.extend(tech_edges)
 
+        # Certificate intelligence ingestion (Plan 1)
+        from apme.ingestion.certificates import ingest_certificates
+        cert_nodes, cert_edges = ingest_certificates(target_id)
+        all_nodes.extend(cert_nodes)
+        all_edges.extend(cert_edges)
+
         # Inject virtual goal nodes (Objectives) to ensure rules have targets
         goal_nodes = self._generate_virtual_goal_nodes(scan_history_id)
         all_nodes.extend(goal_nodes)
