@@ -465,6 +465,58 @@ class Neo4jManager:
                     label="identity_infra", heartbeat_callback=heartbeat,
                 )
 
+            # API Intelligence Endpoints
+            from startScan.models import APIIntelligenceProfile
+            api_rows = []
+            for row in APIIntelligenceProfile.objects.filter(
+                scan_history_id=scan_history_id
+            ).values("base_url", "api_type", "endpoint_count").iterator(
+                chunk_size=GRAPH_SYNC_ORM_CHUNK
+            ):
+                api_rows.append({
+                    "base_url": row["base_url"],
+                    "api_type": row["api_type"],
+                    "endpoint_count": row["endpoint_count"],
+                    "scan_id": scan_history_id,
+                })
+                if len(api_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_api_endpoints, api_rows,
+                        label="api_endpoints", heartbeat_callback=heartbeat,
+                    )
+                    api_rows = []
+            if api_rows:
+                self._batch_execute(
+                    session, self._batch_merge_api_endpoints, api_rows,
+                    label="api_endpoints", heartbeat_callback=heartbeat,
+                )
+
+            # Application nodes
+            from startScan.models import Subdomain as SubdomainModel
+            app_rows = []
+            for sub in SubdomainModel.objects.filter(
+                scan_history_id=scan_history_id,
+                webserver__isnull=False,
+            ).exclude(webserver="").values("name", "webserver").iterator(
+                chunk_size=GRAPH_SYNC_ORM_CHUNK
+            ):
+                app_rows.append({
+                    "name": sub["name"],
+                    "webserver": sub["webserver"] or "",
+                    "scan_id": scan_history_id,
+                })
+                if len(app_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_applications, app_rows,
+                        label="applications", heartbeat_callback=heartbeat,
+                    )
+                    app_rows = []
+            if app_rows:
+                self._batch_execute(
+                    session, self._batch_merge_applications, app_rows,
+                    label="applications", heartbeat_callback=heartbeat,
+                )
+
         heartbeat(f"neo4j scan_id={scan_history_id} complete")
         logger.info(
             f"[Neo4j] sync_scan_results scan_id={scan_history_id}: "
@@ -829,6 +881,159 @@ class Neo4jManager:
             rows=rows,
         )
 
+    @staticmethod
+    def _batch_merge_api_endpoints(tx, rows):
+        """Merge APIEndpoint nodes from APIIntelligenceProfile records."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (ep:APIEndpoint {base_url: row.base_url, scan_id: row.scan_id})
+            SET ep.api_type = row.api_type,
+                ep.endpoint_count = row.endpoint_count
+            WITH ep, row
+            MATCH (sc:Scan {id: row.scan_id})
+            MERGE (sc)-[:FOUND]->(ep)
+            """,
+            rows=rows,
+        )
+
+    @staticmethod
+    def _batch_merge_organizations(tx, rows):
+        """Merge Organization nodes."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (org:Organization {slug: row.slug, scan_id: row.scan_id})
+            SET org.name = row.name
+            WITH org, row
+            MATCH (sc:Scan {id: row.scan_id})
+            MERGE (sc)-[:FOUND]->(org)
+            """,
+            rows=rows,
+        )
+
+    @staticmethod
+    def _batch_merge_applications(tx, rows):
+        """Merge Application nodes synthesized from subdomain+webserver metadata."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (app:Application {name: row.name, scan_id: row.scan_id})
+            SET app.webserver = row.webserver
+            WITH app, row
+            MATCH (sc:Scan {id: row.scan_id})
+            MERGE (sc)-[:FOUND]->(app)
+            """,
+            rows=rows,
+        )
+
+    def get_full_chain_graph(self, scan_id: int) -> dict:
+        """
+        Return nodes and edges for the full attack chain for a scan.
+
+        Traverses: Organization → Subdomain → Application → APIEndpoint →
+                   IdentityInfra/Certificate
+
+        Returns {"nodes": [...], "edges": [...]} serialisable dicts.
+        scan_id is always passed as a Cypher parameter — never interpolated.
+        """
+        if not self.driver:
+            return {"nodes": [], "edges": []}
+
+        ALLOWED_NODE_TYPES = frozenset([
+            "Organization", "Subdomain", "IPAddress", "Application",
+            "Technology", "Certificate", "IdentityInfra", "APIEndpoint",
+            "APMENode", "Vulnerability", "CVE",
+        ])
+        cypher = """
+            MATCH (sc:Scan {id: $scan_id})-[:FOUND]->(n)
+            WHERE any(label IN labels(n)
+                  WHERE label IN ['Organization','Subdomain','IPAddress','Application',
+                                  'Technology','Certificate','IdentityInfra','APIEndpoint',
+                                  'APMENode','Vulnerability','CVE'])
+            OPTIONAL MATCH (n)-[r]->(m)
+            RETURN n, r, m
+            LIMIT 1000
+        """
+        chain_color_map = {
+            "Organization":  "#f59e0b",
+            "Subdomain":     "#3b82f6",
+            "IPAddress":     "#6b7280",
+            "Application":   "#10b981",
+            "Technology":    "#8b5cf6",
+            "Certificate":   "#06b6d4",
+            "IdentityInfra": "#a855f7",
+            "APIEndpoint":   "#ec4899",
+            "Vulnerability": "#ef4444",
+            "CVE":           "#f97316",
+            "APMENode":      "#64748b",
+        }
+
+        nodes_map: dict = {}
+        edges_list: list = []
+
+        with self.driver.session() as session:
+            result = session.run(cypher, scan_id=scan_id)
+            for record in result:
+                n = record.get("n")
+                r = record.get("r")
+                m = record.get("m")
+                if n is not None:
+                    node_id = str(n.element_id)
+                    if node_id not in nodes_map:
+                        labels = list(n.labels)
+                        node_type = next(
+                            (lbl for lbl in labels if lbl in ALLOWED_NODE_TYPES), "Unknown"
+                        )
+                        nodes_map[node_id] = {
+                            "id": node_id,
+                            "type": node_type,
+                            "color": chain_color_map.get(node_type, "#94a3b8"),
+                            "properties": dict(n),
+                        }
+                if r is not None and m is not None:
+                    edges_list.append({
+                        "from": str(n.element_id) if n else None,
+                        "to": str(m.element_id),
+                        "type": r.type,
+                    })
+
+        return {"nodes": list(nodes_map.values()), "edges": edges_list}
+
+    def get_chain_nodes_by_type(self, scan_id: int, node_type: str) -> list:
+        """
+        Return all nodes of a specific type for a scan.
+
+        node_type is validated against ALLOWED_NODE_TYPES before Cypher use.
+        Cypher label is embedded via pre-built template strings (Security Rule 5.1).
+        """
+        if not self.driver:
+            return []
+
+        ALLOWED_NODE_TYPES = frozenset([
+            "Organization", "Subdomain", "IPAddress", "Application",
+            "Technology", "Certificate", "IdentityInfra", "APIEndpoint",
+            "APMENode", "Vulnerability", "CVE",
+        ])
+        if node_type not in ALLOWED_NODE_TYPES:
+            return []
+
+        # Pre-build one safe query per allowed type — no user input interpolated
+        label_queries = {
+            t: f"MATCH (sc:Scan {{id: $scan_id}})-[:FOUND]->(n:{t}) RETURN n LIMIT 500"
+            for t in ALLOWED_NODE_TYPES
+        }
+        cypher = label_queries[node_type]
+
+        result_list: list = []
+        with self.driver.session() as session:
+            result = session.run(cypher, scan_id=scan_id)
+            for record in result:
+                n = record.get("n")
+                if n is not None:
+                    result_list.append(dict(n))
+        return result_list
+
     def ingest_stress_telemetry(self, endpoint_url, scan_id, telemetry_data):
         """
         telemetry_data = {
@@ -1001,8 +1206,11 @@ class Neo4jManager:
             "Technology": "#facc15",
             "CVE": "#7c3aed",
             "StressTest": "#14b8a6",
-            "Certificate": "#06b6d4",
+            "Certificate":   "#06b6d4",
             "IdentityInfra": "#a855f7",
+            "APIEndpoint":   "#ec4899",
+            "Application":   "#10b981",
+            "Organization":  "#f59e0b",
         }
 
         with self.driver.session() as session:
