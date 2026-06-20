@@ -37,6 +37,13 @@ from .config_migration_views import ExportConfig, ImportConfig, ExportScanResult
 from .cert_views import CertificateIntelView
 from .identity_views import IdentityInfraView
 from .graph_intel_views import FullChainGraphView, ChainNodesByTypeView
+from .exposure_mobile_views import (
+    ExposureMobileListView,
+    ExposureMobileDetailView,
+    ExposureStatsMobileView,
+    ExposureStatusUpdateView,
+    ExposureBulkStatusView,
+)
 
 
 app_name = 'api'
@@ -502,6 +509,12 @@ urlpatterns = [
         ParameterSummaryView.as_view(),
         name='parameters_summary'
     ),
+    # Exposure mobile views (order matters: stats/bulk-status before <int:pk>)
+    path('exposures/', ExposureMobileListView.as_view(), name='exposures_mobile_list'),
+    path('exposures/stats/', ExposureStatsMobileView.as_view(), name='exposures_mobile_stats'),
+    path('exposures/bulk-status/', ExposureBulkStatusView.as_view(), name='exposures_bulk_status'),
+    path('exposures/<int:pk>/', ExposureMobileDetailView.as_view(), name='exposures_mobile_detail'),
+    path('exposures/<int:pk>/status/', ExposureStatusUpdateView.as_view(), name='exposures_status_update'),
     path('apme/risk-summary/', RiskSummaryMobileView.as_view(), name='apme_risk_summary_mobile'),
     path('apme/tree/<str:target_id>/', AttackTreeMobileView.as_view(), name='apme_tree_mobile'),
     path('apme/impact/regenerate/', RegenerateImpactMobileView.as_view(), name='apme_impact_regenerate'),
