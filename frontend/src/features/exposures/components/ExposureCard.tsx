@@ -77,7 +77,10 @@ export const ExposureCard: React.FC<ExposureCardProps> = ({ exposure, onClick })
       </Stack>
 
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-        Status: <span style={{ fontWeight: 600, color: 'text.primary' }}>{exposure.status.toUpperCase()}</span>
+        Status:{' '}
+        <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+          {exposure.status.toUpperCase()}
+        </Box>
       </Typography>
 
       <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
