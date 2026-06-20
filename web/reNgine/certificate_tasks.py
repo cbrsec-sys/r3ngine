@@ -234,3 +234,88 @@ def run_certificate_intel(
         len(results), scan_history_id,
     )
     return results
+
+
+def resync_single_certificate(cert_id: int) -> Optional["CertificateIntelligence"]:
+    """
+    Re-run tlsx for a single CertificateIntelligence record's host.
+
+    Fetches the record, probes only that host, and updates the record
+    in-place. Returns the updated instance on success, None on any failure.
+    """
+    import re
+    from startScan.models import CertificateIntelligence
+
+    try:
+        cert = CertificateIntelligence.objects.select_related(
+            "scan_history__domain", "target_domain"
+        ).get(id=cert_id)
+    except CertificateIntelligence.DoesNotExist:
+        logger.error("certificate_tasks: CertificateIntelligence %s not found", cert_id)
+        return None
+
+    host = cert.host
+
+    # Validate host — allow only alphanumeric, hyphens, and dots (Rule 1.4).
+    if not host or not re.match(r'^[a-zA-Z0-9.\-]+$', host):
+        logger.error(
+            "certificate_tasks: Unsafe host in cert %s, aborting resync", cert_id
+        )
+        return None
+
+    logger.info(
+        "certificate_tasks: Resyncing cert %s for host %s", cert_id, host
+    )
+
+    try:
+        cmd = shlex.split(f"tlsx -json -silent -ro -p {_TLS_PORTS} -host {host}")
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        output = proc.stdout or ""
+    except subprocess.TimeoutExpired:
+        logger.error(
+            "certificate_tasks: tlsx timed out for cert %s host %s", cert_id, host
+        )
+        return None
+    except FileNotFoundError:
+        logger.error(
+            "certificate_tasks: tlsx not found in PATH for cert %s", cert_id
+        )
+        return None
+    except Exception as exc:
+        logger.error(
+            "certificate_tasks: Unexpected error for cert %s: %s", cert_id, exc
+        )
+        return None
+
+    for line in output.splitlines():
+        parsed = parse_tlsx_json_line(line)
+        if not parsed or parsed["host"] != host:
+            continue
+
+        # Update all probe-derived fields in-place on the existing record.
+        cert.port = parsed["port"]
+        cert.subject_cn = parsed["subject_cn"]
+        cert.subject_an = parsed["subject_an"] or []
+        cert.issuer_cn = parsed["issuer_cn"]
+        cert.issuer_org = parsed["issuer_org"]
+        cert.not_before = _parse_dt(parsed["not_before"])
+        cert.not_after = _parse_dt(parsed["not_after"])
+        cert.tls_version = parsed["tls_version"]
+        cert.cipher = parsed["cipher"]
+        cert.fingerprint_sha256 = parsed["fingerprint_sha256"]
+        cert.self_signed = parsed["self_signed"]
+        cert.mismatched = parsed["mismatched"]
+        cert.is_expired = _is_expired(parsed["not_after"])
+        cert.has_weak_cipher = is_weak_cipher(parsed["cipher"] or "")
+        cert.raw_json = parsed["raw_json"]
+        cert.save()
+
+        logger.info(
+            "certificate_tasks: Resync complete for cert %s host %s", cert_id, host
+        )
+        return cert
+
+    logger.warning(
+        "certificate_tasks: No tlsx output matched host %s for cert %s", host, cert_id
+    )
+    return None
