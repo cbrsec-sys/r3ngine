@@ -27,6 +27,7 @@ from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIV
 from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView, RecalculateAttackPathsAPIView, AttackPathExplanationAPIView, AttackTreeAPIView
 from .scan_configuration import ScanConfigurationAPI
 from .config_migration_views import ExportConfig, ImportConfig, ExportScanResults
+from .cert_views import CertificateIntelView
 
 
 app_name = 'api'
@@ -515,6 +516,7 @@ urlpatterns = [
         AttackTreeAPIView.as_view(),
         name='apme_attack_trees'
     ),
+    path('certs/', CertificateIntelView.as_view(), name='certificate_intel'),
     path(
         'action/ad-assessment/from-subdomain/',
         LaunchADAssessmentFromSubdomain.as_view(),

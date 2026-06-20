@@ -294,3 +294,41 @@ class TestNeo4jCertSync(TestCase):
             cypher = mock_tx.run.call_args[0][0]
             self.assertIn("Certificate", cypher)
             self.assertIn("MERGE", cypher)
+
+
+class TestCertificateAPI(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user("certuser", password="pass")
+        self.client = APIClient()
+        # force_authenticate satisfies DRF; force_login satisfies LoginRequiredMiddleware
+        self.client.force_authenticate(user=self.user)
+        self.client.force_login(self.user)
+        self.domain = Domain.objects.create(name="api.example.com")
+        self.scan = _make_scan(self.domain)
+        CertificateIntelligence.objects.create(
+            scan_history=self.scan, target_domain=self.domain,
+            host="api.example.com", port=443,
+            fingerprint_sha256="apitest001",
+            is_expired=True, self_signed=False, has_weak_cipher=False,
+        )
+
+    def test_list_certs_by_scan_id(self):
+        resp = self.client.get(f"/api/certs/?scan_id={self.scan.id}")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["results"][0]["host"], "api.example.com")
+        self.assertTrue(data["results"][0]["is_expired"])
+
+    def test_missing_scan_id_returns_400(self):
+        resp = self.client.get("/api/certs/")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_unauthenticated_returns_redirect(self):
+        # LoginRequiredMiddleware redirects to login before DRF auth runs
+        from rest_framework.test import APIClient
+        anon = APIClient()
+        resp = anon.get(f"/api/certs/?scan_id={self.scan.id}")
+        self.assertEqual(resp.status_code, 302)

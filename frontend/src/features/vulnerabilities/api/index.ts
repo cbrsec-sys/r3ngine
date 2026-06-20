@@ -216,8 +216,8 @@ export const useImpactAssessment = (projectSlug: string, vulnId: number | null) 
       return response.json() as Promise<ImpactAssessmentResponse>;
     },
     enabled: !!projectSlug && !!vulnId,
-    refetchInterval: (data) => {
-      if (!data || data.status === false) return 5000;
+    refetchInterval: (query) => {
+      if (!query.state.data || query.state.data.status === false) return 5000;
       return false;
     }
   });
