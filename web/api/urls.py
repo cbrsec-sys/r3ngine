@@ -29,6 +29,7 @@ from .scan_configuration import ScanConfigurationAPI
 from .config_migration_views import ExportConfig, ImportConfig, ExportScanResults
 from .cert_views import CertificateIntelView
 from .identity_views import IdentityInfraView
+from .graph_intel_views import FullChainGraphView, ChainNodesByTypeView
 
 
 app_name = 'api'
@@ -556,6 +557,16 @@ urlpatterns = [
         'graph/node/<str:node_id>/',
         GetNodeDetails.as_view(),
         name='get_node_details'
+    ),
+    path(
+        'graph/chain/',
+        FullChainGraphView.as_view(),
+        name='full_chain_graph',
+    ),
+    path(
+        'graph/chain/nodes/',
+        ChainNodesByTypeView.as_view(),
+        name='chain_nodes_by_type',
     ),
     path(
         'system/logs/',

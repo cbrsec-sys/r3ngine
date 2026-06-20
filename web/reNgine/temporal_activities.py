@@ -2859,6 +2859,33 @@ def run_identity_infra_activity(scan_history_id: int, job_id: str = None) -> dic
         return {"status": "error", "count": 0, "error": format_exception_for_log(e)}
 
 
+@activity.defn(name="run_api_intel_activity")
+def run_api_intel_activity(scan_history_id: int, job_id: str = None) -> dict:
+    """
+    Cluster EndPoint records into APIIntelligenceProfile records.
+    No tool subprocess — reads only from PostgreSQL.
+    Must run before APME so ingest_api_intelligence() has profiles to read.
+    """
+    from apme.ingestion.api_intelligence import collect_api_intelligence
+    from reNgine.utils.logger import format_exception_for_log
+
+    logger.log_line("[SCAN]", "START", "task=api_intel scan_id=%s" % scan_history_id)
+    try:
+        profiles = collect_api_intelligence(scan_history_id)
+        logger.log_line(
+            "[SCAN]", "COMPLETE",
+            "task=api_intel scan_id=%s profiles=%d" % (scan_history_id, len(profiles)),
+        )
+        return {"status": "ok", "count": len(profiles)}
+    except Exception as e:
+        logger.log_line(
+            "[SCAN]", "ERROR",
+            "task=api_intel scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)),
+            level="error",
+        )
+        return {"status": "error", "count": 0}
+
+
 @activity.defn(name="RunLlmApmeActivity")
 def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
     from apme.apme_tasks import run_llm_apme
