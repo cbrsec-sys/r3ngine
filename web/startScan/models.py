@@ -733,6 +733,42 @@ class IdentityInfraDiscovery(models.Model):
 		return f"{self.infra_type.upper()} @ {self.host}"
 
 
+class APIIntelligenceProfile(models.Model):
+	API_TYPE_CHOICES = [
+		("rest", "REST"),
+		("graphql", "GraphQL"),
+		("soap", "SOAP"),
+		("generic", "Generic"),
+	]
+
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name="api_intel",
+	)
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True,
+	)
+	subdomain = models.ForeignKey(
+		"Subdomain", on_delete=models.CASCADE, null=True, blank=True,
+		related_name="api_intel",
+	)
+	base_url = models.URLField(max_length=2000)
+	api_type = models.CharField(max_length=20, choices=API_TYPE_CHOICES, default="rest")
+	endpoint_count = models.IntegerField(default=0)
+	requires_auth = models.BooleanField(default=False)
+	auth_scheme = models.CharField(max_length=100, null=True, blank=True)
+	parameters_sample = models.JSONField(default=list, blank=True)
+	graphql_schema_snippet = models.TextField(null=True, blank=True)
+	raw_endpoints = models.JSONField(default=list, blank=True)
+
+	class Meta:
+		unique_together = [("scan_history", "base_url", "api_type")]
+
+	def __str__(self) -> str:
+		return f"{self.api_type.upper()} @ {self.base_url}"
+
+
 class ExposureEvidence(models.Model):
 	id = models.AutoField(primary_key=True)
 	exposure = models.ForeignKey(Exposure, on_delete=models.CASCADE, related_name='evidence')

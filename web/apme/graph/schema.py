@@ -111,4 +111,7 @@ EDGE_TYPES = [
     "USES_TECH",      # asset -> technology
     "PROTECTS",       # certificate -> endpoint
     "AUTHENTICATES_VIA", # application -> identity infra
+    "DEPENDS_ON",       # app -> api endpoint
+    "TRUSTS_DOMAIN",    # domain -> trusted external domain
+    "PART_OF",          # app/org node -> parent domain node
 ]
