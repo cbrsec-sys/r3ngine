@@ -682,6 +682,57 @@ class CertificateIntelligence(models.Model):
 		return f"{self.host}:{self.port} ({self.subject_cn or 'unknown CN'})"
 
 
+class IdentityInfraDiscovery(models.Model):
+	INFRA_TYPE_CHOICES = [
+		("adfs", "ADFS"),
+		("owa", "Outlook Web Access"),
+		("exchange", "Exchange"),
+		("ldap", "LDAP"),
+		("sso", "SSO Portal"),
+		("saml_idp", "SAML Identity Provider"),
+		("vpn_portal", "VPN Portal"),
+		("ntlm_endpoint", "NTLM Endpoint"),
+		("generic_auth_portal", "Generic Auth Portal"),
+	]
+
+	DETECTION_METHOD_CHOICES = [
+		("url_pattern", "URL Pattern"),
+		("title_keyword", "Page Title Keyword"),
+		("header_analysis", "HTTP Header Analysis"),
+		("combined", "Multiple Signals"),
+	]
+
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name="identity_infra",
+	)
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True,
+	)
+	subdomain = models.ForeignKey(
+		"Subdomain", on_delete=models.CASCADE, null=True, blank=True,
+		related_name="identity_infra",
+	)
+	url = models.URLField(max_length=2000, null=True, blank=True)
+	host = models.CharField(max_length=1000)
+	infra_type = models.CharField(
+		max_length=50, choices=INFRA_TYPE_CHOICES, default="generic_auth_portal"
+	)
+	detection_method = models.CharField(
+		max_length=50, choices=DETECTION_METHOD_CHOICES, default="url_pattern"
+	)
+	confidence_score = models.FloatField(default=0.5)
+	is_externally_accessible = models.BooleanField(default=True)
+	additional_signals = models.JSONField(default=dict, blank=True)
+
+	class Meta:
+		unique_together = [("scan_history", "host", "infra_type")]
+
+	def __str__(self) -> str:
+		return f"{self.infra_type.upper()} @ {self.host}"
+
+
 class ExposureEvidence(models.Model):
 	id = models.AutoField(primary_key=True)
 	exposure = models.ForeignKey(Exposure, on_delete=models.CASCADE, related_name='evidence')
