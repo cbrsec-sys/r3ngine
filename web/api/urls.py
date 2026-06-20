@@ -63,10 +63,12 @@ router.register(r'subscans', SubScanViewSet, basename='subscans')
 router.register(r'soc-settings', SOCSettingsViewSet, basename='soc-settings')
 router.register(r'listScans', ScanHistoryViewSet, basename='list-scans')
 router.register(r'users', UserManageViewSet, basename='users')
+router.register(r'workers', ScanWorkerViewSet, basename='workers')
 
 
 urlpatterns = [
     re_path(r'^', include(router.urls)),
+    path('settings/workers/heartbeat/', WorkerHeartbeatAPIView.as_view(), name='worker_heartbeat'),
     path(
         'add/target/',
         AddTarget.as_view(),
