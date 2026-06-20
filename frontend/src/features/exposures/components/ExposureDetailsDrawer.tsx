@@ -4,6 +4,27 @@ import CloseIcon from '@mui/icons-material/Close';
 import type { Exposure } from '../types';
 import { useThemeTokens } from '@/theme/useThemeTokens';
 
+function EvidenceValue({ data }: { data: Record<string, unknown> }) {
+  const primary = (data?.url ?? data?.name ?? data?.value) as string | undefined;
+  if (primary) {
+    return <span>{primary}</span>;
+  }
+  const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined);
+  if (entries.length === 0) return <span style={{ fontStyle: 'italic' }}>No details</span>;
+  return (
+    <Box component="ul" sx={{ m: 0, pl: 2, listStyle: 'none' }}>
+      {entries.map(([k, v]) => (
+        <Box component="li" key={k} sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+          <Box component="span" sx={{ fontWeight: 600, color: 'text.primary', mr: 0.5 }}>
+            {k}:
+          </Box>
+          {String(v)}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 interface ExposureDetailsDrawerProps {
   exposure: Exposure;
   onClose: () => void;
@@ -86,7 +107,7 @@ export const ExposureDetailsDrawer: React.FC<ExposureDetailsDrawerProps> = ({ ex
                     <Box component="span" sx={{ fontWeight: 600, mr: 1, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>
                       {ev.source_tool}
                     </Box>
-                    {ev.evidence_data?.url as string || ev.evidence_data?.name as string || JSON.stringify(ev.evidence_data)}
+                    <EvidenceValue data={ev.evidence_data} />
                   </Typography>
                 }
               />
