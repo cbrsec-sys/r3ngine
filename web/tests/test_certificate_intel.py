@@ -111,3 +111,28 @@ class TestCertificateParser(TestCase):
     def test_is_weak_cipher_null(self):
         from reNgine.certificate_tasks import is_weak_cipher
         self.assertTrue(is_weak_cipher("TLS_NULL_WITH_NULL_NULL"))
+
+
+class TestCertificateActivity(TestCase):
+    def setUp(self):
+        self.domain = Domain.objects.create(name="activity.example.com")
+        self.scan = _make_scan(self.domain)
+
+    def test_activity_calls_runner(self):
+        from unittest.mock import patch
+        with patch("reNgine.certificate_tasks.run_certificate_intel") as mock_runner:
+            from reNgine.temporal_activities import run_certificate_intel_activity
+            mock_runner.return_value = []
+            result = run_certificate_intel_activity(self.scan.id)
+            mock_runner.assert_called_once()
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["count"], 0)
+
+    def test_activity_returns_count(self):
+        from unittest.mock import patch
+        with patch("reNgine.certificate_tasks.run_certificate_intel") as mock_runner:
+            from reNgine.temporal_activities import run_certificate_intel_activity
+            fake_cert = CertificateIntelligence(host="a.example.com", port=443)
+            mock_runner.return_value = [fake_cert]
+            result = run_certificate_intel_activity(self.scan.id)
+            self.assertEqual(result["count"], 1)

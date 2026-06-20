@@ -2780,6 +2780,44 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
         logger.error(f"Failed to finalize crashed scan {scan_id}: {e}")
 
 
+@activity.defn(name="run_certificate_intel_activity")
+def run_certificate_intel_activity(scan_history_id: int, job_id: str = None) -> dict:
+    """
+    Collect TLS/certificate intelligence for all live subdomains.
+    Runs tlsx -json, parses output, writes CertificateIntelligence records.
+    Must run before APME so ingest_certificates() has data to read.
+    """
+    from reNgine.certificate_tasks import run_certificate_intel
+    import os
+
+    logger.log_line("[SCAN]", "START", "task=cert_intel scan_id=%s" % scan_history_id)
+
+    try:
+        from startScan.models import ScanHistory
+        scan = ScanHistory.objects.select_related("domain").get(id=scan_history_id)
+        results_dir = os.path.join(
+            "/usr/src/app",
+            "scan_results",
+            scan.domain.name,
+            str(scan_history_id),
+        )
+        os.makedirs(results_dir, exist_ok=True)
+        certs = run_certificate_intel(scan_history_id, results_dir)
+        logger.log_line(
+            "[SCAN]", "COMPLETE",
+            "task=cert_intel scan_id=%s certs=%d" % (scan_history_id, len(certs)),
+        )
+        return {"status": "ok", "count": len(certs)}
+    except Exception as e:
+        from reNgine.utils.logger import format_exception_for_log
+        logger.log_line(
+            "[SCAN]", "ERROR",
+            "task=cert_intel scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)),
+            level="error",
+        )
+        return {"status": "error", "count": 0, "error": str(e)}
+
+
 @activity.defn(name="RunLlmApmeActivity")
 def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
     from apme.apme_tasks import run_llm_apme
