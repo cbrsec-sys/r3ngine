@@ -67,7 +67,7 @@ class ImpactDetailMobileView(APIView):
 
     def get(self, request, path_id):
         from startScan.models import ImpactAssessment
-        assessment = ImpactAssessment.objects.filter(
+        assessment = ImpactAssessment.objects.select_related('subdomain').filter(
             potential_attack_chain__apme_path_id=path_id
         ).first()
         if not assessment:
@@ -163,7 +163,7 @@ class AttackTreeMobileView(APIView):
                 continue
             score = float(chain.get('score', 0))
             paths.append({
-                'path_id': chain['apme_path_id'],
+                'path_id': chain.get('apme_path_id', 'unknown'),
                 'risk': chain.get('risk', 'unknown'),
                 'score': score,
                 'step_count': len(chain.get('steps', [])),
