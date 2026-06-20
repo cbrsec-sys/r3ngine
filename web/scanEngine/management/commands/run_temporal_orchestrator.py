@@ -317,7 +317,16 @@ async def _register_daily_cron_schedule(
 class Command(BaseCommand):
     help = 'Runs the Python Temporal Orchestrator Worker on python-orchestrator-queue.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--worker-name', type=str, help='Name of the remote worker')
+        parser.add_argument('--worker-token', type=str, help='Authentication token for the remote worker')
+        parser.add_argument('--r3ngine-url', type=str, help='URL of the central r3ngine instance')
+
     def handle(self, *args, **options):
+        worker_name = options.get('worker_name')
+        worker_token = options.get('worker_token')
+        r3ngine_url = options.get('r3ngine_url')
+        task_queue = worker_name if worker_name else "python-orchestrator-queue"
         # Install plugin tools in THIS container before starting the worker.
         # Tools must be present in the orchestrator — not the web container — because
         # activities (swaks, smtp-user-enum, etc.) run here. This is the only place
@@ -341,7 +350,35 @@ class Command(BaseCommand):
         except Exception as cache_err:
             logger.error(f"Failed to clear needs_restart flags: {cache_err}")
 
+        async def heartbeat_loop():
+            if not worker_name or not worker_token or not r3ngine_url:
+                return
+            import requests
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
+            def send_heartbeat():
+                return requests.post(
+                    f"{r3ngine_url.rstrip('/')}/api/settings/workers/heartbeat/", 
+                    json={"worker_name": worker_name, "token": worker_token},
+                    verify=False,
+                    timeout=10
+                )
+            
+            while True:
+                try:
+                    resp = await asyncio.to_thread(send_heartbeat)
+                    if resp.status_code == 403:
+                        logger.error("Worker authentication failed. Shutting down...")
+                        os.kill(os.getpid(), signal.SIGTERM)
+                        break
+                except Exception as e:
+                    logger.error(f"Failed to send heartbeat: {e}")
+                await asyncio.sleep(60)
+
         async def main():
+            if worker_name and worker_token and r3ngine_url:
+                asyncio.create_task(heartbeat_loop())
 
             temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
             namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
@@ -575,7 +612,7 @@ class Command(BaseCommand):
             with DjangoAwareThreadPoolExecutor(max_workers=10) as executor:
                 worker = Worker(
                     client,
-                    task_queue="python-orchestrator-queue",
+                    task_queue=task_queue,
                     workflows=all_workflows,
                     activities=all_activities,
                     activity_executor=executor,
@@ -585,7 +622,7 @@ class Command(BaseCommand):
 
                 self.stdout.write(self.style.SUCCESS(
                     f"Temporal Python Worker started. "
-                    f"Listening on python-orchestrator-queue "
+                    f"Listening on {task_queue} "
                     f"with {len(all_activities)} registered activities..."
                 ))
 
