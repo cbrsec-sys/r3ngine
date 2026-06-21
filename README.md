@@ -57,7 +57,7 @@ The r3ngine Mobile SOC companion app provides a full command-and-control interfa
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
-<h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-plugins" target="_blank">r3Ngine Plugins</a>: Alpha Release Out Now</h2>
+<h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-plugins" target="_blank">r3Ngine Plugins</a>: Stable Release 1.5.0 Out Now</h2>
 <p align="center">
 <img src="https://img.shields.io/badge/r3ngine--plugins-1.5.0-orange.svg?logo=none" alt="r3ngine Plugins" />
 </p>
