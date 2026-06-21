@@ -4,6 +4,11 @@
 
 #### Enhanced
 
+- **Temporal Plugin Logging & Timeline Grouping**:
+  - Implemented the `LogPluginStartActivity` and `LogPluginEndActivity` Temporal activities within `MasterScanWorkflow` to dynamically log backend execution of plugin child workflows directly to the `ScanActivity` database table.
+  - Refactored the React frontend `ScanDetailPage.tsx` to group and sort `ScanActivity` objects utilizing `anchor_step` and `runtime_position`, creating a unified, dynamically scaled timeline that supports plugin injection correctly alongside standard engine tiers.
+  - Styled Plugin specific timeline cards to visually distinguish them from regular workflow tiers via primary color highlighting.
+
 - **Distributed Remote Worker Infrastructure**:
   - Implemented the `ScanWorker` model and Settings UI (`RemoteWorkersPage`) for managing isolated remote workers with user-defined `auth_token` secrets.
   - Added dynamic `--worker-name`, `--worker-token`, and `--r3ngine-url` arguments to `run_temporal_orchestrator.py` allowing headless worker deployment.
