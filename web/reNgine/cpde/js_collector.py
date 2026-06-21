@@ -88,7 +88,7 @@ def download_js_files(
             url (str), content (str), size (int), hash (str), content_type (str)
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from startScan.models import Proxy
+    from scanEngine.models import Proxy
     import random
 
     if session is None:
