@@ -60,6 +60,7 @@ from .api_intel_mobile_views import (
     APIIntelMobileDetailView,
 )
 from .todo_mobile_views import TodoMobileListCreateView, TodoMobileDetailView
+from .workflow_mobile_views import WorkflowMobileListView
 
 
 app_name = 'api'
@@ -639,6 +640,8 @@ urlpatterns = [
         RegisterPushTokenView.as_view(),
         name='register_push_token',
     ),
+    # Phase 3 — mobile workflow discovery
+    path('workflows/', WorkflowMobileListView.as_view(), name='workflows_mobile_list'),
     # Phase 2 — standalone workflow launcher
     path(
         'workflows/<str:workflow_slug>/start/',
