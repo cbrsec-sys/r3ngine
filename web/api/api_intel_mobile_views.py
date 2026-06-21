@@ -34,7 +34,7 @@ class APIIntelMobileListView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        qs = APIIntelligenceProfile.objects.select_related('subdomain')
+        qs = APIIntelligenceProfile.objects.select_related('subdomain', 'scan_history', 'target_domain')
         scan_id = self.request.query_params.get('scan_id')
         if scan_id:
             try:

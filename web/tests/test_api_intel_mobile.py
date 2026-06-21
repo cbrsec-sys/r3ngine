@@ -92,6 +92,6 @@ class APIIntelMobileViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_list_requires_authentication(self):
-        anon_client = DjangoClient()
+        anon_client = APIClient()  # bare — no force_authenticate
         response = anon_client.get('/mapi/api-intel/')
-        self.assertIn(response.status_code, [401, 403])
+        self.assertEqual(response.status_code, 401)
