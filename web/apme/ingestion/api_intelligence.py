@@ -119,7 +119,7 @@ def collect_api_intelligence(scan_history_id: int) -> List:
                 "target_domain": domain,
                 "subdomain": subdomain_obj,
                 "endpoint_count": len(ep_list),
-                "raw_endpoints": ep_list[:50],
+                "raw_endpoints": ep_list[:200],
             },
         )
         results.append(obj)
