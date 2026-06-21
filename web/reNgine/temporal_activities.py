@@ -467,10 +467,16 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
     now = tz.now()
 
     for entry in plan:
-        # Scope the existence check to (scan_of, name) only — regardless of status.
-        # Using status=INITIATED_TASK in the lookup would create phantom PENDING rows
-        # on workflow recovery if tasks have already transitioned to RUNNING/SUCCESS.
-        if not ScanActivity.objects.filter(scan_of=scan, name=entry['name']).exists():
+        existing = ScanActivity.objects.filter(
+            scan_of=scan,
+            name=entry['name'],
+        ).first()
+        if existing:
+            if existing.tier != entry['tier']:
+                existing.tier = entry['tier']
+                existing.save(update_fields=['tier'])
+            existing_count += 1
+        else:
             ScanActivity.objects.create(
                 scan_of=scan,
                 name=entry['name'],
@@ -481,8 +487,6 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
                 status=INITIATED_TASK,
             )
             created_count += 1
-        else:
-            existing_count += 1
 
     logger.log_line("[TEMPORAL]", "COMPLETE", "task=initialize_scan_tasks scan_id=%s created=%d existing=%d" % (scan_id, created_count, existing_count))
     return {'created': created_count, 'existing': existing_count}

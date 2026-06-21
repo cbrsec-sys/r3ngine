@@ -85,7 +85,7 @@ class RetryTaskViewTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
-from reNgine.temporal_activities import get_scan_final_status_activity
+from reNgine.temporal_activities import get_scan_final_status_activity, initialize_scan_tasks_activity
 
 
 class GetScanFinalStatusTests(TestCase):
@@ -115,3 +115,33 @@ class GetScanFinalStatusTests(TestCase):
         )
         result = get_scan_final_status_activity(scan.id, True)
         self.assertEqual(result, FAILED_TASK)
+
+
+class TierStalenessTests(TestCase):
+    def test_existing_row_tier_is_updated(self):
+        scan = _make_scan()
+        # Simulate a row that was created when web_api_discovery was in tier 5
+        import uuid
+        old_row = ScanActivity.objects.create(
+            scan_of=scan,
+            task_uid=uuid.uuid4(),
+            name="web_api_discovery",
+            title="Web API Discovery",
+            tier=5,
+            status=INITIATED_TASK,
+            time="2026-06-21T10:00:00Z",
+        )
+        # Call activity with a plan that puts web_api_discovery in tier 3
+        ctx = {
+            "scan_history_id": scan.id,
+            "tasks": ["web_api_discovery"],
+            "yaml_configuration": {},
+        }
+        with patch(
+            "reNgine.task_plan.build_scan_task_plan",
+            return_value=[{"name": "web_api_discovery", "title": "Web API Discovery", "tier": 3}],
+        ):
+            initialize_scan_tasks_activity(ctx)
+
+        old_row.refresh_from_db()
+        self.assertEqual(old_row.tier, 3)
