@@ -1855,6 +1855,21 @@ class SubScanWorkflow:
                         raise
                     except Exception as post_e:
                         workflow.logger.error(f"SubScanWorkflow post-scan tasks failed: {post_e}")
+                        # Tier-7 failed — mark any still-untracked tasks as failed so
+                        # finalization reflects the correct status.
+                        for _t in tasks:
+                            if _t not in task_success:
+                                task_success[_t] = False
+                    else:
+                        # Tier-7 succeeded — backfill task_success for tasks that were
+                        # excluded from active_tasks (e.g. "attack_path_modeling",
+                        # "run_apme") and therefore never went through run_and_track_task.
+                        # Without this, any subscan whose type matches a tier-7 name
+                        # defaults to False in task_success and is finalized as FAILED
+                        # even though the activity completed successfully.
+                        for _t in tasks:
+                            if _t not in task_success:
+                                task_success[_t] = True
 
                 # 3. Always finalize all subscan records, regardless of success/failure.
                 # This ensures the UI reflects the correct terminal state even when tasks fail.
