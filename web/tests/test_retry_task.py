@@ -1,0 +1,85 @@
+from django.test import TestCase
+from django.urls import reverse
+from unittest.mock import patch, MagicMock
+from startScan.models import ScanHistory, ScanActivity
+from reNgine.definitions import FAILED_TASK, RUNNING_TASK, INITIATED_TASK, SUCCESS_TASK
+
+
+def _make_scan(status=FAILED_TASK):
+    from django.utils import timezone
+    from targetApp.models import Domain
+    domain = Domain.objects.create(name="example.test")
+    from scanEngine.models import EngineType
+    engine = EngineType.objects.create(
+        engine_name="Test Engine",
+        yaml_configuration="subdomain_discovery:\n  uses_tools: []\n",
+    )
+    return ScanHistory.objects.create(
+        domain=domain,
+        scan_type=engine,
+        scan_status=status,
+        results_dir="/tmp/test",
+        start_scan_date=timezone.now(),
+    )
+
+
+def _make_activity(scan, name="param_discovery", status=FAILED_TASK):
+    import uuid
+    return ScanActivity.objects.create(
+        scan_of=scan,
+        task_uid=uuid.uuid4(),
+        name=name,
+        title="Param Discovery",
+        tier=3,
+        status=status,
+        time_started="2026-06-21T10:00:00Z",
+        time="2026-06-21T10:00:00Z",
+    )
+
+
+class RetryTaskViewTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_superuser("admin", "a@b.com", "password")
+        self.client.force_login(self.user)
+
+    @patch("api.views.run_and_close")
+    def test_retry_failed_activity_resets_to_initiated(self, mock_run):
+        mock_run.return_value = None
+        scan = _make_scan(status=FAILED_TASK)
+        act = _make_activity(scan, status=FAILED_TASK)
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        act.refresh_from_db()
+        self.assertEqual(act.status, INITIATED_TASK)
+        self.assertIsNone(act.time_started)
+
+    @patch("api.views.run_and_close")
+    def test_retry_flips_scan_to_running(self, mock_run):
+        mock_run.return_value = None
+        scan = _make_scan(status=FAILED_TASK)
+        act = _make_activity(scan, status=FAILED_TASK)
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        self.client.post(url, content_type="application/json")
+        scan.refresh_from_db()
+        self.assertEqual(scan.scan_status, RUNNING_TASK)
+
+    def test_retry_returns_400_when_scan_running(self):
+        scan = _make_scan(status=RUNNING_TASK)
+        act = _make_activity(scan, status=FAILED_TASK)
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_retry_returns_400_for_non_failed_activity(self):
+        scan = _make_scan(status=FAILED_TASK)
+        act = _make_activity(scan, status=SUCCESS_TASK)
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_retry_returns_404_for_missing_activity(self):
+        url = reverse("api:retry_task", kwargs={"pk": 99999})
+        resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 404)

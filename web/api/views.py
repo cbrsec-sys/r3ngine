@@ -6033,39 +6033,77 @@ class ScanActivityRetryAPIView(APIView):
     permission_required = PERM_INITATE_SCANS_SUBSCANS
 
     def post(self, request, pk):
-        from startScan.models import ScanActivity
-        try:
-            activity = ScanActivity.objects.get(id=pk)
-        except ScanActivity.DoesNotExist:
-            return Response({"status": False, "message": "Activity not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        scan_history = activity.scan_of
-        
-        if scan_history.scan_status == RUNNING_TASK:
-            return Response({"status": False, "message": "Cannot retry a task while the scan is running"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        ctx = {"scan_history_id": scan_history.id}
-        
+        import yaml
         import asyncio
+        from startScan.models import ScanActivity
+        from reNgine.definitions import FAILED_TASK, RUNNING_TASK, INITIATED_TASK
         from reNgine.temporal_client import TemporalClientProvider
-        
+
+        try:
+            activity_obj = ScanActivity.objects.get(id=pk)
+        except ScanActivity.DoesNotExist:
+            return Response(
+                {"status": False, "message": "Activity not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        scan = activity_obj.scan_of
+
+        if scan.scan_status == RUNNING_TASK:
+            return Response(
+                {"status": False, "message": "Cannot retry a task while the scan is running"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if activity_obj.status != FAILED_TASK:
+            return Response(
+                {"status": False, "message": "Task is not in a failed state"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Reset the failed activity row so the serializer counts it as pending
+        # and _create_scan_activity can claim it normally.
+        ScanActivity.objects.filter(pk=activity_obj.pk).update(
+            status=INITIATED_TASK,
+            time_started=None,
+            time_ended=None,
+            error_message=None,
+        )
+
+        # Flip scan back to RUNNING so the UI reflects active state.
+        scan.scan_status = RUNNING_TASK
+        scan.error_message = None
+        scan.stop_scan_date = None
+        scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
+
+        yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "")
+        ctx = {
+            "scan_history_id": scan.id,
+            "engine_id": scan.scan_type.id,
+            "domain_id": scan.domain.id,
+            "results_dir": scan.results_dir,
+            "yaml_configuration": yaml_config or {},
+            "tasks": [activity_obj.name],
+        }
+        workflow_id = (
+            f"retry-{activity_obj.name}-{scan.id}-{int(timezone.now().timestamp())}"
+        )
+
         async def _start():
             client = await TemporalClientProvider.get_client()
             await client.start_workflow(
                 "SingleTaskRetryWorkflow",
-                args=[ctx, activity.name],
-                id=f"retry-{activity.name}-{scan_history.id}-{int(timezone.now().timestamp())}",
-                task_queue="python-orchestrator-queue"
+                args=[ctx, activity_obj.name],
+                id=workflow_id,
+                task_queue="python-orchestrator-queue",
             )
-            
+
         loop = asyncio.new_event_loop()
         try:
-            loop.run_until_complete(_start())
+            run_and_close(loop, _start())
         finally:
             loop.close()
-            
-        # Also update the activity status to PENDING
-        activity.status = 3  # PENDING? 3 usually? Wait, let's just let the worker update it.
-        # It's safer to just let the workflow update it.
-            
-        return Response({"status": True, "message": f"Retry started for {activity.title}"})
+
+        return Response(
+            {"status": True, "message": f"Retry started for {activity_obj.title}"}
+        )
