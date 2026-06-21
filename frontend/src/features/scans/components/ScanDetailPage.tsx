@@ -1343,7 +1343,7 @@ export const ScanDetailPage = () => {
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
   const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
   const stopScanMutation = useStopScan(projectSlug);
-  const retryScanTaskMutation = useRetryScanTask();
+  const retryScanTaskMutation = useRetryScanTask(projectSlug, parseInt(scanId));
   const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
@@ -1611,7 +1611,7 @@ export const ScanDetailPage = () => {
                         activity={activity}
                         onClick={() => handleTimelineItemClick(activity)}
                         onRetry={handleRetryTask}
-                        isTerminal={[0, 1, 3].includes(data?.scan_info?.scan_status)}
+                        isTerminal={[0, 3].includes(data?.scan_info?.scan_status ?? -1)}
                       />
                     ))}
                   </Box>

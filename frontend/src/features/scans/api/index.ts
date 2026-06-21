@@ -809,7 +809,8 @@ export const useDirectoryFileDelete = () => {
   });
 };
 
-export const useRetryScanTask = () => {
+export const useRetryScanTask = (projectSlug: string, scanId: number) => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (activityId: number) => {
       const response = await fetch(`/api/action/retry/task/${activityId}/`, {
@@ -831,6 +832,13 @@ export const useRetryScanTask = () => {
         throw new Error(message);
       }
       return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan-summary', projectSlug, scanId] });
+    },
+    onError: (e: Error) => {
+      // Toast is handled by the caller if needed; log for now
+      console.error('Retry task failed:', e.message);
     },
   });
 };
