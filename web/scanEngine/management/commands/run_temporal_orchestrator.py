@@ -214,6 +214,10 @@ from reNgine.temporal_activities import (
     run_param_discovery_activity,
     run_http_crawl_bridge_activity,
     extract_auth_for_url_activity,
+    
+    # Plugin lifecycle
+    log_plugin_start_activity,
+    log_plugin_end_activity,
 )
 
 
@@ -586,6 +590,10 @@ class Command(BaseCommand):
                 run_vigolium_audit_activity,
                 run_urlparser_activity,
                 extract_auth_for_url_activity,
+                
+                # Plugin lifecycle
+                log_plugin_start_activity,
+                log_plugin_end_activity,
             ]
 
             # -------------------------------------------------------------------

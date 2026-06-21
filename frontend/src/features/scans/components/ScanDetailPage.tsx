@@ -1366,14 +1366,63 @@ export const ScanDetailPage = () => {
 
   const groupedTimeline = useMemo(() => {
     const timeline: ScanActivity[] = data?.timeline ?? [];
-    const groups = new Map<number, ScanActivity[]>();
+    
+    // Build map of activity name to Plugin
+    const activityToPlugin = new Map<string, any>();
+    if (Array.isArray(plugins)) {
+      plugins.forEach(p => {
+        const workflows = p.manifest?.temporal?.workflows || [];
+        const activities = p.manifest?.temporal?.activities || [];
+        workflows.forEach((w: string) => activityToPlugin.set(w.split('.').pop()!, p));
+        activities.forEach((a: string) => activityToPlugin.set(a.split('.').pop()!, p));
+      });
+    }
+
+    const tierGroups = new Map<number, ScanActivity[]>();
+    const pluginGroups = new Map<string, { plugin: any, activities: ScanActivity[] }>();
+
     timeline.forEach((act) => {
-      const tier = act.tier ?? 7;
-      if (!groups.has(tier)) groups.set(tier, []);
-      groups.get(tier)!.push(act);
+      const plugin = activityToPlugin.get(act.name);
+      if (plugin) {
+        if (!pluginGroups.has(plugin.slug)) {
+          pluginGroups.set(plugin.slug, { plugin, activities: [] });
+        }
+        pluginGroups.get(plugin.slug)!.activities.push(act);
+      } else {
+        const tier = act.tier ?? 7;
+        if (!tierGroups.has(tier)) tierGroups.set(tier, []);
+        tierGroups.get(tier)!.push(act);
+      }
     });
-    return Array.from(groups.entries()).sort(([a], [b]) => a - b);
-  }, [data?.timeline]);
+
+    const sortedTiers = Array.from(tierGroups.entries()).map(([tier, activities]) => ({
+      id: `tier-${tier}`,
+      sortOrder: tier,
+      label: `Tier ${tier} — ${TIER_LABELS[tier] ?? 'Unknown'}`,
+      activities,
+      type: 'tier' as const,
+    }));
+
+    const sortedPlugins = Array.from(pluginGroups.values()).map(({ plugin, activities }) => {
+      let sortOrder = 7;
+      if (plugin.anchor_step && typeof plugin.anchor_step === 'string') {
+        const match = plugin.anchor_step.match(/tier_(\d+)/);
+        if (match) {
+          const tierNum = parseInt(match[1], 10);
+          sortOrder = plugin.runtime_position === 'BEFORE' ? tierNum - 0.5 : tierNum + 0.5;
+        }
+      }
+      return {
+        id: `plugin-${plugin.slug}`,
+        sortOrder,
+        label: `Plugin — ${plugin.name}`,
+        activities,
+        type: 'plugin' as const,
+      };
+    });
+
+    return [...sortedTiers, ...sortedPlugins].sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [data?.timeline, plugins]);
 
   if (isLoading || !data) {
     return (
@@ -1520,23 +1569,23 @@ export const ScanDetailPage = () => {
             </Typography>
           ) : (
             <Stack>
-              {groupedTimeline.map(([tier, activities]) => (
-                <Box key={tier}>
+              {groupedTimeline.map((group) => (
+                <Box key={group.id}>
                   <Typography sx={{
                     display: 'block',
                     fontSize: '0.55rem',
                     fontWeight: 800,
                     letterSpacing: '0.1em',
                     textTransform: 'uppercase',
-                    color: 'text.secondary',
+                    color: group.type === 'plugin' ? tokens.accent.primary : 'text.secondary',
                     mt: 1.5,
                     mb: 0.5,
                     px: 1,
                   }}>
-                    Tier {tier} — {TIER_LABELS[tier] ?? 'Unknown'}
+                    {group.label}
                   </Typography>
                   <Box sx={{ position: 'relative' }}>
-                    {activities.map((activity) => (
+                    {group.activities.map((activity) => (
                       <TimelineItem
                         key={activity.task_uid ?? activity.id}
                         activity={activity}

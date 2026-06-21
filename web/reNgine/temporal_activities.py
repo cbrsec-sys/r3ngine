@@ -3601,3 +3601,54 @@ def resync_certificate_activity(cert_id: int, job_id: str = None) -> dict:
             exc_info=True,
         )
         raise
+
+# ===========================================================================
+# Plugin Lifecycle Logging
+# ===========================================================================
+
+@activity.defn(name="LogPluginStartActivity")
+def log_plugin_start_activity(ctx: dict) -> dict:
+    from startScan.models import ScanActivity
+    from reNgine.definitions import RUNNING_TASK
+    from django.utils import timezone
+    scan_id = ctx.get("scan_id")
+    name = ctx.get("name")
+    title = ctx.get("title")
+    tier_str = ctx.get("tier")
+    tier_num = 7
+    if tier_str and tier_str.startswith("tier_"):
+        try:
+            tier_num = int(tier_str.split("_")[1])
+        except ValueError:
+            pass
+            
+    now = timezone.now()
+    execution_id = "temporal-" + activity.info().activity_id
+    
+    act = ScanActivity.objects.create(
+        scan_of_id=scan_id,
+        name=name,
+        title=title,
+        status=RUNNING_TASK,
+        time=now,
+        time_started=now,
+        tier=tier_num,
+        execution_id=execution_id,
+    )
+    return {"activity_id": act.id}
+
+@activity.defn(name="LogPluginEndActivity")
+def log_plugin_end_activity(ctx: dict) -> None:
+    from startScan.models import ScanActivity
+    from django.utils import timezone
+    act_id = ctx.get("activity_id")
+    status = ctx.get("status")
+    error = ctx.get("error")
+    try:
+        act = ScanActivity.objects.get(id=act_id)
+        act.status = status
+        act.time_ended = timezone.now()
+        act.error_message = error
+        act.save(update_fields=['status', 'time_ended', 'error_message'])
+    except Exception:
+        pass

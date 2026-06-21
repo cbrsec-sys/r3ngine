@@ -93,15 +93,48 @@ async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> Non
     for plugin_meta in plugin_list:
         wf_name = plugin_meta.get("workflow_name")
         slug = plugin_meta.get("slug")
+        plugin_name = plugin_meta.get("name", slug)
         if not wf_name:
             continue
-        await workflow.execute_child_workflow(
-            wf_name,
-            ctx,
-            id=f"{wf_id_prefix}-plugin-{slug}",
+            
+        log_res = await workflow.execute_activity(
+            "LogPluginStartActivity",
+            {
+                "scan_id": ctx.get("scan_history_id"),
+                "name": wf_name,
+                "title": f"Plugin: {plugin_name}",
+                "tier": tier,
+            },
+            start_to_close_timeout=timedelta(seconds=15),
+            retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue",
-            execution_timeout=timedelta(hours=2),
         )
+        act_id = log_res.get("activity_id")
+
+        try:
+            await workflow.execute_child_workflow(
+                wf_name,
+                ctx,
+                id=f"{wf_id_prefix}-plugin-{slug}",
+                task_queue="python-orchestrator-queue",
+                execution_timeout=timedelta(hours=2),
+            )
+            await workflow.execute_activity(
+                "LogPluginEndActivity",
+                {"activity_id": act_id, "status": 2}, # SUCCESS_TASK
+                start_to_close_timeout=timedelta(seconds=15),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue",
+            )
+        except Exception as e:
+            await workflow.execute_activity(
+                "LogPluginEndActivity",
+                {"activity_id": act_id, "status": 0, "error": str(e)}, # FAILED_TASK
+                start_to_close_timeout=timedelta(seconds=15),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue",
+            )
+            # We don't re-raise here so other plugins/tiers can still run
 
 
 @workflow.defn(name="MasterScanWorkflow")
