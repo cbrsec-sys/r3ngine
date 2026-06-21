@@ -382,6 +382,10 @@ urlpatterns = [
         InitiateSubTask.as_view(),
         name='initiate_subscan'),
     path(
+        'action/retry/task/<int:pk>/',
+        ScanActivityRetryAPIView.as_view(),
+        name='retry_task'),
+    path(
         'action/initiate/scan/',
         InitiateScan.as_view(),
         name='initiate_scan'),

@@ -83,7 +83,7 @@ import {
   GitBranch,
   Brain
 } from 'lucide-react';
-import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan } from '../api';
+import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useRetryScanTask } from '../api';
 import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote } from '../types';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
@@ -752,7 +752,7 @@ const TIER_LABELS: Record<number, string> = {
   7: 'Post-Processing',
 };
 
-const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> = ({ activity, onClick }) => {
+const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onRetry?: (activity: ScanActivity) => void, isTerminal?: boolean }> = ({ activity, onClick, onRetry, isTerminal }) => {
   const { theme, isLight, tokens } = useThemeTokens();
   const statusConfig: Record<string, { color: string, label: string }> = {
     'SUCCESS': { color: tokens.accent.success, label: 'Completed' },
@@ -816,25 +816,38 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
       </Box>
 
       <Stack spacing={0.5} className="timeline-content" sx={{ p: 1, borderRadius: 1, transition: 'background-color 0.2s' }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: theme.palette.text.primary }}>
-            {activity.title}
-          </Typography>
-          <Box sx={{
-            px: 1,
-            py: 0.1,
-            borderRadius: 1,
-            bgcolor: `${config.color}20`,
-            border: `1px solid ${config.color}40`,
-            color: config.color,
-            fontSize: '0.6rem',
-            fontWeight: 800
-          }}>
-            {config.label}
-          </Box>
-          <Typography sx={{ fontSize: '0.6rem', color: isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            • Click to view details <ChevronRight size={10} />
-          </Typography>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: theme.palette.text.primary }}>
+              {activity.title}
+            </Typography>
+            <Box sx={{
+              px: 1,
+              py: 0.1,
+              borderRadius: 1,
+              bgcolor: `${config.color}20`,
+              border: `1px solid ${config.color}40`,
+              color: config.color,
+              fontSize: '0.6rem',
+              fontWeight: 800
+            }}>
+              {config.label}
+            </Box>
+            <Typography sx={{ fontSize: '0.6rem', color: isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              • Click to view details <ChevronRight size={10} />
+            </Typography>
+          </Stack>
+          {isTerminal && activity.name !== 'raw_scan_history' && onRetry && (
+            <MuiTooltip title="Retry Task" placement="top">
+              <IconButton 
+                size="small" 
+                onClick={(e) => { e.stopPropagation(); onRetry(activity); }}
+                sx={{ color: tokens.accent.primary, '&:hover': { bgcolor: `${tokens.accent.primary}20` } }}
+              >
+                <RefreshCw size={14} />
+              </IconButton>
+            </MuiTooltip>
+          )}
         </Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Typography sx={{ fontSize: '0.7rem', color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
@@ -1330,6 +1343,7 @@ export const ScanDetailPage = () => {
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
   const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
   const stopScanMutation = useStopScan(projectSlug);
+  const retryScanTaskMutation = useRetryScanTask();
   const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
@@ -1362,6 +1376,12 @@ export const ScanDetailPage = () => {
       });
     }
     setTaskOverlayOpen(true);
+  };
+
+  const handleRetryTask = (activity: ScanActivity) => {
+    if (confirm(`Are you sure you want to retry ${activity.title}?`)) {
+      retryScanTaskMutation.mutate(Number(activity.id));
+    }
   };
 
   const groupedTimeline = useMemo(() => {
@@ -1590,6 +1610,8 @@ export const ScanDetailPage = () => {
                         key={activity.task_uid ?? activity.id}
                         activity={activity}
                         onClick={() => handleTimelineItemClick(activity)}
+                        onRetry={handleRetryTask}
+                        isTerminal={[0, 1, 3].includes(data?.scan_info?.scan_status)}
                       />
                     ))}
                   </Box>

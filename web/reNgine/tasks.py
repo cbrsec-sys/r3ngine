@@ -8274,14 +8274,29 @@ def resume_scan_temporal(scan_id):
 	# Mark genuinely-running activities as failed; leave INITIATED rows intact so
 	# run-2 can claim them — they were never started and are not real failures.
 	scan.scanactivity_set.filter(status=RUNNING_TASK).update(status=FAILED_TASK)
-	
+
 	# Calculate completed tasks
 	completed_activities = scan.scanactivity_set.filter(status=SUCCESS_TASK).values_list('name', flat=True)
 	completed_tasks = set(completed_activities)
-	
+
 	# Filter the scan's original task list (tasks may be NULL for old/broken scans)
 	remaining_tasks = [t for t in (scan.tasks or []) if t not in completed_tasks]
-	
+
+	# Reset FAILED rows for tasks that will be retried back to INITIATED so:
+	# (a) _create_scan_activity can claim the existing row rather than creating
+	#     a tier-less duplicate, and (b) the progress serializer no longer counts
+	#     those tiers as completed, giving the UI an accurate picture immediately.
+	if remaining_tasks:
+		scan.scanactivity_set.filter(
+			status=FAILED_TASK,
+			name__in=remaining_tasks,
+		).update(
+			status=INITIATED_TASK,
+			time_started=None,
+			time_ended=None,
+			error_message=None,
+		)
+
 	if not remaining_tasks:
 		logger.info(f"Scan {scan_id} has no remaining tasks to resume.")
 		scan.scan_status = SUCCESS_TASK

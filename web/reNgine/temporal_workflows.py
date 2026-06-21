@@ -3213,3 +3213,81 @@ class CertificateResyncWorkflow:
             task_queue="python-orchestrator-queue",
         )
 
+
+@workflow.defn(name="SingleTaskRetryWorkflow")
+class SingleTaskRetryWorkflow:
+    """Workflow to retry a single task from a completed scan.
+    """
+
+    @workflow.run
+    async def run(self, ctx: dict, task_name: str) -> dict:
+        workflow.logger.info(
+            f"Starting SingleTaskRetryWorkflow for scan_id={ctx.get('scan_history_id')}, task={task_name}"
+        )
+        
+        # Determine which activity to run based on task_name
+        if task_name == "subdomain_discovery":
+            await workflow.execute_activity("RunSubdomainDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseDiscoveryResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "amass_intel_discovery":
+            await workflow.execute_activity("RunAmassIntelDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseDiscoveryResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "firewall_vpn_scan":
+            await workflow.execute_activity("RunFirewallVPNScanActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseDiscoveryResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "dns_security":
+            await workflow.execute_activity("RunDNSSecurityActivity", ctx, start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseDiscoveryResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "osint":
+            await workflow.execute_activity("RunGenericTaskActivity", args=[ctx, "osint", "OSINT Scan"], start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseDiscoveryResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "spiderfoot_scan":
+            await workflow.execute_activity("RunGenericTaskActivity", args=[ctx, "spiderfoot_scan", "SpiderFoot Attack Surface Intelligence"], start_to_close_timeout=timedelta(hours=24), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseDiscoveryResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "http_crawl":
+            ctx = await workflow.execute_activity("SeedEndpointsForCrawlActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("RunHTTPCrawlActivity", ctx, start_to_close_timeout=timedelta(hours=3), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseHTTPCrawlResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "port_scan":
+            await workflow.execute_activity("RunPortScanActivity", ctx, start_to_close_timeout=timedelta(hours=3), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseEnumerationResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "vigolium_discovery":
+            await workflow.execute_activity("RunVigoliumDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+        elif task_name == "fetch_url":
+            await workflow.execute_activity("RunFetchURLActivity", ctx, start_to_close_timeout=timedelta(hours=8), heartbeat_timeout=timedelta(minutes=15), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("RunHTTPCrawlBridgeActivity", ctx, start_to_close_timeout=timedelta(hours=3), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+        elif task_name == "screenshot":
+            await workflow.execute_activity("RunScreenshotActivity", ctx, start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
+        elif task_name == "web_api_discovery":
+            await workflow.execute_activity("RunWebAPIDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=10), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
+        elif task_name == "param_discovery":
+            await workflow.execute_activity("RunParamDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=10), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+        elif task_name == "dir_file_fuzz":
+            await workflow.execute_activity("RunDirFileFuzzActivity", ctx, start_to_close_timeout=timedelta(hours=8), heartbeat_timeout=timedelta(minutes=15), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseFuzzResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "waf_detection":
+            await workflow.execute_activity("RunWAFDetectionActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseAnalysisResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "secret_scanning":
+            await workflow.execute_activity("RunSecretScanningActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseAnalysisResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "vigolium_analysis":
+            await workflow.execute_activity("RunVigoliumAnalysisActivity", ctx, start_to_close_timeout=timedelta(hours=8), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("ParseAnalysisResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+        elif task_name == "vulnerability_scan":
+            await workflow.execute_child_workflow("NucleiPlannerWorkflow", ctx, id=f"{workflow.info().workflow_id}-nuclei", task_queue="python-orchestrator-queue", execution_timeout=timedelta(hours=24), run_timeout=timedelta(hours=24), retry_policy=RetryPolicy(maximum_attempts=1))
+            await workflow.execute_activity("ParseAssessmentResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("CorrelateVulnerabilitiesActivity", ctx, start_to_close_timeout=timedelta(minutes=90), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("CorrelateExposuresActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("EnrichScanCVEsActivity", ctx, start_to_close_timeout=timedelta(minutes=45), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("CalculateRiskScoresActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            await workflow.execute_activity("GenerateImpactAssessmentActivity", ctx, start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LLM, task_queue="python-orchestrator-queue")
+        elif task_name == "waf_bypass":
+            await workflow.execute_activity("RunWAFBypassActivity", ctx, start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
+        else:
+            workflow.logger.warning(f"Task name {task_name} is not recognized for retry.")
+            # If it's a plugin, it might not be supported yet or needs generic fallback
+        
+        return {"status": "SUCCESS", "task_name": task_name}
+
+

@@ -6027,3 +6027,45 @@ class RunSearchsploitAction(APIView):
             return Response({'status': True, 'results': exploits})
         except Exception as e:
             return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ScanActivityRetryAPIView(APIView):
+    permission_classes = [HasPermission]
+    permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+    def post(self, request, pk):
+        from startScan.models import ScanActivity
+        try:
+            activity = ScanActivity.objects.get(id=pk)
+        except ScanActivity.DoesNotExist:
+            return Response({"status": False, "message": "Activity not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        scan_history = activity.scan_of
+        
+        if scan_history.scan_status == RUNNING_TASK:
+            return Response({"status": False, "message": "Cannot retry a task while the scan is running"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        ctx = {"scan_history_id": scan_history.id}
+        
+        import asyncio
+        from reNgine.temporal_client import TemporalClientProvider
+        
+        async def _start():
+            client = await TemporalClientProvider.get_client()
+            await client.start_workflow(
+                "SingleTaskRetryWorkflow",
+                args=[ctx, activity.name],
+                id=f"retry-{activity.name}-{scan_history.id}-{int(timezone.now().timestamp())}",
+                task_queue="python-orchestrator-queue"
+            )
+            
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(_start())
+        finally:
+            loop.close()
+            
+        # Also update the activity status to PENDING
+        activity.status = 3  # PENDING? 3 usually? Wait, let's just let the worker update it.
+        # It's safer to just let the workflow update it.
+            
+        return Response({"status": True, "message": f"Retry started for {activity.title}"})

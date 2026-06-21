@@ -808,3 +808,29 @@ export const useDirectoryFileDelete = () => {
     },
   });
 };
+
+export const useRetryScanTask = () => {
+  return useMutation({
+    mutationFn: async (activityId: number) => {
+      const response = await fetch(`/api/action/retry/task/${activityId}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        let message = 'Failed to retry task';
+        try {
+          const errorData = await response.json();
+          message = errorData.message || errorData.error || message;
+        } catch {
+          // ignore
+        }
+        throw new Error(message);
+      }
+      return response.json();
+    },
+  });
+};
