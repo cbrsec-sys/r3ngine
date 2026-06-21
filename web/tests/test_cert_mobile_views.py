@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.utils import timezone
+from unittest.mock import patch, MagicMock
 from startScan.models import ScanHistory, CertificateIntelligence
 from targetApp.models import Domain
 from dashboard.models import Project
@@ -97,4 +98,42 @@ class CertMobileViewTests(TestCase):
         from django.test import Client
         anon_client = Client()
         resp = anon_client.get('/mapi/certificates/')
+        self.assertIn(resp.status_code, [401, 403])
+
+    @patch('asyncio.new_event_loop')
+    @patch('reNgine.job_tracker.create_job', return_value='job-abc')
+    def test_resync_queues_workflow(self, mock_create_job, mock_new_event_loop):
+        """POST /mapi/certificates/<pk>/resync/ returns 202 with queued=True and job_id."""
+        mock_loop = MagicMock()
+        mock_new_event_loop.return_value = mock_loop
+        resp = self.client.post(f'/mapi/certificates/{self.cert.id}/resync/')
+        self.assertEqual(resp.status_code, 202)
+        data = resp.json()
+        self.assertTrue(data.get('queued'))
+        self.assertEqual(data.get('job_id'), 'job-abc')
+
+    def test_resync_404_on_missing_cert(self):
+        """POST to a non-existent certificate pk returns 404."""
+        resp = self.client.post('/mapi/certificates/99999/resync/')
+        self.assertEqual(resp.status_code, 404)
+
+    @patch('asyncio.new_event_loop')
+    @patch('reNgine.job_tracker.update_job')
+    @patch('reNgine.job_tracker.create_job', return_value='job-xyz')
+    def test_resync_returns_202_even_if_workflow_start_fails(
+        self, mock_create_job, mock_update_job, mock_new_event_loop
+    ):
+        """If workflow dispatch raises, view still returns 202 (fire-and-forget)."""
+        mock_loop = MagicMock()
+        mock_loop.run_until_complete.side_effect = Exception("Temporal unavailable")
+        mock_new_event_loop.return_value = mock_loop
+        resp = self.client.post(f'/mapi/certificates/{self.cert.id}/resync/')
+        self.assertEqual(resp.status_code, 202)
+        mock_update_job.assert_called_once()
+
+    def test_resync_unauthenticated_blocked(self):
+        """Anonymous users cannot POST to the resync endpoint."""
+        from django.test import Client
+        anon_client = Client()
+        resp = anon_client.post(f'/mapi/certificates/{self.cert.id}/resync/')
         self.assertIn(resp.status_code, [401, 403])

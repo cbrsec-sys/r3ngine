@@ -71,10 +71,34 @@ class CertificateResyncView(APIView):
             c = CertificateIntelligence.objects.get(pk=pk)
         except CertificateIntelligence.DoesNotExist:
             return Response({'error': 'Certificate not found'}, status=status.HTTP_404_NOT_FOUND)
-        logger.info('CertificateResyncView: queuing resync for cert %s host %s', pk, c.host)
-        # Resync is a best-effort background operation; dispatch is logged only.
-        # A future task can wire this into a Temporal workflow.
-        return Response({'queued': True}, status=status.HTTP_202_ACCEPTED)
+
+        from reNgine.job_tracker import create_job, update_job
+        from reNgine.temporal_client import TemporalClientProvider
+        import asyncio
+
+        job_id = create_job()
+
+        async def _start():
+            client = await TemporalClientProvider.get_client()
+            await client.start_workflow(
+                "CertificateResyncWorkflow",
+                args=[c.id, job_id],
+                id=f"cert-resync-{c.id}-{job_id}",
+                task_queue="python-orchestrator-queue",
+            )
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(_start())
+        except Exception as e:
+            update_job(job_id, "FAILED", 100, f"Failed to start resync: {e}")
+            logger.warning(
+                "CertificateResyncView: workflow start failed for cert %s: %s", pk, e
+            )
+        finally:
+            loop.close()
+
+        return Response({'queued': True, 'job_id': job_id}, status=status.HTTP_202_ACCEPTED)
 
 
 class CertificateFlagView(APIView):
