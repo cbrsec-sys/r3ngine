@@ -84,6 +84,31 @@ class RetryTaskViewTests(TestCase):
         resp = self.client.post(url, content_type="application/json")
         self.assertEqual(resp.status_code, 404)
 
+    @patch("api.views.run_and_close")
+    def test_retry_returns_400_when_scan_paused(self, mock_run):
+        from reNgine.definitions import PAUSED_TASK
+        scan = _make_scan(status=PAUSED_TASK)
+        act = _make_activity(scan, status=FAILED_TASK)
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_retry_returns_400_for_subscan_activity(self):
+        scan = _make_scan(status=FAILED_TASK)
+        act = _make_activity(scan, status=FAILED_TASK)
+        # Patch objects.get so the returned instance reports a non-null subscan_id
+        original_get = ScanActivity.objects.get
+
+        def patched_get(**kwargs):
+            obj = original_get(**kwargs)
+            obj.subscan_id = 42  # non-null simulates a subscan-linked activity
+            return obj
+
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        with patch.object(ScanActivity.objects, 'get', side_effect=patched_get):
+            resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 400)
+
 
 from reNgine.temporal_activities import get_scan_final_status_activity, initialize_scan_tasks_activity
 

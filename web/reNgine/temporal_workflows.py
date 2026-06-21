@@ -22,7 +22,7 @@ from datetime import timedelta
 from typing import Any, Dict, List, Union
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, ApplicationError, ChildWorkflowError
 
 # All imports that touch Django or any non-deterministic module must be wrapped
 # in workflow.unsafe.imports_passed_through() to prevent sandbox errors.
@@ -3291,11 +3291,14 @@ class SingleTaskRetryWorkflow:
             elif task_name == "waf_bypass":
                 await workflow.execute_activity("RunWAFBypassActivity", ctx, start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
             else:
-                workflow.logger.warning(f"SingleTaskRetryWorkflow: unrecognised task_name={task_name}")
+                raise ApplicationError(
+                    f"Unrecognised task_name for retry: {task_name}",
+                    non_retryable=True,
+                )
 
             task_succeeded = True
 
-        except ActivityError as exc:
+        except (ActivityError, ChildWorkflowError) as exc:
             workflow.logger.error(
                 f"SingleTaskRetryWorkflow: task={task_name} failed — {exc}"
             )

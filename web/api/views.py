@@ -6039,6 +6039,8 @@ class ScanActivityRetryAPIView(APIView):
         from reNgine.definitions import FAILED_TASK, RUNNING_TASK, INITIATED_TASK
         from reNgine.temporal_client import TemporalClientProvider
 
+        from django.db import transaction
+
         try:
             activity_obj = ScanActivity.objects.get(id=pk)
         except ScanActivity.DoesNotExist:
@@ -6047,11 +6049,24 @@ class ScanActivityRetryAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if activity_obj.subscan_id is not None:
+            return Response(
+                {"status": False, "message": "Retrying subscan tasks is not yet supported"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         scan = activity_obj.scan_of
 
-        if scan.scan_status == RUNNING_TASK:
+        if scan is None:
             return Response(
-                {"status": False, "message": "Cannot retry a task while the scan is running"},
+                {"status": False, "message": "Activity has no parent scan"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from reNgine.definitions import PAUSED_TASK
+        if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
+            return Response(
+                {"status": False, "message": "Cannot retry a task while the scan is running or paused"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -6061,20 +6076,21 @@ class ScanActivityRetryAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Reset the failed activity row so the serializer counts it as pending
-        # and _create_scan_activity can claim it normally.
-        ScanActivity.objects.filter(pk=activity_obj.pk).update(
-            status=INITIATED_TASK,
-            time_started=None,
-            time_ended=None,
-            error_message=None,
-        )
+        with transaction.atomic():
+            # Reset the failed activity row so the serializer counts it as pending
+            # and _create_scan_activity can claim it normally.
+            ScanActivity.objects.filter(pk=activity_obj.pk).update(
+                status=INITIATED_TASK,
+                time_started=None,
+                time_ended=None,
+                error_message=None,
+            )
 
-        # Flip scan back to RUNNING so the UI reflects active state.
-        scan.scan_status = RUNNING_TASK
-        scan.error_message = None
-        scan.stop_scan_date = None
-        scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
+            # Flip scan back to RUNNING so the UI reflects active state.
+            scan.scan_status = RUNNING_TASK
+            scan.error_message = None
+            scan.stop_scan_date = None
+            scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
 
         yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "")
         ctx = {
@@ -6099,10 +6115,8 @@ class ScanActivityRetryAPIView(APIView):
             )
 
         loop = asyncio.new_event_loop()
-        try:
-            run_and_close(loop, _start())
-        finally:
-            loop.close()
+        asyncio.set_event_loop(loop)
+        run_and_close(loop, _start())
 
         return Response(
             {"status": True, "message": f"Retry started for {activity_obj.title}"}
