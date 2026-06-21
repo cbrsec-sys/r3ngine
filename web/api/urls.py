@@ -59,6 +59,7 @@ from .api_intel_mobile_views import (
     APIIntelMobileListView,
     APIIntelMobileDetailView,
 )
+from .todo_mobile_views import TodoMobileListCreateView, TodoMobileDetailView
 
 
 app_name = 'api'
@@ -578,6 +579,9 @@ urlpatterns = [
     # API Intelligence mobile views
     path('api-intel/', APIIntelMobileListView.as_view(), name='api_intel_mobile_list'),
     path('api-intel/<int:pk>/', APIIntelMobileDetailView.as_view(), name='api_intel_mobile_detail'),
+    # Todos mobile CRUD
+    path('todos/', TodoMobileListCreateView.as_view(), name='todos_mobile_list_create'),
+    path('todos/<int:pk>/', TodoMobileDetailView.as_view(), name='todos_mobile_detail'),
     path(
         'action/ad-assessment/from-subdomain/',
         LaunchADAssessmentFromSubdomain.as_view(),
