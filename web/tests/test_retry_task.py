@@ -83,3 +83,35 @@ class RetryTaskViewTests(TestCase):
         url = reverse("api:retry_task", kwargs={"pk": 99999})
         resp = self.client.post(url, content_type="application/json")
         self.assertEqual(resp.status_code, 404)
+
+
+from reNgine.temporal_activities import get_scan_final_status_activity
+
+
+class GetScanFinalStatusTests(TestCase):
+    def test_returns_failed_when_task_did_not_succeed(self):
+        scan = _make_scan()
+        result = get_scan_final_status_activity(scan.id, False)
+        self.assertEqual(result, FAILED_TASK)
+
+    def test_returns_success_when_no_true_failures(self):
+        scan = _make_scan()
+        _make_activity(scan, name="http_crawl", status=SUCCESS_TASK)
+        result = get_scan_final_status_activity(scan.id, True)
+        self.assertEqual(result, SUCCESS_TASK)
+
+    def test_returns_failed_when_other_tasks_still_failed(self):
+        scan = _make_scan()
+        import uuid
+        ScanActivity.objects.create(
+            scan_of=scan,
+            task_uid=uuid.uuid4(),
+            name="other_task",
+            title="Other",
+            tier=2,
+            status=FAILED_TASK,
+            time_started="2026-06-21T09:00:00Z",
+            time="2026-06-21T09:00:00Z",
+        )
+        result = get_scan_final_status_activity(scan.id, True)
+        self.assertEqual(result, FAILED_TASK)

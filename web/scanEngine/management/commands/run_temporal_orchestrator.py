@@ -69,6 +69,7 @@ from reNgine.temporal_workflows import (
     HackerOneImportWorkflow,
     HackerOneSyncBookmarkedWorkflow,
     ProxyFetchWorkflow,
+    SingleTaskRetryWorkflow,
     # Phase 2 — rengine-ng standalone workflows
     UserHuntWorkflow,
     URLBypassWorkflow,
@@ -92,6 +93,7 @@ from reNgine.temporal_activities import (
     finalize_subscan_activity,
     finalize_failed_scan_activity,
     update_scan_status_activity,
+    get_scan_final_status_activity,
     # Step 0: Task initialization & Target Profiling
     initialize_scan_tasks_activity,
     load_checkpoint_activity,
@@ -463,6 +465,7 @@ class Command(BaseCommand):
                 finalize_subscan_activity,
                 finalize_failed_scan_activity,
                 update_scan_status_activity,
+                get_scan_final_status_activity,
 
                 # Step 0
                 initialize_scan_tasks_activity,
@@ -612,7 +615,7 @@ class Command(BaseCommand):
                                  DomainReconWorkflow, SubdomainReconWorkflow, URLCrawlWorkflow,
                                  URLDirSearchWorkflow, URLFuzzWorkflow, URLParamsFuzzWorkflow,
                                  URLVulnWorkflow, URLAuthExtractWorkflow]
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + _p2_workflows + plugin_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow] + _p2_workflows + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
                 logger.error(f"Failed to load dynamic plugin temporal exports: {e}")
@@ -621,7 +624,7 @@ class Command(BaseCommand):
                                  DomainReconWorkflow, SubdomainReconWorkflow, URLCrawlWorkflow,
                                  URLDirSearchWorkflow, URLFuzzWorkflow, URLParamsFuzzWorkflow,
                                  URLVulnWorkflow, URLAuthExtractWorkflow]
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + _p2_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow] + _p2_workflows
 
             # -------------------------------------------------------------------
             # Start the Temporal Worker

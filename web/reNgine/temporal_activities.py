@@ -3652,3 +3652,31 @@ def log_plugin_end_activity(ctx: dict) -> None:
         act.save(update_fields=['status', 'time_ended', 'error_message'])
     except Exception:
         pass
+
+
+@activity.defn(name="GetScanFinalStatusActivity")
+def get_scan_final_status_activity(scan_id: int, task_succeeded: bool) -> int:
+    """Return SUCCESS_TASK if the task succeeded and no other activities truly failed;
+    otherwise return FAILED_TASK. Used by SingleTaskRetryWorkflow to finalize scan status.
+    """
+    from startScan.models import ScanHistory, ScanActivity
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+
+    if not task_succeeded:
+        return FAILED_TASK
+
+    failed_names = set(
+        ScanActivity.objects.filter(
+            scan_of_id=scan_id,
+            status=FAILED_TASK,
+            time_started__isnull=False,
+        ).values_list("name", flat=True)
+    )
+    success_names = set(
+        ScanActivity.objects.filter(
+            scan_of_id=scan_id,
+            status=SUCCESS_TASK,
+        ).values_list("name", flat=True)
+    )
+    true_failures = failed_names - success_names
+    return FAILED_TASK if true_failures else SUCCESS_TASK
