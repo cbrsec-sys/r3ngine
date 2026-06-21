@@ -55,6 +55,10 @@ from .cert_mobile_views import (
     CertificateResyncView,
     CertificateFlagView,
 )
+from .api_intel_mobile_views import (
+    APIIntelMobileListView,
+    APIIntelMobileDetailView,
+)
 
 
 app_name = 'api'
@@ -571,6 +575,9 @@ urlpatterns = [
     path('identity/<int:pk>/confirm/', IdentityConfirmView.as_view(), name='identity_confirm'),
     path('identity/<int:pk>/dismiss/', IdentityDismissView.as_view(), name='identity_dismiss'),
     path('identity/<int:pk>/', IdentityMobileDetailView.as_view(), name='identity_mobile_detail'),
+    # API Intelligence mobile views
+    path('api-intel/', APIIntelMobileListView.as_view(), name='api_intel_mobile_list'),
+    path('api-intel/<int:pk>/', APIIntelMobileDetailView.as_view(), name='api_intel_mobile_detail'),
     path(
         'action/ad-assessment/from-subdomain/',
         LaunchADAssessmentFromSubdomain.as_view(),
