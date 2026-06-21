@@ -267,6 +267,7 @@ class ScanSummaryAPIView(APIView):
             )),
             'subdomains': [
                 {
+                    'id': sub.id,
                     'name': sub.name,
                     'http_status': sub.http_status,
                     'page_title': sub.page_title,
@@ -280,6 +281,7 @@ class ScanSummaryAPIView(APIView):
                     'low_count': sub.get_low_count,
                     'info_count': sub.get_info_count,
                     'content_length': sub.content_length,
+                    'is_important': bool(sub.is_important),
                     'ip_addresses': [
                         {
                             'address': ip.address,

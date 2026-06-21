@@ -1,8 +1,30 @@
 import React from 'react';
 import { Drawer, Box, Typography, IconButton, Divider, List, ListItem, ListItemText, Chip, Stack } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { useParams, Link } from '@tanstack/react-router';
 import type { Exposure } from '../types';
 import { useThemeTokens } from '@/theme/useThemeTokens';
+
+function EvidenceValue({ data }: { data: Record<string, unknown> }) {
+  const primary = (data?.url ?? data?.name ?? data?.value) as string | undefined;
+  if (primary) {
+    return <span>{primary}</span>;
+  }
+  const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined);
+  if (entries.length === 0) return <span style={{ fontStyle: 'italic' }}>No details</span>;
+  return (
+    <Box component="ul" sx={{ m: 0, pl: 2, listStyle: 'none' }}>
+      {entries.map(([k, v]) => (
+        <Box component="li" key={k} sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+          <Box component="span" sx={{ fontWeight: 600, color: 'text.primary', mr: 0.5 }}>
+            {k}:
+          </Box>
+          {String(v)}
+        </Box>
+      ))}
+    </Box>
+  );
+}
 
 interface ExposureDetailsDrawerProps {
   exposure: Exposure;
@@ -11,6 +33,7 @@ interface ExposureDetailsDrawerProps {
 
 export const ExposureDetailsDrawer: React.FC<ExposureDetailsDrawerProps> = ({ exposure, onClose }) => {
   const { tokens } = useThemeTokens();
+  const { projectSlug } = useParams({ strict: false });
 
   return (
     <Drawer
@@ -86,8 +109,15 @@ export const ExposureDetailsDrawer: React.FC<ExposureDetailsDrawerProps> = ({ ex
                     <Box component="span" sx={{ fontWeight: 600, mr: 1, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>
                       {ev.source_tool}
                     </Box>
-                    {ev.evidence_data?.url as string || ev.evidence_data?.name as string || JSON.stringify(ev.evidence_data)}
+                    <EvidenceValue data={ev.evidence_data} />
                   </Typography>
+                }
+                secondary={
+                  ev.timestamp && (
+                    <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.68rem' }}>
+                      {new Date(ev.timestamp).toLocaleString()}
+                    </Typography>
+                  )
                 }
               />
             </ListItem>
@@ -107,9 +137,24 @@ export const ExposureDetailsDrawer: React.FC<ExposureDetailsDrawerProps> = ({ ex
             <ListItem key={vuln.id} sx={{ px: 0, py: 1, borderBottom: `1px solid ${tokens.border.subtle}` }}>
               <ListItemText
                 primary={
-                  <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
-                    {vuln.name}
-                  </Typography>
+                  projectSlug ? (
+                    <Link
+                      to={`/$projectSlug/vulns`}
+                      params={{ projectSlug }}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ color: tokens.accent.primary, fontWeight: 500, '&:hover': { textDecoration: 'underline' } }}
+                      >
+                        {vuln.name}
+                      </Typography>
+                    </Link>
+                  ) : (
+                    <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
+                      {vuln.name}
+                    </Typography>
+                  )
                 }
                 secondary={
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
