@@ -51,3 +51,32 @@ class SubdomainHasIpFilterTest(TestCase):
             for _, kwargs in [c for c in qs.filter.call_args_list]
         )
         self.assertTrue(found, "has_ip=false must add filter(ip_addresses__isnull=True)")
+
+
+class LoggerFstringTest(TestCase):
+    """_run_single_subscan must not use f-string log calls (Rule 2.1)."""
+
+    def test_no_fstring_in_run_single_subscan(self):
+        import ast, inspect
+        from api import views as api_views
+        source = inspect.getsource(api_views)
+        tree = ast.parse(source)
+
+        violations = []
+        for node in ast.walk(tree):
+            # Find logger.info / logger.exception / logger.warning calls
+            if not isinstance(node, ast.Call):
+                continue
+            if not (isinstance(node.func, ast.Attribute) and node.func.attr in ('info', 'exception', 'warning', 'error', 'debug')):
+                continue
+            if not (isinstance(node.func.value, ast.Name) and node.func.value.id == 'logger'):
+                continue
+            # Check if any argument is an f-string (JoinedStr)
+            for arg in node.args:
+                if isinstance(arg, ast.JoinedStr):
+                    violations.append(ast.get_source_segment(source, node) or str(ast.dump(node)))
+
+        self.assertEqual(
+            violations, [],
+            f"f-string logger calls found (violates Rule 2.1):\n" + "\n".join(violations[:5])
+        )

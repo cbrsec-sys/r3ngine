@@ -2216,7 +2216,7 @@ class ResumeScan(APIView):
 		except ScanHistory.DoesNotExist:
 			response['message'] = 'Scan not found'
 		except Exception as e:
-			logger.error(f'Error resuming scan {scan_id}: {e}')
+			logger.error('Error resuming scan %s', scan_id, exc_info=True)
 			response['message'] = str(e)
 		
 		return Response(response)
@@ -2259,19 +2259,19 @@ class PauseScan(APIView):
 						try:
 							TemporalClientProvider.pause_workflow(wf_id)
 						except Exception as e:
-							logger.error(f"Failed to pause subscan workflow {wf_id}: {e}")
+							logger.error("Failed to pause subscan workflow %s", wf_id, exc_info=True)
 
 				for te in scan.temporal_executions.filter(status="RUNNING"):
 					try:
 						TemporalClientProvider.pause_workflow(te.workflow_id)
 					except Exception as e:
-						logger.error(f"Failed to pause workflow {te.workflow_id} for scan {scan.id}: {e}")
+						logger.error("Failed to pause workflow %s for scan %s", te.workflow_id, scan.id, exc_info=True)
 
 				from reNgine.tasks import create_scan_activity
 				create_scan_activity(scan.id, "Scan paused", PAUSED_TASK)
 				paused_count += 1
 			except Exception as e:
-				logger.error(f"Failed to pause scan {scan.id}: {e}")
+				logger.error("Failed to pause scan %s", scan.id, exc_info=True)
 
 		return Response({'status': True, 'paused_count': paused_count, 'message': f'Paused {paused_count} scans.'})
 
@@ -2313,19 +2313,19 @@ class UnpauseScan(APIView):
 						try:
 							TemporalClientProvider.resume_workflow(wf_id)
 						except Exception as e:
-							logger.error(f"Failed to resume subscan workflow {wf_id}: {e}")
+							logger.error("Failed to resume subscan workflow %s", wf_id, exc_info=True)
 
 				for te in scan.temporal_executions.filter(status="RUNNING"):
 					try:
 						TemporalClientProvider.resume_workflow(te.workflow_id)
 					except Exception as e:
-						logger.error(f"Failed to resume workflow {te.workflow_id} for scan {scan.id}: {e}")
+						logger.error("Failed to resume workflow %s for scan %s", te.workflow_id, scan.id, exc_info=True)
 
 				from reNgine.tasks import create_scan_activity
 				create_scan_activity(scan.id, "Scan resumed", RUNNING_TASK)
 				resumed_count += 1
 			except Exception as e:
-				logger.error(f"Failed to resume/unpause scan {scan.id}: {e}")
+				logger.error("Failed to resume/unpause scan %s", scan.id, exc_info=True)
 
 		return Response({'status': True, 'resumed_count': resumed_count, 'message': f'Resumed {resumed_count} scans.'})
 
@@ -2430,7 +2430,7 @@ class InitiateScan(APIView):
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
 				except Exception as e:
-					logger.error(f"Error initiating scan for domain {domain_id}: {str(e)}")
+					logger.error("Error initiating scan for domain %s", domain_id, exc_info=True)
 					errors.append({'domain_id': domain_id, 'error': str(e)})
 
 			if not results:
@@ -2501,7 +2501,7 @@ class InitiateSubTask(APIView):
 		def _run_single_subscan(sub_id):
 			"""Run a single subscan launch inside a worker thread, ensuring DB connection cleanup."""
 			try:
-				logger.info(f'Running subscans {scan_types} on subdomain "{sub_id}" (concurrent) ...')
+				logger.info('Running subscans %s on subdomain "%s" (concurrent) ...', scan_types, sub_id)
 				ctx = {
 					'scan_history_id': None,
 					'subdomain_id': sub_id,
@@ -2512,7 +2512,7 @@ class InitiateSubTask(APIView):
 				}
 				return sub_id, initiate_subscan_temporal(**ctx)
 			except Exception as ex:
-				logger.exception(f'Error starting concurrent subscan for subdomain {sub_id}: {ex}')
+				logger.exception('Error starting concurrent subscan for subdomain %s', sub_id, exc_info=True)
 				return sub_id, {'success': False, 'error': str(ex)}
 			finally:
 				# Close all connections created or cached for this thread to prevent leaks
@@ -2639,7 +2639,7 @@ class RengineUpdateCheck(APIView):
 					return_response['changelog'] = response[0]['body']
 					return_response['status'] = True
 		except Exception as e:
-			logger.error(f"Error fetching GitHub releases: {str(e)}")
+			logger.error("Error fetching GitHub releases", exc_info=True)
 
 		# Fallback: check .version file in master branch
 		version_url = 'https://raw.githubusercontent.com/whiterabb17/r3ngine/main/web/.version'
@@ -2654,7 +2654,7 @@ class RengineUpdateCheck(APIView):
 					return_response['changelog'] = 'A new update is available in the repository. Please pull the latest changes from the main branch.'
 					return_response['status'] = True
 		except Exception as e:
-			logger.error(f"Error fetching raw .version: {str(e)}")
+			logger.error("Error fetching raw .version", exc_info=True)
 
 		if return_response['status'] and return_response['latest_version']:
 			is_version_update_available = safe_parse_version(return_response['current_version']) < safe_parse_version(return_response['latest_version'])
@@ -2880,7 +2880,7 @@ class UpdateTool(APIView):
 			if return_code == 0:
 				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
 			else:
-				logger.error(f"Update failed for {tool.name}: {output}")
+				logger.error("Update failed for %s", tool.name, exc_info=True)
 				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
 		except Exception as e:
 			logger.error(str(e))
@@ -2937,10 +2937,10 @@ class GetExternalToolCurrentVersion(APIView):
 		try:
 			return_code, stdout = run_command(tool.version_lookup_command, shell=True)
 			if return_code != 0:
-				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
+				logger.warning("Version lookup failed for %s with code %s", tool.name, return_code)
 				return Response({'status': False, 'message': 'Tool not found or check failed.'})
 		except Exception as e:
-			logger.error(f"Error running version lookup command: {str(e)}")
+			logger.error("Error running version lookup command", exc_info=True)
 			return Response({'status': False, 'message': f'Error running version lookup command: {str(e)}'})
 
 		if tool.version_match_regex:
@@ -3189,7 +3189,7 @@ class IPToDomain(APIView):
 				'message': 'IP Address Required'
 			})
 		try:
-			logger.info(f'Resolving IP address {ip_address} ...')
+			logger.info('Resolving IP address %s ...', ip_address)
 			resolved_ips = []
 			for ip in IPv4Network(ip_address, False):
 				domains = []
@@ -3197,7 +3197,7 @@ class IPToDomain(APIView):
 				try:
 					(domain, domains, ips) = socket.gethostbyaddr(str(ip))
 				except socket.herror:
-					logger.info(f'No PTR record for {ip_address}')
+					logger.info('No PTR record for %s', ip_address)
 					domain = str(ip)
 				if domain not in domains:
 					domains.append(domain)
@@ -5512,7 +5512,7 @@ class MobileMediaServeView(APIView):
 		
 		# Security check
 		if not is_safe_path(settings.MEDIA_ROOT, file_path):
-			logger.error(f"is_safe_path failed for {file_path}")
+			logger.error("is_safe_path failed for %s", file_path)
 			raise Http404("File not found")
 			
 		if os.path.exists(file_path):
@@ -5522,7 +5522,7 @@ class MobileMediaServeView(APIView):
 			content_type, _ = mimetypes.guess_type(file_path)
 			return FileResponse(open(file_path, 'rb'), content_type=content_type)
 		else:
-			logger.error(f"File not found: {file_path}")
+			logger.error("File not found: %s", file_path)
 			raise Http404("File not found")
 
 
@@ -5683,7 +5683,7 @@ class GetSystemLogs(APIView):
 				# Return at most 500 lines to keep responses lightweight
 				return Response({'status': True, 'logs': lines[-500:]})
 		except Exception as e:
-			logger.error(f"Error reading system logs ({log_type}): {str(e)}")
+			logger.error("Error reading system logs (%s)", log_type, exc_info=True)
 			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)
 
 
@@ -5733,7 +5733,7 @@ class LaunchADAssessmentFromSubdomain(APIView):
 				created_by=request.user,
 			)
 		except Exception as exc:
-			logger.error(f'[AD Bridge] Failed to create ADAssessment: {exc}')
+			logger.error('[AD Bridge] Failed to create ADAssessment', exc_info=True)
 			return Response(
 				{'error': 'Failed to create assessment.'},
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -6152,7 +6152,7 @@ class RunSearchsploitAction(APIView):
             try:
                 shutil.copy('/usr/src/exploitdb/.searchsploit_rc', '/root/.searchsploit_rc')
             except Exception as e:
-                logger.error(f"Failed to copy searchsploit_rc dynamically: {e}")
+                logger.error("Failed to copy searchsploit_rc dynamically", exc_info=True)
 
         cmd = ['searchsploit', '--json', query]
         try:
