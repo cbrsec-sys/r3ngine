@@ -80,3 +80,33 @@ class LoggerFstringTest(TestCase):
             violations, [],
             f"f-string logger calls found (violates Rule 2.1):\n" + "\n".join(violations[:5])
         )
+
+
+class ProxyTimeoutConsistencyTest(TestCase):
+    """get_random_proxy must call check_proxy_robust with PROXY_VALIDATION_TIMEOUT, not a hardcoded value."""
+
+    def test_uses_constant_not_hardcoded_10(self):
+        import ast, inspect
+        from reNgine import common_func
+        source = inspect.getsource(common_func)
+        tree = ast.parse(source)
+
+        # Find calls to check_proxy_robust that pass a literal integer for timeout
+        hardcoded_timeouts = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = (func.id if isinstance(func, ast.Name)
+                    else func.attr if isinstance(func, ast.Attribute) else None)
+            if name != 'check_proxy_robust':
+                continue
+            for kw in node.keywords:
+                if kw.arg == 'timeout' and isinstance(kw.value, ast.Constant):
+                    hardcoded_timeouts.append(kw.value.value)
+
+        self.assertEqual(
+            hardcoded_timeouts, [],
+            f"check_proxy_robust called with hardcoded timeout value(s): {hardcoded_timeouts}. "
+            "Use PROXY_VALIDATION_TIMEOUT instead."
+        )

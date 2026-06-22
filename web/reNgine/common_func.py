@@ -1232,7 +1232,7 @@ def get_random_proxy():
 
 	def _check(proxy_url):
 		"""Check a single proxy; mark it failed on the cache and prune from DB if dead."""
-		if check_proxy_robust(proxy_url, timeout=10, server_ip=server_ip):
+		if check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=server_ip):
 			return proxy_url
 		_failed_proxy_cache[proxy_url] = time.time()
 		if remove_proxy_from_pool(proxy_url, _proxy_obj):
