@@ -415,6 +415,47 @@ export const useSecretLeaks = (projectSlug: string, scanId: number) => {
   });
 };
 
+export const useEmailBreaches = (scanId: number) => {
+  return useQuery<any[]>({
+    queryKey: ['email-breaches', scanId],
+    queryFn: async () => {
+      const response = await fetch(`/api/emailBreaches/?scan_id=${scanId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    },
+    enabled: !!scanId,
+  });
+};
+
+export const useCheckEmailBreach = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ emailAddress, scanId }: { emailAddress: string; scanId: number }) => {
+      const response = await fetch('/api/emails/check_breach/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email_address: emailAddress, scan_id: scanId }),
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-breaches'] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
+    }
+  });
+};
+
+
 export const useScanStatus = (projectSlug: string) => {
   return useQuery({
     queryKey: ['scan-status', projectSlug],

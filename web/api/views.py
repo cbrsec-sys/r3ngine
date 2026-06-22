@@ -4802,6 +4802,91 @@ class SecretLeakViewSet(viewsets.ModelViewSet):
 		return queryset.order_by('-discovered_date')
 
 
+class EmailBreachViewSet(viewsets.ModelViewSet):
+	"""ViewSet for viewing email breaches.
+
+	Allows listing email breaches filtered by scan_id, target_id, or project.
+	"""
+	permission_classes = [IsPenetrationTester]
+	serializer_class = EmailBreachSerializer
+	pagination_class = None
+	queryset = EmailBreach.objects.none()
+
+	def get_queryset(self):
+		"""Retrieve query parameters and filter the EmailBreach objects.
+
+		Returns:
+			QuerySet: Filtered EmailBreach query results.
+		"""
+		req = self.request
+		project = req.query_params.get('project')
+		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_id')
+		email_id = req.query_params.get('email_id')
+
+		queryset = EmailBreach.objects.all()
+
+		if project:
+			queryset = queryset.filter(scan_history__domain__project__slug=project)
+		if target_id:
+			queryset = queryset.filter(scan_history__domain__id=target_id)
+		if scan_id:
+			queryset = queryset.filter(scan_history__id=scan_id)
+		if email_id:
+			queryset = queryset.filter(email__id=email_id)
+
+		return queryset.order_by('-discovered_date')
+
+
+class CheckEmailBreach(APIView):
+	"""API endpoint to manually check an email address for HIBP breaches.
+
+	POST:
+		Trigger the Playwright-based HIBP crawler on demand.
+	"""
+	permission_classes = [IsPenetrationTester]
+
+	def post(self, request, format=None):
+		"""Handle the POST request to manually check a single email address.
+
+		Args:
+			request (Request): Request containing email_address and scan_id.
+
+		Returns:
+			Response: Serialized email and breach details.
+		"""
+		email_address = request.data.get('email_address')
+		scan_id = request.data.get('scan_id')
+
+		if not email_address or not scan_id:
+			return Response({"error": "email_address and scan_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			scan_history = ScanHistory.objects.get(id=scan_id)
+		except ScanHistory.DoesNotExist:
+			return Response({"error": "ScanHistory not found"}, status=status.HTTP_404_NOT_FOUND)
+
+		# Ensure the Email object exists and is associated with this scan
+		from reNgine.utils.task import save_email
+		email_obj, created = save_email(email_address, scan_history=scan_history)
+		if not email_obj:
+			return Response({"error": "Invalid email address format"}, status=status.HTTP_400_BAD_REQUEST)
+
+		# Trigger Playwright check asynchronously in a background thread
+		from reNgine.osint.hibp_scraper import check_hibp_for_email_task
+		threading.Thread(
+			target=check_hibp_for_email_task,
+			args=(email_address, scan_history.id, email_obj.id),
+			daemon=True
+		).start()
+
+		return Response({
+			"status": "checking",
+			"email": EmailSerializer(email_obj).data
+		}, status=status.HTTP_202_ACCEPTED)
+
+
+
 class ScreenshotViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
 	queryset = Screenshot.objects.all()

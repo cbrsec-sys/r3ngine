@@ -20,7 +20,7 @@ from reNgine.charts import (
 from reNgine.utils.graph import Neo4jManager
 from reNgine.common_func import get_interesting_subdomains
 from reNgine.stress.report_builder import StressReportBuilder
-from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult, Parameter
+from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult, Parameter, EmailBreach
 from scanEngine.models import VulnerabilityReportSetting
 
 logger = logging.getLogger('reNgine.tasks')
@@ -213,6 +213,8 @@ def generate_report_task(report_id):
                     'remediation_priority': a.remediation_priority,
                 })
 
+        email_breaches = EmailBreach.objects.filter(scan_history=scan).order_by('email_address', '-discovered_date')
+
         data = {
             'scan_object': scan,
             **vuln_ctx,
@@ -229,6 +231,8 @@ def generate_report_task(report_id):
             'stress_results': stress_results,
             'parameters': parameters,
             'parameters_count': parameters.count(),
+            'email_breaches': email_breaches,
+            'email_breaches_count': email_breaches.count(),
         }
 
         # Stress Test Aggregation for context

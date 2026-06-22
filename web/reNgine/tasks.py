@@ -1326,6 +1326,12 @@ def osint(self, host=None, ctx={}, description=None):
 			results_dir=self.results_dir,
 			ctx=ctx
 		)
+		
+		# Run HaveIBeenPwned checks sequentially for all found emails
+		logger.info('Starting HaveIBeenPwned playwright check for found emails...')
+		from reNgine.osint.hibp_scraper import check_hibp_for_email_task
+		for email_obj in self.scan.emails.all():
+			check_hibp_for_email_task(email_obj.address, self.scan.id, email_obj.id)
 
 	logger.info('OSINT Tasks finished...')
 	return True

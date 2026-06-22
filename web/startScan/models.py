@@ -1706,3 +1706,35 @@ class VulnerabilityHistory(models.Model):
             is_remediated=False,
             days_since_discovery__gte=min_days
         ).order_by('first_seen')
+
+
+class EmailBreach(models.Model):
+	"""Represents an individual data breach finding for a given email address.
+
+	Attributes:
+		id (AutoField): The primary key.
+		scan_history (ForeignKey): Link to the scan history context.
+		email (ForeignKey): Link to the email object if resolved.
+		email_address (CharField): The target email address string.
+		breach_name (CharField): The name of the data breach.
+		breach_date (CharField): The month and year of the breach.
+		description (TextField): Context and description explaining the breach.
+		compromised_data (JSONField): The types/classes of compromised data.
+		discovered_date (DateTimeField): The datetime the finding was created.
+	"""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, null=True, blank=True)
+	email = models.ForeignKey(Email, on_delete=models.CASCADE, null=True, blank=True)
+	email_address = models.CharField(max_length=255)
+	breach_name = models.CharField(max_length=255)
+	breach_date = models.CharField(max_length=100, null=True, blank=True)
+	description = models.TextField(null=True, blank=True)
+	compromised_data = models.JSONField(default=list, blank=True)
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name_plural = "Email Breaches"
+		ordering = ['-discovered_date']
+
+	def __str__(self):
+		return f"{self.email_address} in {self.breach_name}"

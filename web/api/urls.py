@@ -85,6 +85,7 @@ router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hacker
 router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
 router.register(r'projects', ProjectViewSet, basename='projects')
 router.register(r'secretLeaks', SecretLeakViewSet, basename='secret-leaks')
+router.register(r'emailBreaches', EmailBreachViewSet, basename='email-breaches')
 router.register(r'hardwareProfiles', HardwareProfileViewSet, basename='hardware-profiles')
 router.register(r'scanProfiles', ScanProfileViewSet, basename='scan-profiles')
 
@@ -149,6 +150,10 @@ urlpatterns = [
         'queryEmails/',
         ListEmails.as_view(),
         name='queryEmails'),
+    path(
+        'emails/check_breach/',
+        CheckEmailBreach.as_view(),
+        name='check_email_breach'),
     path(
         'queryEmployees/',
         ListEmployees.as_view(),

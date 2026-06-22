@@ -1244,6 +1244,43 @@
         {% endfor %}
     </article>
     {% endif %}
+
+    {% if email_breaches_count > 0 %}
+    <article style="page-break-before: always">
+        <h2 class="page-title primary">Email Breaches & Leaks</h2>
+        <p>
+            The following email addresses discovered during the scan were matched against known public data breaches on HaveIBeenPwned.
+        </p>
+        <div class="interesting-subdomain-table-container" style="margin-top: 10px;">
+            <table class="interesting-subdomain-table">
+                <tr>
+                    <th style="width: 25%;">Email Address</th>
+                    <th style="width: 20%;">Breach Name</th>
+                    <th style="width: 15%;">Breach Date</th>
+                    <th style="width: 40%;">Compromised Data</th>
+                </tr>
+                {% for breach in email_breaches %}
+                <tr>
+                    <td style="width: 25%; font-family: monospace; word-break: break-all;">{{ breach.email_address }}</td>
+                    <td style="width: 20%; font-weight: bold;">{{ breach.breach_name }}</td>
+                    <td style="width: 15%;">{{ breach.breach_date|default:"Unknown" }}</td>
+                    <td style="width: 40%;">
+                        {% for item in breach.compromised_data %}
+                        <span style="font-size: 8pt; margin: 2px; padding: 2px 6px; border-radius: 4px; display: inline-block; background-color: #e2e8f0; color: #1e293b;">{{ item }}</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="4" style="font-size: 9pt; color: #475569; padding: 8px 12px; background-color: #f8fafc; border-top: none;">
+                        <strong>Description:</strong> {{ breach.description }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </article>
+    {% endif %}
+
     {% if show_vuln %}
     <article id="vulnerabilities-discovered" style="page-break-before: always">
         <h2 class="page-title primary">Vulnerabilities Discovered</h2>

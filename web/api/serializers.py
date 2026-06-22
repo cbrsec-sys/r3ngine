@@ -1532,6 +1532,13 @@ class SecretLeakSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+class EmailBreachSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = EmailBreach
+		fields = '__all__'
+
+
+
 class VulnerabilityReportSettingSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = VulnerabilityReportSetting
