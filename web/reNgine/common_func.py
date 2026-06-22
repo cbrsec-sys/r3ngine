@@ -898,21 +898,13 @@ def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''
 
 	import ipaddress
 
-	# 13 popular, fast public checkers
+	# 5 popular, fast public checkers
 	ALL_CHECKERS = [
-		("https://cloudflare.com/cdn-cgi/trace", "cloudflare"),
-		("https://icanhazip.com", "plain"),
-		("https://ifconfig.co/ip", "plain"),
-		("https://api.ip.sb/ip", "plain"),
 		("https://whatismyip.akamai.com/", "plain"),
-		("https://checkip.amazonaws.com", "plain"),
-		("https://eth0.me", "plain"),
-		("https://ident.me", "plain"),
-		("https://v4.ident.me", "plain"),
-		("https://ipecho.net/plain", "plain"),
-		("https://ipinfo.io/ip", "plain"),
-		("https://api.ipify.org?format=json", "ipify"),
-		("http://ip-api.com/json", "ip-api"),
+		("https://cloudflare.com/cdn-cgi/trace", "cloudflare"),
+		("https://api.ip.sb/ip", "plain"),
+		("https://ifconfig.co/ip", "plain"),
+		("https://icanhazip.com", "plain"),
 	]
 
 	# Deterministically select two distinct checkers based on proxy_url
