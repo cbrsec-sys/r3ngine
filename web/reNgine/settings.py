@@ -40,6 +40,7 @@ DEFAULT_HTTP_TIMEOUT = env.int('DEFAULT_HTTP_TIMEOUT', default=5) # seconds
 DEFAULT_RETRIES = env.int('DEFAULT_RETRIES', default=1)
 DEFAULT_THREADS = env.int('DEFAULT_THREADS', default=30)
 DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
+# Lowered from 10s to 5s in PR #66 to speed up bulk validation; set PROXY_VALIDATION_TIMEOUT env var to restore previous behaviour.
 PROXY_VALIDATION_TIMEOUT = env.int('PROXY_VALIDATION_TIMEOUT', default=5) # seconds
 PROXY_VALIDATION_MAX_WORKERS = env.int('PROXY_VALIDATION_MAX_WORKERS', default=50)
 

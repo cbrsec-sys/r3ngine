@@ -672,6 +672,9 @@ def check_proxy_bulk(request, slug):
     max_workers = min(PROXY_VALIDATION_MAX_WORKERS, max(1, len(proxies)))
     results = {}
 
+    # Each proxy URL is used as the outbound proxy for external IP-check requests.
+    # SSRF surface: only authenticated users with PERM_MODIFY_SCAN_CONFIGURATIONS can
+    # reach this endpoint (enforced by @has_permission_decorator above).
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_proxy = {
             executor.submit(check_proxy_robust, p, PROXY_VALIDATION_TIMEOUT): p 
