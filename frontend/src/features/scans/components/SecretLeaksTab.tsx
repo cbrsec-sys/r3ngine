@@ -201,7 +201,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
 
       <Box sx={{ mt: 4 }}>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <TacticalPanel title="MANUAL EMAIL AUDIT" icon={<Mail size={14} />}>
               <Box component="form" onSubmit={handleAddAndScan} sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -241,7 +241,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
             </TacticalPanel>
           </Grid>
 
-          <Grid item xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <TacticalPanel title="EMAIL BREACH COVERAGE" icon={<ShieldAlert size={14} />}>
               <TableContainer sx={{ maxHeight: '280px' }}>
                 <Table size="small" stickyHeader>
@@ -345,7 +345,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
 
           <Grid container spacing={2}>
             {emailBreaches.map((breach: any) => (
-              <Grid item xs={12} sm={6} key={breach.id}>
+              <Grid size={{ xs: 12, sm: 6 }} key={breach.id}>
                 <Card sx={{ 
                   bgcolor: 'background.paper',
                   border: `1px solid ${tokens.border.subtle}`,
