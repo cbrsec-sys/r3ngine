@@ -5,6 +5,8 @@ import logging
 import subprocess
 # threading.Thread - retained for migration test checks
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from django.db import connections
 import requests
 import validators
 from django.conf import settings
@@ -2494,9 +2496,6 @@ class InitiateSubTask(APIView):
 			if single:
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
-
-		from concurrent.futures import ThreadPoolExecutor
-		from django.db import connections
 
 		def _run_single_subscan(sub_id):
 			"""Run a single subscan launch inside a worker thread, ensuring DB connection cleanup."""

@@ -1,4 +1,5 @@
 import glob
+import json
 import os
 import re
 import shutil
@@ -654,10 +655,9 @@ def check_proxy_bulk(request, slug):
     """Validate multiple proxy URLs concurrently. POST {proxies: list} → {results: dict}"""
     if request.method != 'POST':
         return http.JsonResponse({'error': 'Method not allowed'}, status=405)
-    import json as _json
     try:
-        body = _json.loads(request.body)
-    except (_json.JSONDecodeError, ValueError):
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
         return http.JsonResponse({'error': 'Invalid JSON'}, status=400)
     proxies = body.get('proxies', [])
     if not isinstance(proxies, list):
