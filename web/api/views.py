@@ -4534,7 +4534,10 @@ class EndPointViewSet(viewsets.ModelViewSet):
 
 		http_status = req.query_params.get('http_status')
 		if http_status:
-			endpoints = endpoints.filter(http_status=http_status)
+			try:
+				endpoints = endpoints.filter(http_status=int(http_status))
+			except ValueError:
+				pass
 
 		if 'only_urls' in req.query_params:
 			self.serializer_class = EndpointOnlyURLsSerializer
