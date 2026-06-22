@@ -663,6 +663,9 @@ def check_proxy_bulk(request, slug):
     if not isinstance(proxies, list):
         return http.JsonResponse({'error': 'No proxies list provided'}, status=400)
 
+    # Prevent potential resource exhaustion by capping target list
+    proxies = proxies[:500]
+
     from reNgine.common_func import check_proxy_robust, PROXY_VALIDATION_TIMEOUT, PROXY_VALIDATION_MAX_WORKERS
     from concurrent.futures import ThreadPoolExecutor, as_completed
 

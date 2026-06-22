@@ -64,7 +64,30 @@
 - **Feroxbuster Directory Fuzzing**:
   - Added the `run_feroxbuster` engine config key to `dir_file_fuzz`. When enabled, `ffuf` and `feroxbuster` run side-by-side with shared wordlist/proxy settings; results are merged and deduped on URL before persistence. The flag is set to `false` by default in all bundled engine YAML fixtures to preserve prior behavior on upgrade.
 
+- **Proxy Validation Engine & Cache Optimization**:
+  - Rebuilt the proxy validation engine with connection-reusing `requests.Session` instances, eliminating massive TLS handshake overhead across parallel threads.
+  - Replaced ord-sum hashing with Python's C-backed `hash()` for deterministic checker selection.
+  - Replaced string-based exception scanning with class-based exception type checks (`_PROXY_DEAD_EXCEPTIONS`) for connection-level errors. Made read-time exceptions tolerant to avoid false negatives if a check server itself is slow/rate-limiting.
+  - Upgraded the process-lifetime failed proxy cache from a basic set to a timestamped dictionary with a 30-minute Time-To-Live (TTL), preventing stale blocks when dead proxies come back online.
+  - Added a maximum input limit (500) to the bulk proxy validation API endpoint (`check_proxy_bulk`) to protect the server from Denial of Service (DoS) and thread exhaustion.
+
+- **Endpoints/URLs Management Improvements**:
+  - Rebuilt the Endpoints Tab UI to support multi-select checkboxes for batch operations.
+  - Added bulk action bar actions: "COPY SELECTED" (copies all selected URLs to clipboard) and "DELETE SELECTED" (prompts with confirmation to delete all selected URLs).
+  - Added per-row action buttons for Copy, Open in Browser, and Delete.
+  - Added a page-level export button to download all visible URLs as a `.txt` file.
+
 #### Fixed
+
+- **Scan Detail Subdomains N+1 Query & Screenshot Lookup**:
+  - Resolved a severe database N+1 query loop and slow glob search on `ScanSummaryAPIView`, allowing the Scan Detail page to load in under a second.
+  - Added prefetching relationships (`select_related` and `prefetch_related`) to the subdomains datatable viewset to speed up listing loads.
+
+- **Empty Target Summary Tabs**:
+  - Passed the latest scan ID to both `<DirectoriesTab />` and `<ParametersTab />` on the Target Summary page, fixing a bug where these tabs loaded with empty/blank results.
+
+- **Scan detail link path fixes**:
+  - Corrected Route path parameters and project slug prefixes in "Recent Scan" links in the Target List and Scan List pages.
 
 - **Exposure Correlation regression coverage**: Updated stale CPDE integration test mocks to match the new `get_js_urls_from_results_dir` signature introduced when the JS collector was refactored.
 
