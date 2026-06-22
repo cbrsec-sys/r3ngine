@@ -265,6 +265,10 @@ class ScanSummaryAPIView(APIView):
             'vulnerability_highlights': list(vulnerabilities.order_by('-severity', '-discovered_date')[:10].values(
                 'id', 'name', 'severity', 'http_url', 'discovered_date', 'description', 'impact', 'remediation', 'is_gpt_used'
             )),
+            # Intentionally minimal: only id/name/origin_ip for subdomains with a known IP.
+            # Consumer is IpAddressesWidget in ScanDetailPage.tsx which only reads origin_ip.
+            # Returning full rich objects here (screenshot_path, vuln counts, ip_addresses list)
+            # caused N+1 queries on large scans. Do not add fields back without prefetch_related.
             'subdomains': list(
                 subdomain_qs
                 .exclude(origin_ip=None)
