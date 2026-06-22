@@ -15,6 +15,7 @@ from startScan.models import ScanHistory, Email, Employee
 from reNgine.definitions import *
 from reNgine.osint.linkedin_intelligence import LinkedInScraper
 from dashboard.models import LinkedInCredentials, HunterIOAPIKey
+from reNgine.osint.hunter_lookup import run_hunter_lookup
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +253,13 @@ def osint_orchestrator(scan_history_id):
     """
     scan_history = ScanHistory.objects.get(pk=scan_history_id)
     domain = scan_history.domain.name
-    
+
+    # Run Hunter.io lookup synchronously first so discovered emails and
+    # employees are in the DB before holehe/maigret/LinkedIn threads spawn.
+    hunter_key_obj = HunterIOAPIKey.objects.first()
+    if hunter_key_obj and hunter_key_obj.key:
+        run_hunter_lookup(domain, scan_history_id, hunter_key_obj.key)
+
     threads = []
     
     # 1. Get already discovered emails
