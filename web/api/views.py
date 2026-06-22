@@ -2880,7 +2880,7 @@ class UpdateTool(APIView):
 			if return_code == 0:
 				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
 			else:
-				logger.error("Update failed for %s", tool.name, exc_info=True)
+				logger.error("Update failed for %s: %s", tool.name, output)
 				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
 		except Exception as e:
 			logger.error(str(e))
