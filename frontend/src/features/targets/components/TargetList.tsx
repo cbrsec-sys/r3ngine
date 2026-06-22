@@ -452,7 +452,7 @@ export const TargetList: React.FC = () => {
                         <Typography 
                           variant="caption" 
                           component="a"
-                          href={`/${projectSlug}/detail/${domain.most_recent_scan}`}
+                          href={`/${projectSlug}/scan/detail/${domain.most_recent_scan}`}
                           target="_blank"
                           sx={{ 
                             color: tokens.accent.info, 

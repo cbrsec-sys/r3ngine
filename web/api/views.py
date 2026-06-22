@@ -5,6 +5,8 @@ import logging
 import subprocess
 # threading.Thread - retained for migration test checks
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from django.db import connections
 import requests
 import validators
 from django.conf import settings
@@ -2216,7 +2218,7 @@ class ResumeScan(APIView):
 		except ScanHistory.DoesNotExist:
 			response['message'] = 'Scan not found'
 		except Exception as e:
-			logger.error(f'Error resuming scan {scan_id}: {e}')
+			logger.error('Error resuming scan %s', scan_id, exc_info=True)
 			response['message'] = str(e)
 		
 		return Response(response)
@@ -2259,19 +2261,19 @@ class PauseScan(APIView):
 						try:
 							TemporalClientProvider.pause_workflow(wf_id)
 						except Exception as e:
-							logger.error(f"Failed to pause subscan workflow {wf_id}: {e}")
+							logger.error("Failed to pause subscan workflow %s", wf_id, exc_info=True)
 
 				for te in scan.temporal_executions.filter(status="RUNNING"):
 					try:
 						TemporalClientProvider.pause_workflow(te.workflow_id)
 					except Exception as e:
-						logger.error(f"Failed to pause workflow {te.workflow_id} for scan {scan.id}: {e}")
+						logger.error("Failed to pause workflow %s for scan %s", te.workflow_id, scan.id, exc_info=True)
 
 				from reNgine.tasks import create_scan_activity
 				create_scan_activity(scan.id, "Scan paused", PAUSED_TASK)
 				paused_count += 1
 			except Exception as e:
-				logger.error(f"Failed to pause scan {scan.id}: {e}")
+				logger.error("Failed to pause scan %s", scan.id, exc_info=True)
 
 		return Response({'status': True, 'paused_count': paused_count, 'message': f'Paused {paused_count} scans.'})
 
@@ -2313,19 +2315,19 @@ class UnpauseScan(APIView):
 						try:
 							TemporalClientProvider.resume_workflow(wf_id)
 						except Exception as e:
-							logger.error(f"Failed to resume subscan workflow {wf_id}: {e}")
+							logger.error("Failed to resume subscan workflow %s", wf_id, exc_info=True)
 
 				for te in scan.temporal_executions.filter(status="RUNNING"):
 					try:
 						TemporalClientProvider.resume_workflow(te.workflow_id)
 					except Exception as e:
-						logger.error(f"Failed to resume workflow {te.workflow_id} for scan {scan.id}: {e}")
+						logger.error("Failed to resume workflow %s for scan %s", te.workflow_id, scan.id, exc_info=True)
 
 				from reNgine.tasks import create_scan_activity
 				create_scan_activity(scan.id, "Scan resumed", RUNNING_TASK)
 				resumed_count += 1
 			except Exception as e:
-				logger.error(f"Failed to resume/unpause scan {scan.id}: {e}")
+				logger.error("Failed to resume/unpause scan %s", scan.id, exc_info=True)
 
 		return Response({'status': True, 'resumed_count': resumed_count, 'message': f'Resumed {resumed_count} scans.'})
 
@@ -2430,7 +2432,7 @@ class InitiateScan(APIView):
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
 				except Exception as e:
-					logger.error(f"Error initiating scan for domain {domain_id}: {str(e)}")
+					logger.error("Error initiating scan for domain %s", domain_id, exc_info=True)
 					errors.append({'domain_id': domain_id, 'error': str(e)})
 
 			if not results:
@@ -2494,21 +2496,36 @@ class InitiateSubTask(APIView):
 			if single:
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
+
+		def _run_single_subscan(sub_id):
+			"""Run a single subscan launch inside a worker thread, ensuring DB connection cleanup."""
+			try:
+				logger.info('Running subscans %s on subdomain "%s" (concurrent) ...', scan_types, sub_id)
+				ctx = {
+					'scan_history_id': None,
+					'subdomain_id': sub_id,
+					'scan_type': scan_types,
+					'engine_id': engine_id,
+					'selected_plugin_slugs': selected_plugins,
+					'task_queue': task_queue or worker_name,
+				}
+				return sub_id, initiate_subscan_temporal(**ctx)
+			except Exception as ex:
+				logger.exception('Error starting concurrent subscan for subdomain %s', sub_id, exc_info=True)
+				return sub_id, {'success': False, 'error': str(ex)}
+			finally:
+				# Close all connections created or cached for this thread to prevent leaks
+				connections.close_all()
+
+		max_workers = min(len(subdomain_ids), 15)
+		with ThreadPoolExecutor(max_workers=max_workers) as executor:
+			results = list(executor.map(_run_single_subscan, subdomain_ids))
+
 		errors = []
-		for subdomain_id in subdomain_ids:
-			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
-			ctx = {
-				'scan_history_id': None,
-				'subdomain_id': subdomain_id,
-				'scan_type': scan_types,
-				'engine_id': engine_id,
-				'selected_plugin_slugs': selected_plugins,
-				'task_queue': task_queue or worker_name,
-			}
-			res = initiate_subscan_temporal(**ctx)
+		for sub_id, res in results:
 			if not res.get('success'):
 				errors.append({
-					'subdomain_id': subdomain_id,
+					'subdomain_id': sub_id,
 					'error': res.get('error', 'Failed to initiate subscan'),
 				})
 
@@ -2621,7 +2638,7 @@ class RengineUpdateCheck(APIView):
 					return_response['changelog'] = response[0]['body']
 					return_response['status'] = True
 		except Exception as e:
-			logger.error(f"Error fetching GitHub releases: {str(e)}")
+			logger.error("Error fetching GitHub releases", exc_info=True)
 
 		# Fallback: check .version file in master branch
 		version_url = 'https://raw.githubusercontent.com/whiterabb17/r3ngine/main/web/.version'
@@ -2636,7 +2653,7 @@ class RengineUpdateCheck(APIView):
 					return_response['changelog'] = 'A new update is available in the repository. Please pull the latest changes from the main branch.'
 					return_response['status'] = True
 		except Exception as e:
-			logger.error(f"Error fetching raw .version: {str(e)}")
+			logger.error("Error fetching raw .version", exc_info=True)
 
 		if return_response['status'] and return_response['latest_version']:
 			is_version_update_available = safe_parse_version(return_response['current_version']) < safe_parse_version(return_response['latest_version'])
@@ -2862,7 +2879,7 @@ class UpdateTool(APIView):
 			if return_code == 0:
 				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
 			else:
-				logger.error(f"Update failed for {tool.name}: {output}")
+				logger.error("Update failed for %s: %s", tool.name, output)
 				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
 		except Exception as e:
 			logger.error(str(e))
@@ -2919,10 +2936,10 @@ class GetExternalToolCurrentVersion(APIView):
 		try:
 			return_code, stdout = run_command(tool.version_lookup_command, shell=True)
 			if return_code != 0:
-				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
+				logger.warning("Version lookup failed for %s with code %s", tool.name, return_code)
 				return Response({'status': False, 'message': 'Tool not found or check failed.'})
 		except Exception as e:
-			logger.error(f"Error running version lookup command: {str(e)}")
+			logger.error("Error running version lookup command", exc_info=True)
 			return Response({'status': False, 'message': f'Error running version lookup command: {str(e)}'})
 
 		if tool.version_match_regex:
@@ -3171,7 +3188,7 @@ class IPToDomain(APIView):
 				'message': 'IP Address Required'
 			})
 		try:
-			logger.info(f'Resolving IP address {ip_address} ...')
+			logger.info('Resolving IP address %s ...', ip_address)
 			resolved_ips = []
 			for ip in IPv4Network(ip_address, False):
 				domains = []
@@ -3179,7 +3196,7 @@ class IPToDomain(APIView):
 				try:
 					(domain, domains, ips) = socket.gethostbyaddr(str(ip))
 				except socket.herror:
-					logger.info(f'No PTR record for {ip_address}')
+					logger.info('No PTR record for %s', ip_address)
 					domain = str(ip)
 				if domain not in domains:
 					domains.append(domain)
@@ -4188,6 +4205,19 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 			elif has_ip.lower() in ('false', '0', 'f', 'n', 'no'):
 				self.queryset = self.queryset.filter(ip_addresses__isnull=True).distinct()
 
+		self.queryset = (
+			self.queryset
+			.select_related('scan_history', 'target_domain')
+			.prefetch_related(
+				'ip_addresses',
+				'ip_addresses__ports',
+				'waf',
+				'technologies',
+				'directories',
+				'waf_bypass_findings',
+				'screenshots'
+			)
+		)
 		return self.queryset
 
 	def filter_queryset(self, qs):
@@ -4501,6 +4531,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 
 		if subdomain_id:
 			endpoints = endpoints.filter(subdomain__id=subdomain_id)
+
+		http_status = req.query_params.get('http_status')
+		if http_status:
+			try:
+				endpoints = endpoints.filter(http_status=int(http_status))
+			except ValueError:
+				pass
 
 		if 'only_urls' in req.query_params:
 			self.serializer_class = EndpointOnlyURLsSerializer
@@ -5037,9 +5074,11 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		scan_id = req.query_params.get('scan_history')
 		domain = req.query_params.get('domain')
 		severity = req.query_params.get('severity')
+		exclude_severity = req.query_params.get('exclude_severity')
 		validation_status = req.query_params.get('validation_status')
 		open_status = req.query_params.get('open_status')
 		source = req.query_params.get('source')
+		exclude_source = req.query_params.get('exclude_source')
 		subdomain_id = req.query_params.get('subdomain_id')
 		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
@@ -5080,6 +5119,11 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 			severity_values = self._normalize_severity_filters(severity)
 			if severity_values:
 				qs = qs.filter(severity__in=severity_values)
+		if exclude_severity:
+			# Filter out (exclude) vulnerabilities matching these severity levels
+			exclude_severity_values = self._normalize_severity_filters(exclude_severity)
+			if exclude_severity_values:
+				qs = qs.exclude(severity__in=exclude_severity_values)
 		if validation_status:
 			qs = qs.filter(validation_status__iexact=validation_status)
 		if open_status is not None:
@@ -5094,6 +5138,14 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 				for source_value in source_values:
 					source_query |= Q(source__iexact=source_value)
 				qs = qs.filter(source_query)
+		if exclude_source:
+			# Filter out (exclude) vulnerabilities matching these scanner source tools
+			exclude_source_values = self._normalize_csv_filters(exclude_source)
+			if exclude_source_values:
+				exclude_source_query = Q()
+				for source_value in exclude_source_values:
+					exclude_source_query |= Q(source__iexact=source_value)
+				qs = qs.exclude(exclude_source_query)
 		if subdomain_id:
 			qs = qs.filter(subdomain__id=subdomain_id)
 		self.queryset = qs
@@ -5462,7 +5514,7 @@ class MobileMediaServeView(APIView):
 		
 		# Security check
 		if not is_safe_path(settings.MEDIA_ROOT, file_path):
-			logger.error(f"is_safe_path failed for {file_path}")
+			logger.error("is_safe_path failed for %s", file_path)
 			raise Http404("File not found")
 			
 		if os.path.exists(file_path):
@@ -5472,7 +5524,7 @@ class MobileMediaServeView(APIView):
 			content_type, _ = mimetypes.guess_type(file_path)
 			return FileResponse(open(file_path, 'rb'), content_type=content_type)
 		else:
-			logger.error(f"File not found: {file_path}")
+			logger.error("File not found: %s", file_path)
 			raise Http404("File not found")
 
 
@@ -5633,7 +5685,7 @@ class GetSystemLogs(APIView):
 				# Return at most 500 lines to keep responses lightweight
 				return Response({'status': True, 'logs': lines[-500:]})
 		except Exception as e:
-			logger.error(f"Error reading system logs ({log_type}): {str(e)}")
+			logger.error("Error reading system logs (%s)", log_type, exc_info=True)
 			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)
 
 
@@ -5683,7 +5735,7 @@ class LaunchADAssessmentFromSubdomain(APIView):
 				created_by=request.user,
 			)
 		except Exception as exc:
-			logger.error(f'[AD Bridge] Failed to create ADAssessment: {exc}')
+			logger.error('[AD Bridge] Failed to create ADAssessment', exc_info=True)
 			return Response(
 				{'error': 'Failed to create assessment.'},
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -6102,7 +6154,7 @@ class RunSearchsploitAction(APIView):
             try:
                 shutil.copy('/usr/src/exploitdb/.searchsploit_rc', '/root/.searchsploit_rc')
             except Exception as e:
-                logger.error(f"Failed to copy searchsploit_rc dynamically: {e}")
+                logger.error("Failed to copy searchsploit_rc dynamically", exc_info=True)
 
         cmd = ['searchsploit', '--json', query]
         try:

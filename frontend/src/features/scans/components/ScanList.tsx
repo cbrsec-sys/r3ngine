@@ -160,7 +160,7 @@ export const ScanList: React.FC = () => {
                 <TableRow key={scan.id!} sx={{ '&:hover': { bgcolor: 'action.hover' }, transition: 'all 0.2s' }}>
                   <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <a
-                      href={`/scan/detail/${scan.id!}`}
+                      href={`/${projectSlug}/scan/detail/${scan.id!}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ textDecoration: 'none' }}
@@ -238,7 +238,7 @@ export const ScanList: React.FC = () => {
                         <IconButton 
                           size="small" 
                           component="a"
-                          href={`/scan/detail/${scan.id!}`}
+                          href={`/${projectSlug}/scan/detail/${scan.id!}`}
                           target="_blank"
                           sx={{ color: tokens.accent.primary, '&:hover': { bgcolor: `${tokens.accent.primary}15` } }}
                         >

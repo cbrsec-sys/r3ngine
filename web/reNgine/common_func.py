@@ -18,6 +18,7 @@ import shlex
 import re
 import xmltodict
 
+import time
 from time import sleep
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
@@ -856,13 +857,43 @@ def get_chaos_api_key():
 	return key_obj.key if key_obj else ''
 
 
-# ---------------------------------------------------------------------------
-# Module-level cache of proxies known to be dead within this process lifetime.
-# Cleared between scans automatically because Celery workers restart between
-# tasks. Prevents wasting timeout budget re-checking proxies that already
-# failed during the same scan session.
-# ---------------------------------------------------------------------------
-_failed_proxy_cache: set = set()
+# Curated pool of modern desktop browser user agents for realistic request spoofing.
+_USER_AGENT_POOL = [
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
+	'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.4; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 OPR/110.0.0.0',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Vivaldi/6.7.3329.21',
+]
+
+_DEFAULT_USER_AGENT = _USER_AGENT_POOL[0]
+
+# 5 popular, fast public checkers in preference order
+ALL_PROXY_CHECKERS = [
+	("https://whatismyip.akamai.com/", "plain"),
+	("https://cloudflare.com/cdn-cgi/trace", "cloudflare"),
+	("https://api.ip.sb/ip", "plain"),
+	("https://ifconfig.co/ip", "plain"),
+	("https://icanhazip.com", "plain"),
+]
+
+# Cache of proxies known to be dead within this process lifetime, mapping proxy_url -> epoch timestamp.
+_failed_proxy_cache: dict = {}
+_FAILED_PROXY_TTL = 1800  # 30 minutes
+
+# Standard exceptions suggesting proxy itself is down/unreachable (connection phase)
+_PROXY_DEAD_EXCEPTIONS = (
+	requests.exceptions.ProxyError,
+	requests.exceptions.ConnectTimeout,
+	requests.exceptions.ConnectionError,
+)
+
+_PROXY_DEAD_KEYWORDS = ('proxyerror', 'connecttimeout', 'refused', 'unreachable', 'connection reset', 'connection aborted')
 
 
 def _detect_server_ip(timeout: int = 5) -> str:
@@ -884,116 +915,97 @@ def _detect_server_ip(timeout: int = 5) -> str:
 	return ''
 
 
-def _is_valid_ip(value: str) -> bool:
-	"""Return True if *value* looks like a valid IPv4 or IPv6 address.
-
-	This filters out captive-portal strings like 'Login Required' that could
-	otherwise fool a simple 200-OK JSON check.
+def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''):
+	"""Test if a proxy is truly working and not transparent.
+	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
+	by making a request to a public API returning a JSON payload or plain text with client IP.
 	"""
-	import ipaddress
-	try:
-		ipaddress.ip_address(value)
-		return True
-	except ValueError:
+	proxy_url = proxy_url.strip()
+	if not proxy_url:
 		return False
+	test_proxy = proxy_url
+	if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://', 'socks5h://']):
+		test_proxy = 'http://' + test_proxy
 
+	# Select two checkers deterministically within this process lifetime.
+	# hash() is randomized per-process (PYTHONHASHSEED) so selection varies
+	# across worker restarts — this is intentional: it spreads load across
+	# checkers without requiring a PRNG or state.
+	hash_val = abs(hash(proxy_url))
+	idx1 = hash_val % len(ALL_PROXY_CHECKERS)
+	idx2 = (hash_val + 1) % len(ALL_PROXY_CHECKERS)
+	check_targets = [ALL_PROXY_CHECKERS[idx1], ALL_PROXY_CHECKERS[idx2]]
 
-def check_proxy_robust(proxy_url, timeout=10, server_ip=''):
-	"""Test if a proxy is truly working and not a transparent/captive-portal proxy.
-
-	Improvements over the old implementation:
-	  - Both IP-reflection endpoints are checked in *parallel* (short-circuit on
-	    first success) rather than sequentially, halving worst-case latency.
-	  - The returned IP value is validated as a real IPv4 / IPv6 address so that
-	    captive-portal HTML strings cannot produce a false positive.
-	  - When ``server_ip`` is provided (and OpSec transparent-proxy detection is
-	    enabled), the proxy is rejected if its reported IP matches the server's own
-	    outbound IP (i.e. the proxy is transparent and exposes the real source).
-
-	Args:
-		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080).
-		timeout (int): Per-request timeout in seconds. Defaults to 10.
-		server_ip (str): The server's own outbound IP string (for transparent-proxy
-			detection). Pass '' to disable the check.
-
-	Returns:
-		bool: True if the proxy forwards traffic correctly, False otherwise.
-	"""
-	import ipaddress as _ipaddr
-	from concurrent.futures import ThreadPoolExecutor, as_completed
-
-	try:
-		proxy_url = proxy_url.strip()
-		if not proxy_url:
-			return False
-		# Normalise – ensure a scheme is present so requests can route correctly
-		test_proxy = proxy_url
-		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-			test_proxy = 'http://' + test_proxy
-
-		proxies = {'http': test_proxy, 'https': test_proxy}
-		headers = {
-			'User-Agent': (
-				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-				'(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-			)
-		}
-
-		# Two independent IP-reflection endpoints checked in parallel.
-		check_targets = [
-			('https://api.ipify.org?format=json', 'ip'),
-			('http://ip-api.com/json',            'query'),
-		]
-
-		def _try_endpoint(url, key):
-			"""Return the reported IP string or raise on failure."""
-			resp = requests.get(
-				url,
-				proxies=proxies,
-				headers=headers,
-				timeout=timeout,
-				allow_redirects=True,
-			)
-			if resp.status_code != 200:
-				raise ValueError(f'HTTP {resp.status_code}')
-			data = resp.json()
-			ip_str = data.get(key, '')
-			if not ip_str:
-				raise ValueError('empty IP field in response')
-			if not _is_valid_ip(ip_str):
-				raise ValueError(f'response IP is not a valid IP address: {ip_str!r}')
-			return ip_str
-
-		reported_ip = None
-		with ThreadPoolExecutor(max_workers=2) as _pool:
-			future_map = {_pool.submit(_try_endpoint, u, k): (u, k) for u, k in check_targets}
-			for fut in as_completed(future_map):
+	def _try_proxy(scheme_proxy):
+		"""Return (reported_ip, errors) for the given proxy URL."""
+		proxies = {'http': scheme_proxy, 'https': scheme_proxy}
+		headers = {"User-Agent": _DEFAULT_USER_AGENT}
+		errors = []
+		with requests.Session() as session:
+			session.proxies = proxies
+			session.headers.update(headers)
+			for url, expected_type in check_targets:
 				try:
-					reported_ip = fut.result()
-					# Cancel the sibling future – we have our answer
-					for other in future_map:
-						if other is not fut:
-							other.cancel()
-					break
-				except Exception:
-					continue  # try the other endpoint
+					response = session.get(
+						url,
+						timeout=timeout,
+						allow_redirects=True
+					)
+					if response.status_code == 200:
+						text = response.text.strip()
+						if expected_type == "cloudflare":
+							# Parse cloudflare trace line-by-line to extract IP
+							for line in text.splitlines():
+								if line.startswith("ip="):
+									val = line.split("=", 1)[1].strip()
+									try:
+										ipaddress.ip_address(val)
+										return val, []
+									except ValueError:
+										pass
+							errors.append("Could not parse IP from cloudflare trace")
+						elif expected_type == "plain":
+							try:
+								ipaddress.ip_address(text)
+								return text, []
+							except ValueError:
+								errors.append(f"Invalid IP address format: {text[:50]}")
+					else:
+						errors.append(f"HTTP {response.status_code}")
+				except Exception as exc:
+					errors.append(exc)
+					# If the proxy itself is unreachable or times out, stop checking further targets
+					if isinstance(exc, _PROXY_DEAD_EXCEPTIONS) or any(k in str(exc).lower() for k in _PROXY_DEAD_KEYWORDS):
+						break
+		return None, errors
 
-		if not reported_ip:
-			# Both endpoints failed – proxy is dead or blocking check requests
-			return False
+	# 1) Try with the original scheme
+	reported_ip, errors = _try_proxy(test_proxy)
 
-		# Optional transparent-proxy detection: reject if the proxy simply
-		# forwards our real IP without changing it.
-		if server_ip and reported_ip == server_ip:
-			logger.warning(
-				'Proxy %s is transparent – reported IP %s matches server IP. Rejecting.',
-				proxy_url, reported_ip,
-			)
-			return False
+	# 2) For socks5:// only, retry with socks5h:// (remote DNS via proxy).
+	if not reported_ip and test_proxy.startswith('socks5://'):
+		is_proxy_unreachable = False
+		for err in errors:
+			if isinstance(err, _PROXY_DEAD_EXCEPTIONS) or any(k in str(err).lower() for k in _PROXY_DEAD_KEYWORDS):
+				is_proxy_unreachable = True
+				break
+		if not is_proxy_unreachable:
+			socks5h_proxy = test_proxy.replace('socks5://', 'socks5h://', 1)
+			logger.debug("check_proxy_robust: retrying with remote DNS via %s", socks5h_proxy)
+			reported_ip, _ = _try_proxy(socks5h_proxy)
 
-		return True
-	except Exception:
+	if not reported_ip:
 		return False
+
+	# Optional transparent-proxy detection
+	if server_ip and reported_ip == server_ip:
+		logger.warning(
+			'Proxy %s is transparent – reported IP %s matches server IP. Rejecting.',
+			proxy_url, reported_ip,
+		)
+		return False
+
+	return True
 
 
 def merge_imported_subdomains(domain, imported_subdomains):
@@ -1086,23 +1098,7 @@ def remove_proxy_from_pool(proxy_value, proxy_obj=None):
 	return removed
 
 
-# Curated pool of modern desktop browser user agents for realistic request spoofing.
-# Rotated when OpSec random UA is enabled.
-_USER_AGENT_POOL = [
-	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0',
-	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
-	'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-	'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
-	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.4; rv:125.0) Gecko/20100101 Firefox/125.0',
-	'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0',
-	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 OPR/110.0.0.0',
-	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Vivaldi/6.7.3329.21',
-]
 
-# Fallback UA used when OpSec random UA is disabled.
-_DEFAULT_USER_AGENT = _USER_AGENT_POOL[0]
 
 
 def get_random_user_agent():
@@ -1175,8 +1171,12 @@ def get_random_proxy():
 			p = f'http://{p}'
 		proxies.append(p)
 
-	# Remove entries that have already failed this session
-	candidates = [p for p in proxies if p not in _failed_proxy_cache]
+	# Remove entries that have already failed this session (within TTL)
+	now_epoch = time.time()
+	candidates = [
+		p for p in proxies
+		if p not in _failed_proxy_cache or (now_epoch - _failed_proxy_cache[p]) > _FAILED_PROXY_TTL
+	]
 	if not candidates:
 		# All known proxies have failed – clear the cache and try again fresh
 		logger.warning('All cached proxies failed this session. Clearing failure cache.')
@@ -1234,9 +1234,9 @@ def get_random_proxy():
 
 	def _check(proxy_url):
 		"""Check a single proxy; mark it failed on the cache and prune from DB if dead."""
-		if check_proxy_robust(proxy_url, timeout=10, server_ip=server_ip):
+		if check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=server_ip):
 			return proxy_url
-		_failed_proxy_cache.add(proxy_url)
+		_failed_proxy_cache[proxy_url] = time.time()
 		if remove_proxy_from_pool(proxy_url, _proxy_obj):
 			logger.warning('Removed invalid proxy from pool: %s', proxy_url)
 		return None
