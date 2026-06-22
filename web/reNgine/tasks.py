@@ -4099,7 +4099,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	
 	if proxies_file_path and os.path.exists(proxies_file_path):
 		cmd += f' -proxy {proxies_file_path}'
-	elif 'http' in proxy:
+	elif proxy:
 		cmd += f' -proxy {proxy}' 
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''

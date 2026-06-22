@@ -1245,8 +1245,8 @@ def create_proxy_list_activity(ctx: dict) -> str:
     logger.log_line("[TEMPORAL]", "START", f"task=create_proxy_list scan_id={scan_id}")
 
     proxies = get_proxy_list()
-    if not proxies or any(p.startswith('socks') for p in proxies):
-        logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=no_proxies_or_socks")
+    if not proxies:
+        logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=no_proxies")
         return None
 
     results_dir = f"/usr/src/github/scan_results/{scan_id}"
