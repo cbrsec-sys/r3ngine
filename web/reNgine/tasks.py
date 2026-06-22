@@ -48,7 +48,7 @@ from scanEngine.models import (EngineType, InstalledExternalTool, Notification, 
 from startScan.models import *
 from startScan.models import EndPoint, Subdomain, Vulnerability, Parameter
 from targetApp.models import Domain, normalize_manual_subdomains
-from dashboard.models import AcunetixAPIKey
+from dashboard.models import AcunetixAPIKey, HunterIOAPIKey
 from reNgine.monitor_tasks import *
 from reNgine.utils.graph import Neo4jManager
 from reNgine.vulnerability_tasks import *
@@ -1276,7 +1276,20 @@ def osint(self, host=None, ctx={}, description=None):
 			shutil.copyfile(source_api_keys, target_api_keys)
 			logger.info('Copied theHarvester api-keys.yaml to /root/.theHarvester/api-keys.yaml')
 	except Exception as e:
-		logger.error(f'Failed to copy theHarvester api-keys.yaml: {e}')
+		logger.error('Failed to copy theHarvester api-keys.yaml: %s', e)
+
+	# Inject stored Hunter API key so theHarvester -b all uses Hunter as a source.
+	try:
+		hunter_key_obj = HunterIOAPIKey.objects.first()
+		if hunter_key_obj and hunter_key_obj.key and os.path.exists(target_api_keys):
+			with open(target_api_keys, 'r') as _f:
+				_yaml_data = yaml.safe_load(_f) or {}
+			_yaml_data.setdefault('apikeys', {}).setdefault('hunter', {})['key'] = hunter_key_obj.key
+			with open(target_api_keys, 'w') as _f:
+				yaml.dump(_yaml_data, _f)
+			logger.info('[HUNTER] Injected Hunter API key into theHarvester api-keys.yaml')
+	except Exception as e:
+		logger.error('Failed to inject Hunter key into theHarvester YAML: %s', e)
 
 	config = self.yaml_configuration.get(OSINT) or OSINT_DEFAULT_CONFIG
 	results = {}
