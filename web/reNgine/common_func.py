@@ -927,8 +927,10 @@ def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''
 	if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://', 'socks5h://']):
 		test_proxy = 'http://' + test_proxy
 
-	# Deterministically select two distinct checkers based on proxy_url
-	# Using Python's fast built-in hash() function
+	# Select two checkers deterministically within this process lifetime.
+	# hash() is randomized per-process (PYTHONHASHSEED) so selection varies
+	# across worker restarts — this is intentional: it spreads load across
+	# checkers without requiring a PRNG or state.
 	hash_val = abs(hash(proxy_url))
 	idx1 = hash_val % len(ALL_PROXY_CHECKERS)
 	idx2 = (hash_val + 1) % len(ALL_PROXY_CHECKERS)
