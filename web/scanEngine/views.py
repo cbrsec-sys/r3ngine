@@ -649,6 +649,45 @@ def check_proxy_single(request, slug):
     return http.JsonResponse({'proxy': proxy_url, 'valid': bool(is_valid)})
 
 
+@has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def check_proxy_bulk(request, slug):
+    """Validate multiple proxy URLs concurrently. POST {proxies: list} → {results: dict}"""
+    if request.method != 'POST':
+        return http.JsonResponse({'error': 'Method not allowed'}, status=405)
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except (_json.JSONDecodeError, ValueError):
+        return http.JsonResponse({'error': 'Invalid JSON'}, status=400)
+    proxies = body.get('proxies', [])
+    if not isinstance(proxies, list):
+        return http.JsonResponse({'error': 'No proxies list provided'}, status=400)
+
+    # Prevent potential resource exhaustion by capping target list
+    proxies = proxies[:500]
+
+    from reNgine.common_func import check_proxy_robust, PROXY_VALIDATION_TIMEOUT, PROXY_VALIDATION_MAX_WORKERS
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    max_workers = min(PROXY_VALIDATION_MAX_WORKERS, max(1, len(proxies)))
+    results = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_proxy = {
+            executor.submit(check_proxy_robust, p, PROXY_VALIDATION_TIMEOUT): p 
+            for p in proxies if p.strip()
+        }
+        for future in as_completed(future_to_proxy):
+            proxy = future_to_proxy[future]
+            try:
+                is_valid = future.result()
+            except Exception:
+                is_valid = False
+            results[proxy] = bool(is_valid)
+
+    return http.JsonResponse({'results': results})
+
+
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def tool_arsenal_section(request, slug):
     tools = InstalledExternalTool.objects.all().order_by('id')

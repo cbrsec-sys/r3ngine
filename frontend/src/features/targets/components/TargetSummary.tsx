@@ -131,6 +131,8 @@ export const TargetSummary = () => {
   const { data, isLoading, error } = useTargetSummary(projectSlug || 'default', parseInt(targetId || '0'));
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
+  const [subdomainInitialAlive, setSubdomainInitialAlive] = useState(false);
+  const [endpointsInitialAlive, setEndpointsInitialAlive] = useState(false);
   const [aiExportModalOpen, setAiExportModalOpen] = useState(false);
   const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
   const stopScanMutation = useStopScan(projectSlug || 'default');
@@ -351,6 +353,10 @@ export const TargetSummary = () => {
               color="#7000ff"
               icon={Layers}
               sx={{ height: 180 }}
+              onClick={() => {
+                setSubdomainInitialAlive(true);
+                setActiveTab(1);
+              }}
             />
             <KpiCard
               title="ENDPOINTS"
@@ -359,6 +365,10 @@ export const TargetSummary = () => {
               color="#ff00f7"
               icon={Target}
               sx={{ height: 180 }}
+              onClick={() => {
+                setEndpointsInitialAlive(true);
+                setActiveTab(3);
+              }}
             />
             <KpiCard
               title="VULNERABILITIES"
@@ -763,9 +773,13 @@ export const TargetSummary = () => {
 
       {/* Tab Bar Integration */}
       <Box sx={{ mb: 3, borderBottom: `1px solid ${theme.palette.divider}`, position: 'sticky', top: 0, bgcolor: theme.palette.background.default, zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
+        <Tabs 
+          value={activeTab} 
+          onChange={(_, v) => {
+            setActiveTab(v);
+            setSubdomainInitialAlive(false);
+            setEndpointsInitialAlive(false);
+          }} 
           variant="scrollable"
           scrollButtons="auto"
           sx={{
@@ -801,10 +815,10 @@ export const TargetSummary = () => {
       {/* Tab Content */}
       <Box sx={{ mt: 2 }}>
         {tabs[activeTab]?.label === 'HOME' && renderHome()}
-        {tabs[activeTab]?.label === 'SUBDOMAINS' && <SubdomainsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
-        {tabs[activeTab]?.label === 'DIRECTORIES' && <DirectoriesTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
-        {tabs[activeTab]?.label === 'URLS' && <EndpointsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
-        {tabs[activeTab]?.label === 'PARAMETERS' && <ParametersTab targetId={parseInt(targetId || '0')} />}
+        {tabs[activeTab]?.label === 'SUBDOMAINS' && <SubdomainsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} initialAlive={subdomainInitialAlive} />}
+        {tabs[activeTab]?.label === 'DIRECTORIES' && <DirectoriesTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} scanId={latestScanId} />}
+        {tabs[activeTab]?.label === 'URLS' && <EndpointsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} initialAlive={endpointsInitialAlive} />}
+        {tabs[activeTab]?.label === 'PARAMETERS' && <ParametersTab targetId={parseInt(targetId || '0')} scanId={latestScanId} />}
         {tabs[activeTab]?.label === 'VULNERABILITIES' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>

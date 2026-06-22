@@ -2494,21 +2494,39 @@ class InitiateSubTask(APIView):
 			if single:
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
+
+		from concurrent.futures import ThreadPoolExecutor
+		from django.db import connections
+
+		def _run_single_subscan(sub_id):
+			"""Run a single subscan launch inside a worker thread, ensuring DB connection cleanup."""
+			try:
+				logger.info(f'Running subscans {scan_types} on subdomain "{sub_id}" (concurrent) ...')
+				ctx = {
+					'scan_history_id': None,
+					'subdomain_id': sub_id,
+					'scan_type': scan_types,
+					'engine_id': engine_id,
+					'selected_plugin_slugs': selected_plugins,
+					'task_queue': task_queue or worker_name,
+				}
+				return sub_id, initiate_subscan_temporal(**ctx)
+			except Exception as ex:
+				logger.exception(f'Error starting concurrent subscan for subdomain {sub_id}: {ex}')
+				return sub_id, {'success': False, 'error': str(ex)}
+			finally:
+				# Close all connections created or cached for this thread to prevent leaks
+				connections.close_all()
+
+		max_workers = min(len(subdomain_ids), 15)
+		with ThreadPoolExecutor(max_workers=max_workers) as executor:
+			results = list(executor.map(_run_single_subscan, subdomain_ids))
+
 		errors = []
-		for subdomain_id in subdomain_ids:
-			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
-			ctx = {
-				'scan_history_id': None,
-				'subdomain_id': subdomain_id,
-				'scan_type': scan_types,
-				'engine_id': engine_id,
-				'selected_plugin_slugs': selected_plugins,
-				'task_queue': task_queue or worker_name,
-			}
-			res = initiate_subscan_temporal(**ctx)
+		for sub_id, res in results:
 			if not res.get('success'):
 				errors.append({
-					'subdomain_id': subdomain_id,
+					'subdomain_id': sub_id,
 					'error': res.get('error', 'Failed to initiate subscan'),
 				})
 
@@ -4182,12 +4200,19 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 			if port_list:
 				self.queryset = self.queryset.filter(ip_addresses__ports__number__in=port_list).distinct()
 
-		if has_ip is not None:
-			if has_ip.lower() in ('true', '1', 't', 'y', 'yes'):
-				self.queryset = self.queryset.filter(ip_addresses__isnull=False).distinct()
-			elif has_ip.lower() in ('false', '0', 'f', 'n', 'no'):
-				self.queryset = self.queryset.filter(ip_addresses__isnull=True).distinct()
-
+		self.queryset = (
+			self.queryset
+			.select_related('scan_history', 'target_domain')
+			.prefetch_related(
+				'ip_addresses',
+				'ip_addresses__ports',
+				'waf',
+				'technologies',
+				'directories',
+				'waf_bypass_findings',
+				'screenshots'
+			)
+		)
 		return self.queryset
 
 	def filter_queryset(self, qs):
@@ -4501,6 +4526,10 @@ class EndPointViewSet(viewsets.ModelViewSet):
 
 		if subdomain_id:
 			endpoints = endpoints.filter(subdomain__id=subdomain_id)
+
+		http_status = req.query_params.get('http_status')
+		if http_status:
+			endpoints = endpoints.filter(http_status=http_status)
 
 		if 'only_urls' in req.query_params:
 			self.serializer_class = EndpointOnlyURLsSerializer
@@ -5037,9 +5066,11 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		scan_id = req.query_params.get('scan_history')
 		domain = req.query_params.get('domain')
 		severity = req.query_params.get('severity')
+		exclude_severity = req.query_params.get('exclude_severity')
 		validation_status = req.query_params.get('validation_status')
 		open_status = req.query_params.get('open_status')
 		source = req.query_params.get('source')
+		exclude_source = req.query_params.get('exclude_source')
 		subdomain_id = req.query_params.get('subdomain_id')
 		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
@@ -5080,6 +5111,11 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 			severity_values = self._normalize_severity_filters(severity)
 			if severity_values:
 				qs = qs.filter(severity__in=severity_values)
+		if exclude_severity:
+			# Filter out (exclude) vulnerabilities matching these severity levels
+			exclude_severity_values = self._normalize_severity_filters(exclude_severity)
+			if exclude_severity_values:
+				qs = qs.exclude(severity__in=exclude_severity_values)
 		if validation_status:
 			qs = qs.filter(validation_status__iexact=validation_status)
 		if open_status is not None:
@@ -5094,6 +5130,14 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 				for source_value in source_values:
 					source_query |= Q(source__iexact=source_value)
 				qs = qs.filter(source_query)
+		if exclude_source:
+			# Filter out (exclude) vulnerabilities matching these scanner source tools
+			exclude_source_values = self._normalize_csv_filters(exclude_source)
+			if exclude_source_values:
+				exclude_source_query = Q()
+				for source_value in exclude_source_values:
+					exclude_source_query |= Q(source__iexact=source_value)
+				qs = qs.exclude(exclude_source_query)
 		if subdomain_id:
 			qs = qs.filter(subdomain__id=subdomain_id)
 		self.queryset = qs
