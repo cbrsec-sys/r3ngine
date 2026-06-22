@@ -887,7 +887,7 @@ def _detect_server_ip(timeout: int = 5) -> str:
 def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''):
 	"""Test if a proxy is truly working and not transparent.
 	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
-	by making a request to a public API and validating that the response is a valid IP address.
+	by making a request to a public API returning a JSON payload or plain text with client IP.
 	"""
 	proxy_url = proxy_url.strip()
 	if not proxy_url:
@@ -898,17 +898,21 @@ def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''
 
 	import ipaddress
 
-	# 9 popular, fast plain-text checkers returning just the raw IP address (eth0.me removed)
+	# 13 popular, fast public checkers
 	ALL_CHECKERS = [
-		"https://icanhazip.com",
-		"https://ifconfig.co/ip",
-		"https://api.ip.sb/ip",
-		"https://whatismyip.akamai.com/",
-		"https://checkip.amazonaws.com",
-		"https://ident.me",
-		"https://v4.ident.me",
-		"https://ipecho.net/plain",
-		"https://ipinfo.io/ip",
+		("https://cloudflare.com/cdn-cgi/trace", "cloudflare"),
+		("https://icanhazip.com", "plain"),
+		("https://ifconfig.co/ip", "plain"),
+		("https://api.ip.sb/ip", "plain"),
+		("https://whatismyip.akamai.com/", "plain"),
+		("https://checkip.amazonaws.com", "plain"),
+		("https://eth0.me", "plain"),
+		("https://ident.me", "plain"),
+		("https://v4.ident.me", "plain"),
+		("https://ipecho.net/plain", "plain"),
+		("https://ipinfo.io/ip", "plain"),
+		("https://api.ipify.org?format=json", "ipify"),
+		("http://ip-api.com/json", "ip-api"),
 	]
 
 	# Deterministically select two distinct checkers based on proxy_url
@@ -927,7 +931,7 @@ def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''
 			)
 		}
 		errors = []
-		for url in check_targets:
+		for url, expected_type in check_targets:
 			try:
 				response = requests.get(
 					url,
@@ -938,15 +942,40 @@ def check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=''
 				)
 				if response.status_code == 200:
 					text = response.text.strip()
-					try:
-						# Validate as a real IPv4 or IPv6 address.
-						# This prevents false positives from captive portals or ISP redirects.
-						ipaddress.ip_address(text)
-						return text, []
-					except ValueError:
-						errors.append(f"Invalid IP format: {text[:50]}")
-				else:
-					errors.append(f"HTTP {response.status_code}")
+					if expected_type == "cloudflare":
+						# Parse cloudflare trace line-by-line to extract IP
+						for line in text.splitlines():
+							if line.startswith("ip="):
+								val = line.split("=", 1)[1].strip()
+								try:
+									ipaddress.ip_address(val)
+									return val, []
+								except ValueError:
+									pass
+					elif expected_type == "ipify":
+						data = response.json()
+						val = data.get("ip", "")
+						try:
+							ipaddress.ip_address(val)
+							return val, []
+						except ValueError:
+							pass
+					elif expected_type == "ip-api":
+						data = response.json()
+						val = data.get("query", "")
+						try:
+							ipaddress.ip_address(val)
+							return val, []
+						except ValueError:
+							pass
+					elif expected_type == "plain":
+						if 7 <= len(text) <= 45 and "<" not in text and ("." in text or ":" in text):
+							try:
+								ipaddress.ip_address(text)
+								return text, []
+							except ValueError:
+								pass
+				errors.append(f"HTTP {response.status_code}")
 			except Exception as exc:
 				errors.append(exc)
 				# If the proxy itself is unreachable or times out, stop checking further targets
