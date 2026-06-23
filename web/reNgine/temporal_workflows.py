@@ -405,7 +405,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunPortScanActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=3),
+                        start_to_close_timeout=timedelta(hours=6),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -3255,7 +3255,7 @@ class SingleTaskRetryWorkflow:
                 await workflow.execute_activity("RunHTTPCrawlActivity", ctx, start_to_close_timeout=timedelta(hours=3), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
                 await workflow.execute_activity("ParseHTTPCrawlResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
             elif task_name == "port_scan":
-                await workflow.execute_activity("RunPortScanActivity", ctx, start_to_close_timeout=timedelta(hours=3), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+                await workflow.execute_activity("RunPortScanActivity", ctx, start_to_close_timeout=timedelta(hours=6), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
                 await workflow.execute_activity("ParseEnumerationResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
             elif task_name == "vigolium_discovery":
                 await workflow.execute_activity("RunVigoliumDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
