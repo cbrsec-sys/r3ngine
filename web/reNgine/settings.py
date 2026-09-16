@@ -53,6 +53,15 @@ DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
 # Lowered from 10s to 5s in PR #66 to speed up bulk validation; set PROXY_VALIDATION_TIMEOUT env var to restore previous behaviour.
 PROXY_VALIDATION_TIMEOUT = env.int('PROXY_VALIDATION_TIMEOUT', default=5) # seconds
 PROXY_VALIDATION_MAX_WORKERS = env.int('PROXY_VALIDATION_MAX_WORKERS', default=50)
+# How long a freshly batch-verified proxy list is handed out entirely unchecked.
+# This covers the "fetch_proxies_task just finished" case only. Beyond it, and up
+# to Proxy.proxy_ttl_minutes, the proxy about to be used is verified individually
+# instead of the whole list being trusted — free proxies die in minutes, so the
+# old behaviour fed dead entries into scans for the full two-hour TTL.
+PROXY_TRUST_WINDOW_SECONDS = env.int('PROXY_TRUST_WINDOW_SECONDS', default=300)
+# How many random candidates get_random_proxy verifies before giving up on the
+# cheap path and re-validating the whole pool in parallel.
+PROXY_SAMPLE_ATTEMPTS = env.int('PROXY_SAMPLE_ATTEMPTS', default=3)
 
 # Acunetix (AWVS) Configuration
 ACUNETIX_POLL_INTERVAL = env.int('ACUNETIX_POLL_INTERVAL', default=30)  # seconds

@@ -1351,34 +1351,49 @@ def get_random_proxy(http_only=False):
 		candidates = proxies
 
 	# ------------------------------------------------------------------
-	# Freshness short-circuit
-	# If the batch verification is recent enough, trust it and return a
-	# random candidate without any individual re-validation.
+	# Freshness handling — three tiers rather than one blind window.
+	#
+	# 1. Inside PROXY_TRUST_WINDOW_SECONDS the batch verification is recent
+	#    enough to take on trust; this is the "fetch_proxies_task just
+	#    finished" case and costs nothing.
+	# 2. Past that but inside proxy_ttl_minutes, the pool is still not
+	#    re-validated wholesale, but the proxy about to be handed out is
+	#    checked. Previously an unchecked entry was returned for the entire
+	#    TTL, two hours by default, so a free proxy that died five minutes
+	#    after the batch run kept being fed into scans as if it were good.
+	# 3. Past the TTL, the existing full parallel re-validation runs.
 	# ------------------------------------------------------------------
 	ttl_minutes = getattr(_proxy_obj, 'proxy_ttl_minutes', 120) or 120
 	verified_at = getattr(_proxy_obj, 'proxies_verified_at', None)
+	within_ttl = False
+	age_minutes = 0.0
 	if verified_at is not None:
 		now_utc = _dt.datetime.now(_tz.utc)
-		age_minutes = (now_utc - verified_at).total_seconds() / 60
-		if age_minutes <= ttl_minutes:
+		age_seconds = (now_utc - verified_at).total_seconds()
+		age_minutes = age_seconds / 60
+		within_ttl = age_minutes <= ttl_minutes
+		if age_seconds <= PROXY_TRUST_WINDOW_SECONDS:
 			chosen = random.choice(candidates)
 			mark_proxy_used(chosen)
 			logger.info(
-				'Proxy list is fresh (%.1f min old, TTL %d min). '
-				'Returning %s without re-validation.',
-				age_minutes, ttl_minutes, redact_proxy_credentials(chosen),
+				'Proxy list was verified %.0fs ago (trust window %ds). '
+				'Returning %s unchecked.',
+				age_seconds, PROXY_TRUST_WINDOW_SECONDS,
+				redact_proxy_credentials(chosen),
 			)
 			return chosen
-		logger.info(
-			'Proxy list is stale (%.1f min old, TTL %d min). '
-			'Falling back to parallel re-validation.',
-			age_minutes, ttl_minutes,
-		)
+		if not within_ttl:
+			logger.info(
+				'Proxy list is stale (%.1f min old, TTL %d min). '
+				'Falling back to parallel re-validation.',
+				age_minutes, ttl_minutes,
+			)
 	else:
 		logger.info('No proxies_verified_at timestamp found. Performing parallel re-validation.')
 
 	# ------------------------------------------------------------------
-	# Optional transparent-proxy detection (opt-in via OpSec setting)
+	# Optional transparent-proxy detection (opt-in via OpSec setting).
+	# Needed by both the sampled check below and the full re-validation.
 	# ------------------------------------------------------------------
 	server_ip = ''
 	try:
@@ -1390,6 +1405,37 @@ def get_random_proxy(http_only=False):
 				logger.info('Transparent proxy detection enabled. Server IP: %s', server_ip)
 	except Exception as _e:
 		logger.warning('Could not read OpSec settings for transparent proxy detection: %s', _e)
+
+	# ------------------------------------------------------------------
+	# Sampled verification — the cheap middle tier inside the TTL.
+	# At most PROXY_SAMPLE_ATTEMPTS checks instead of re-validating the pool.
+	# ------------------------------------------------------------------
+	if within_ttl:
+		sample = random.sample(
+			candidates, min(PROXY_SAMPLE_ATTEMPTS, len(candidates))
+		)
+		for candidate in sample:
+			if check_proxy_robust(
+				candidate, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=server_ip
+			):
+				# Same bookkeeping as the other two tiers, so a proxy verified
+				# here also earns the 24-hour removal protection.
+				mark_proxy_used(candidate)
+				logger.info(
+					'Proxy list is %.1f min old; verified %s before handing it out.',
+					age_minutes, redact_proxy_credentials(candidate),
+				)
+				return candidate
+			_failed_proxy_cache[candidate] = time.time()
+			if remove_proxy_from_pool(candidate, _proxy_obj):
+				logger.warning(
+					'Removed invalid proxy from pool: %s',
+					redact_proxy_credentials(candidate),
+				)
+		logger.warning(
+			'None of the %d sampled proxies answered; re-validating the whole pool.',
+			len(sample),
+		)
 
 	# ------------------------------------------------------------------
 	# Parallel re-validation – first live proxy wins
