@@ -1275,6 +1275,14 @@ def create_proxy_list_activity(ctx: dict) -> str:
     file_path = os.path.join(results_dir, f"proxies_{uuid.uuid4().hex}.txt")
     with open(file_path, 'w') as f:
         f.write('\n'.join(proxies))
+    # The list can hold authenticated proxies, so the file holds live credentials
+    # for the duration of the scan. Keep it readable only by the owning process.
+    try:
+        os.chmod(file_path, 0o600)
+    except OSError as exc:
+        activity.logger.warning(
+            "[CreateProxyListActivity] could not restrict %s: %s", file_path, exc
+        )
 
     activity.logger.info(f"[CreateProxyListActivity] scan_id={scan_id} wrote {len(proxies)} proxies to {file_path}")
     logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=created")

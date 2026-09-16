@@ -23,7 +23,11 @@ def fetch_proxies_task(limit=1000, job_id=None):
     Returns:
         str: Newline-separated list of validated live proxies.
     """
-    from reNgine.common_func import check_proxy_robust, is_proxy_recently_used
+    from reNgine.common_func import (
+        check_proxy_robust,
+        is_proxy_recently_used,
+        proxy_has_credentials,
+    )
     from reNgine.job_tracker import update_job as _update_job
     from scanEngine.models import Proxy
 
@@ -188,7 +192,22 @@ def fetch_proxies_task(limit=1000, job_id=None):
             final_list = final_list + preserved
             proxy_str = "\n".join(final_list)
 
-        proxy_obj.proxies = proxy_str
+        # Credentialed entries are hand-typed paid endpoints, never scraped ones.
+        # The field used to be overwritten wholesale, so one press of "fetch
+        # proxies" silently replaced them with free ones. They are kept out of
+        # proxy_str on purpose: that string is echoed back in the job result and
+        # would carry the credentials into the UI payload.
+        credentialed = [
+            p for p in existing_proxies
+            if proxy_has_credentials(p) and p not in final_list
+        ]
+        if credentialed:
+            logger.info(
+                'Preserving %d credentialed proxy entries during pool refresh.',
+                len(credentialed),
+            )
+
+        proxy_obj.proxies = "\n".join(credentialed + final_list)
         proxy_obj.use_proxy = True
         proxy_obj.proxies_verified_at = _dj_tz.now()
         proxy_obj.save()

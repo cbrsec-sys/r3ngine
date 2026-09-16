@@ -358,7 +358,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		self.scan_id, severities_str or '-', tags or '-',
 		','.join(templates) or '-', _target_count,
 	)
-	logger.warning('[NUCLEI] CMD | scan_id=%s | %s', self.scan_id, cmd)
+	logger.warning(
+		'[NUCLEI] CMD | scan_id=%s | %s', self.scan_id, redact_proxy_credentials(cmd)
+	)
 
 	results = []
 	notif = Notification.objects.first()
