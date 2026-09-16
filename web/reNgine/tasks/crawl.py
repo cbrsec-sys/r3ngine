@@ -142,7 +142,10 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			if p and (not os.path.exists(url_results_file) or os.path.getsize(url_results_file) == 0):
 				logger.warning(f'{tool}: all proxy attempts failed, retrying once without proxy')
 				full_no_proxy_cmd = f'cat {input_path} | {base_tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
-				logger.warning(f'{tool} no-proxy fallback: {full_no_proxy_cmd}')
+				logger.warning(
+					'%s no-proxy fallback: %s', tool,
+					redact_proxy_credentials(full_no_proxy_cmd),
+				)
 				run_command(full_no_proxy_cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 
 			recon_run = True

@@ -7,7 +7,7 @@ import subprocess
 import json
 import threading
 import time
-from urllib.parse import urlparse
+from urllib.parse import quote, unquote, urlparse
 from django.conf import settings
 from scanEngine.models import OpSec, Proxy
 from reNgine.definitions import BRUTUS_EXEC_PATH, PROXYCHAINS_EXEC_PATH
@@ -274,27 +274,39 @@ class ProxychainsWrapper:
             # Format expected by proxychains: type host port [user pass]
             # reNgine might store as protocol://host:port or host:port
             
-            p_type = "socks5" # default
-            p_host = ""
-            p_port = ""
-            
+            p_type = "socks5"  # default
             if "://" in line:
-                p_type = line.split("://")[0].lower()
-                if p_type == "http" or p_type == "https":
-                    p_type = "http" # proxychains uses 'http' for both
-                line = line.split("://")[1]
-            
-            if ":" in line:
-                parts = line.split(":")
-                p_host = parts[0]
-                p_port = parts[1]
-                # If there are more parts, could be user:pass@host:port or host:port:user:pass
-                # But simple host:port is most common in reNgine
-                proxies.append(f"{p_type} {p_host} {p_port}")
+                p_type = line.split("://", 1)[0].lower()
+                if p_type in ("http", "https"):
+                    p_type = "http"    # proxychains uses 'http' for both
+                elif p_type == "socks5h":
+                    p_type = "socks5"  # proxychains has no socks5h; it resolves
+                                       # through the proxy regardless
+                parsed = urlparse(line)
             elif " " in line:
-                # Already in type host port format
+                # Already in 'type host port [user pass]' format
                 proxies.append(line)
-                
+                continue
+            else:
+                parsed = urlparse(f"socks5://{line}")
+
+            try:
+                p_host, p_port = parsed.hostname, parsed.port
+            except ValueError:
+                p_host = p_port = None
+            if not p_host or not p_port:
+                continue
+
+            entry = f"{p_type} {p_host} {p_port}"
+            # proxychains takes credentials as two trailing fields. The previous
+            # code split the line on ':' and read host='user', port='pass@host',
+            # so an authenticated proxy could never work through proxychains.
+            if parsed.username:
+                entry += f" {unquote(parsed.username)}"
+                if parsed.password:
+                    entry += f" {unquote(parsed.password)}"
+            proxies.append(entry)
+
         return proxies
 
     def get_random_proxy(self):
@@ -328,13 +340,27 @@ class ProxychainsWrapper:
                 return None
             p_type, p_host, p_port = parts[0], parts[1], parts[2]
             scheme = 'http' if p_type in ['http', 'https'] else p_type
-            proxy_url = f'{scheme}://{p_host}:{p_port}'
+            # Rebuild the credentials the proxychains line carries. Validating
+            # without them made every authenticated proxy look dead.
+            userinfo = ''
+            if len(parts) >= 4:
+                userinfo = quote(parts[3], safe='')
+                if len(parts) >= 5:
+                    userinfo += ':' + quote(parts[4], safe='')
+                userinfo += '@'
+            proxy_url = f'{scheme}://{userinfo}{p_host}:{p_port}'
             if check_proxy_robust(proxy_url, timeout=10):
                 from reNgine.common_func import mark_proxy_used
                 mark_proxy_used(proxy_url)
                 return proxy_str
-            _log.error('Proxychains proxy %s validation failed.', proxy_url)
-            from reNgine.common_func import remove_proxy_from_pool
+            from reNgine.common_func import (
+                redact_proxy_credentials,
+                remove_proxy_from_pool,
+            )
+            _log.error(
+                'Proxychains proxy %s validation failed.',
+                redact_proxy_credentials(proxy_url),
+            )
             remove_proxy_from_pool(proxy_url)
             return None
 
