@@ -1,7 +1,16 @@
 name: r3ngine
+# Every service inherits this. Without it the json-file driver grows without
+# bound, and a box running 24-hour nuclei stages fills its disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   db:
     restart: always
+    logging: *default-logging
     image: "postgres:16-alpine"
     command: >
       postgres
@@ -37,6 +46,7 @@ services:
 
   redis:
     restart: always
+    logging: *default-logging
     image: "redis:alpine"
     command: redis-server --requirepass "${REDIS_PASSWORD}"
     hostname: redis
@@ -55,6 +65,7 @@ services:
       dockerfile: docker/web/Dockerfile
     entrypoint: /usr/src/app/entrypoint.sh
     restart: always
+    logging: *default-logging
     init: true
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
@@ -124,6 +135,7 @@ services:
 
   proxy:
     restart: always
+    logging: *default-logging
     image: nginx:alpine
     ports:
       - 8082:8082/tcp
@@ -155,6 +167,7 @@ services:
   neo4j:
     image: neo4j:5.12.0
     restart: always
+    logging: *default-logging
     # Override entrypoint to remove stale PID file before each start.
     # The PID file survives stop (non-remove) cycles in the container's writable
     # layer and makes Neo4j refuse to launch with "already running".
@@ -197,6 +210,7 @@ services:
     image: r3ngine-tor:latest
     container_name: tor
     restart: "no"
+    logging: *default-logging
     profiles: ["tor"]
     networks:
       - r3ngine_network
@@ -210,6 +224,7 @@ services:
   temporal:
     image: temporalio/auto-setup:1.22.4
     restart: always
+    logging: *default-logging
     ports:
       - "127.0.0.1:7233:7233"
     environment:
@@ -242,6 +257,7 @@ services:
   temporal-python-orchestrator:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
+    logging: *default-logging
     init: true
     entrypoint: /usr/src/app/temporal-entrypoint.sh
     environment:
@@ -297,6 +313,7 @@ services:
   temporal-go-executor:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
+    logging: *default-logging
     init: true
     entrypoint: /usr/src/app/executor-entrypoint.sh
     environment:
