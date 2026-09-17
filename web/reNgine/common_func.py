@@ -1129,6 +1129,23 @@ def redact_proxy_credentials(text):
 	return _URL_CREDENTIALS_RE.sub(r'\1\2:***@', text)
 
 
+def get_priority_proxies(proxy_obj=None):
+	"""Return the operator's hand-entered proxies, in the order they were typed.
+
+	These live in their own field, which is what keeps fetch_proxies_task from
+	overwriting them and remove_proxy_from_pool from evicting them: both operate
+	on the scraped `proxies` field only.
+	"""
+	proxy_obj = proxy_obj or Proxy.objects.first()
+	if not proxy_obj or not getattr(proxy_obj, 'use_priority_proxies', True):
+		return []
+	return [
+		line.strip()
+		for line in (getattr(proxy_obj, 'priority_proxies', '') or '').splitlines()
+		if line.strip()
+	]
+
+
 def proxy_has_credentials(proxy_line):
 	"""True when a proxy line carries userinfo, e.g. socks5://user:pass@host:1234.
 
@@ -1323,17 +1340,44 @@ def get_random_proxy(http_only=False):
 	if not _proxy_obj or not _proxy_obj.use_proxy:
 		return ''
 
-	# Parse and clean the newline-separated proxy lines
+	# Hand-entered proxies come first and are tried on their own before the
+	# scraped pool is considered at all. The operator vouches for these, so a
+	# working one should always win over a free entry of unknown quality.
+	priority_raw = get_priority_proxies(_proxy_obj)
 	raw_proxies = [p.strip() for p in (_proxy_obj.proxies or '').splitlines() if p.strip()]
-	if not raw_proxies:
+	if not raw_proxies and not priority_raw:
 		return ''
 
-	# Normalise – ensure every entry has a scheme
-	proxies = []
-	for p in raw_proxies:
-		if not p.startswith('http') and not p.startswith('socks'):
-			p = f'http://{p}'
-		proxies.append(p)
+	def _normalise(lines):
+		out = []
+		for p in lines:
+			if not p.startswith('http') and not p.startswith('socks'):
+				p = f'http://{p}'
+			out.append(p)
+		return out
+
+	priority_proxies = _normalise(priority_raw)
+	proxies = _normalise(raw_proxies)
+
+	if priority_proxies:
+		server_ip_pre = ''
+		for candidate in priority_proxies:
+			if check_proxy_robust(candidate, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=server_ip_pre):
+				logger.info(
+					'Using priority proxy %s', redact_proxy_credentials(candidate)
+				)
+				return candidate
+			logger.warning(
+				'Priority proxy %s did not answer; it stays configured, trying the next.',
+				redact_proxy_credentials(candidate),
+			)
+		if not proxies:
+			logger.error('All priority proxies failed and no scraped pool is configured.')
+			return ''
+		logger.warning(
+			'All %d priority proxies failed — falling back to the scraped pool.',
+			len(priority_proxies),
+		)
 
 	if http_only:
 		proxies = [p for p in proxies if p.lower().startswith('http')]
@@ -1499,11 +1543,20 @@ def get_proxy_list():
 	if not proxy or not proxy.use_proxy or proxy.use_tor:
 		return []
 
-	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
+	# Hand-entered proxies lead the file. Tools that read it top-down therefore
+	# reach for the vouched-for entries before anything scraped.
+	priority = get_priority_proxies(proxy)
+	proxies = priority + [
+		p.strip() for p in (proxy.proxies or '').splitlines() if p.strip()
+	]
 	cleaned_proxies = []
+	seen = set()
 	for p in proxies:
 		if not p.startswith('http') and not p.startswith('socks'):
 			p = f"http://{p}"
+		if p in seen:
+			continue
+		seen.add(p)
 		cleaned_proxies.append(p)
 
 	return cleaned_proxies

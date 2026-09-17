@@ -1041,21 +1041,50 @@ class NucleiPlannerWorkflow:
             nuclei_specific_config = vuln_config.get('nuclei', {})
             severities = nuclei_specific_config.get('severity') or NUCLEI_DEFAULT_SEVERITIES
             workflow.logger.info(
-                "[NUCLEI] PLAN | scan_id=%s severities=%s — one nuclei run per severity "
-                "per tag batch, so expect several narrow runs rather than one wide one",
+                "[NUCLEI] PLAN | scan_id=%s severities=%s — all severities go in a "
+                "single -severity flag, so expect one run per tag batch",
                 ctx.get('scan_history_id'), ','.join(severities),
             )
 
             if workflow.patched("nuclei-proxy-rotation"):
                 proxies_file_path = None
                 try:
-                    proxies_file_path = await workflow.execute_activity(
-                        "CreateProxyListActivity",
+                    # Going through the proxy pool costs most of nuclei's speed,
+                    # because the concurrency and rate caps that stop it
+                    # deadlocking on flaky proxies also throttle it. When the
+                    # operator has asked for it, probe the target first and pay
+                    # that price only if the target actually blocks us.
+                    _proxy_policy = await workflow.execute_activity(
+                        "GetProxyPolicyActivity",
                         args=[ctx],
-                        start_to_close_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(minutes=2),
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue",
                     )
+                    _need_proxy = True
+                    if _proxy_policy.get('use_proxy') and _proxy_policy.get('only_after_ban'):
+                        _need_proxy = await workflow.execute_activity(
+                            "CheckTargetBlockingActivity",
+                            args=[ctx],
+                            start_to_close_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue",
+                        )
+                        workflow.logger.warning(
+                            "[NUCLEI] PROXY DECISION | scan_id=%s blocked=%s — %s",
+                            ctx.get('scan_history_id'), _need_proxy,
+                            "using the proxy pool" if _need_proxy
+                            else "scanning direct at full speed",
+                        )
+
+                    if _need_proxy:
+                        proxies_file_path = await workflow.execute_activity(
+                            "CreateProxyListActivity",
+                            args=[ctx],
+                            start_to_close_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue",
+                        )
 
                     # Gather tags and pre-built batches via activity.
                     # Activity counts templates per tag so each batch is bounded by
