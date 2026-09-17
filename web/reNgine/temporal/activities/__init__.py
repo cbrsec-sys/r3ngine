@@ -1450,7 +1450,16 @@ def gather_nuclei_tags_activity(ctx: dict) -> dict:
             "task=gather_nuclei_tags scan_id=%s tag=%s templates=%d" % (scan_id, tag, tag_counts.get(tag, 0))
         )
 
-    batches = build_tag_batches(merged, tag_counts, max_per_batch=max_per_batch, max_tags=3)
+    # max_tags is the fallback guard for when template counts are unavailable and
+    # every tag looks free. get_template_counts_for_tags() reads the counts
+    # directly from the template files, so max_per_batch is the real bound here
+    # and a ceiling of 3 only inflated the batch count — on a host with a rich
+    # technology fingerprint that meant dozens of nuclei runs where a handful
+    # would do.
+    max_tags = int(os.environ.get('NUCLEI_MAX_TAGS_PER_BATCH', 10))
+    batches = build_tag_batches(
+        merged, tag_counts, max_per_batch=max_per_batch, max_tags=max_tags
+    )
 
     activity.logger.info(
         "[GatherNucleiTagsActivity] scan_id=%s tags=%s batches=%d max_per_batch=%d",
