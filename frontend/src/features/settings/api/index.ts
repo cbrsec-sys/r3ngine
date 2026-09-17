@@ -55,6 +55,11 @@ export interface ProxySettings {
   proxies: string;
   use_proxychains: boolean;
   use_tor: boolean;
+  /** Hand-entered proxies, tried before the scraped pool and never overwritten by the fetch. */
+  priority_proxies?: string;
+  use_priority_proxies?: boolean;
+  /** Scan direct and engage the pool only once the target is found to block us. */
+  proxy_only_after_ban?: boolean;
   valid_proxy_count?: number;
   skip_validation?: boolean;
 }
@@ -194,7 +199,14 @@ export const useUpdateProxySettings = (slug: string) => {
       if (data.use_tor) {
         formData.append('use_tor', 'on');
       }
+      if (data.use_priority_proxies) {
+        formData.append('use_priority_proxies', 'on');
+      }
+      if (data.proxy_only_after_ban) {
+        formData.append('proxy_only_after_ban', 'on');
+      }
       formData.append('proxies', data.proxies);
+      formData.append('priority_proxies', data.priority_proxies ?? '');
       if (data.skip_validation) {
         formData.append('skip_validation', 'true');
       }
