@@ -123,7 +123,7 @@ DATABASES = {
         'CONN_MAX_AGE': 0,
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
-            'sslmode': env('POSTGRES_SSLMODE', default='prefer'),
+            'sslmode': env('POSTGRES_SSLMODE', default='prefer') or 'prefer',
             'sslrootcert': os.path.join(BASE_DIR, 'ca.crt'),
         }
     }
