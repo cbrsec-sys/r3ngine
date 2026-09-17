@@ -1288,6 +1288,90 @@ def create_proxy_list_activity(ctx: dict) -> str:
     logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=created")
     return file_path
 
+@activity.defn(name="CheckTargetBlockingActivity")
+def check_target_blocking_activity(ctx: dict) -> bool:
+    """Probe a sample of the target's own endpoints directly, without a proxy.
+
+    Answers one question for NucleiPlannerWorkflow: is this target blocking us?
+    Routing nuclei through the proxy pool costs most of its speed, and most
+    targets do not block at all, so that price should only be paid when it buys
+    something.
+
+    A ban shows up two ways and both are counted: a hard block drops or resets
+    the connection, and a soft block answers 403 or 429. nuclei's own error
+    counter sees only the first kind, which is why this probe exists instead of
+    reading nuclei's statistics.
+
+    Returns:
+        bool: True when the blocked share of the sample crosses the threshold,
+              or when the target could not be sampled at all (fail safe: use the
+              proxy rather than hammer a target that may already be refusing us).
+    """
+    import requests as _requests
+    from reNgine.common_func import get_http_urls, get_random_user_agent
+    from startScan.models import ScanHistory
+
+    scan_id = ctx.get('scan_history_id')
+    sample_size = int(os.environ.get('BAN_PROBE_SAMPLE_SIZE', 10))
+    threshold = float(os.environ.get('BAN_PROBE_THRESHOLD', 0.5))
+
+    urls = get_http_urls(is_alive=False, ignore_files=True, ctx=ctx) or []
+    if not urls:
+        scan = ScanHistory.objects.filter(pk=scan_id).first()
+        if scan and scan.domain:
+            urls = [f'https://{scan.domain.name}']
+    if not urls:
+        activity.logger.warning(
+            "[BANPROBE] scan_id=%s no endpoints to sample — assuming blocked so "
+            "the proxy pool is used.", scan_id,
+        )
+        return True
+
+    sample = urls[:sample_size]
+    blocked = 0
+    for url in sample:
+        try:
+            resp = _requests.get(
+                url,
+                timeout=10,
+                allow_redirects=True,
+                headers={'User-Agent': get_random_user_agent()},
+            )
+            if resp.status_code in (403, 429):
+                blocked += 1
+        except _requests.exceptions.RequestException:
+            # Reset, refused or timed out — the hard-block shape.
+            blocked += 1
+
+    ratio = blocked / len(sample)
+    is_blocked = ratio >= threshold
+    activity.logger.warning(
+        "[BANPROBE] scan_id=%s sampled=%d blocked=%d ratio=%.2f threshold=%.2f "
+        "-> %s", scan_id, len(sample), blocked, ratio, threshold,
+        "USE PROXY" if is_blocked else "SCAN DIRECT",
+    )
+    return is_blocked
+
+
+@activity.defn(name="GetProxyPolicyActivity")
+def get_proxy_policy_activity(ctx: dict) -> dict:
+    """Return how the proxy pool should be engaged for this scan.
+
+    Kept as its own activity because workflow code must not touch the database.
+    """
+    from scanEngine.models import Proxy
+
+    proxy_obj = Proxy.objects.first()
+    policy = {
+        'use_proxy': bool(proxy_obj and (proxy_obj.use_proxy or proxy_obj.use_tor)),
+        'only_after_ban': bool(
+            proxy_obj and getattr(proxy_obj, 'proxy_only_after_ban', False)
+        ),
+    }
+    activity.logger.info("[BANPROBE] proxy policy: %s", policy)
+    return policy
+
+
 @activity.defn(name="CleanupProxyListActivity")
 def cleanup_proxy_list_activity(file_path: str) -> bool:
     """Clean up the proxies.txt file.
