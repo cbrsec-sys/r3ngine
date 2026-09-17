@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import logging
+import os
 import re
 
 ###############################################################################
@@ -119,8 +120,20 @@ NUCLEI_CONCURRENCY = 'concurrency'
 # Maximum concurrency and rate when routing nuclei through a proxy file.
 # nuclei v3.9.0 AdaptiveWaitGroup deadlocks at high concurrency when the
 # proxy error rate exceeds ~60% — these caps prevent the semaphore hang.
-NUCLEI_PROXY_MAX_CONCURRENCY = 20
-NUCLEI_PROXY_MAX_RATE_LIMIT = 50
+#
+# The caps assume a pool of free public proxies, where that error rate is normal,
+# and they are punishing at scale: a thousand subdomains at a throttled rate is
+# days of work, which is how Tier 6 came to exceed its 24-hour budget. With a
+# reliable (paid, authenticated) proxy the error rate is nowhere near 60% and the
+# cap costs more than the deadlock it guards against, so both are tunable from
+# the environment. Raise them only when the pool is actually reliable.
+NUCLEI_PROXY_MAX_CONCURRENCY = int(os.environ.get('NUCLEI_PROXY_MAX_CONCURRENCY', 20))
+NUCLEI_PROXY_MAX_RATE_LIMIT = int(os.environ.get('NUCLEI_PROXY_MAX_RATE_LIMIT', 50))
+# Wall-clock budget for the nuclei stage of Tier 6. Once it is spent the
+# remaining tag batches are skipped so that the rest of Tier 6 (Acunetix,
+# WPScan, cPanel, S3, Dalfox) and the whole of Tier 7 still run, instead of
+# every one of them dying with "Child Workflow execution timed out".
+NUCLEI_STAGE_BUDGET_HOURS = int(os.environ.get('NUCLEI_STAGE_BUDGET_HOURS', 10))
 NUCLEI_MAX_TEMPLATES_PER_BATCH = 'max_templates_per_batch'
 OSINT = 'osint'
 OSINT_DOCUMENTS_LIMIT = 'documents_limit'
