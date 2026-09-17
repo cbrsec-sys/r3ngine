@@ -29,7 +29,10 @@ from temporalio.exceptions import ActivityError, ApplicationError, ChildWorkflow
 with workflow.unsafe.imports_passed_through():
     from reNgine.temporal_activities import _PERMITTED_GENERIC_TASKS
     from reNgine.scan_context import ScanContext
-    from reNgine.definitions import NUCLEI_DEFAULT_SEVERITIES
+    from reNgine.definitions import (
+        NUCLEI_DEFAULT_SEVERITIES,
+        NUCLEI_STAGE_BUDGET_HOURS,
+    )
 
 
 # Retry policy presets — applied explicitly to every execute_activity call.
@@ -1067,21 +1070,46 @@ class NucleiPlannerWorkflow:
                     )
                     tag_batches = nuclei_tag_result.get('batches') or [None]
 
-                    for severity in severities:
-                        for batch in tag_batches:
-                            severity_ctx = {
-                                **ctx,
-                                "nuclei_severity_filter": severity,
-                                "nuclei_proxies_path": proxies_file_path
-                            }
-                            await workflow.execute_activity(
-                                "RunNucleiActivity",
-                                args=[severity_ctx, severity, batch],
-                                start_to_close_timeout=timedelta(hours=6),
-                                heartbeat_timeout=timedelta(minutes=5),
-                                retry_policy=_RETRY_LONG_SCAN,
-                                task_queue="python-orchestrator-queue",
+                    # One run per tag batch, with every severity in a single
+                    # -severity flag. Looping over severities re-scanned the same
+                    # target list once per level — six passes for identical
+                    # coverage, since nuclei accepts the whole list at once. On a
+                    # host with a rich technology fingerprint that multiplied the
+                    # batch count by six and pushed Tier 6 past this child
+                    # workflow's 24-hour execution_timeout, so everything queued
+                    # behind nuclei (Acunetix, WPScan, cPanel, S3, Dalfox and the
+                    # whole of Tier 7) never got to run at all.
+                    severity_filter = (
+                        ','.join(severities)
+                        if isinstance(severities, (list, tuple))
+                        else str(severities)
+                    )
+                    _nuclei_deadline = workflow.now() + timedelta(
+                        hours=NUCLEI_STAGE_BUDGET_HOURS
+                    )
+                    for _idx, batch in enumerate(tag_batches, start=1):
+                        if workflow.now() >= _nuclei_deadline:
+                            workflow.logger.warning(
+                                "[NUCLEI] BUDGET SPENT | scan_id=%s — %dh budget used "
+                                "after %d of %d tag batches. Skipping the rest so the "
+                                "remaining Tier 6 tools and Tier 7 still run.",
+                                ctx.get('scan_history_id'),
+                                NUCLEI_STAGE_BUDGET_HOURS, _idx - 1, len(tag_batches),
                             )
+                            break
+                        severity_ctx = {
+                            **ctx,
+                            "nuclei_severity_filter": severity_filter,
+                            "nuclei_proxies_path": proxies_file_path
+                        }
+                        await workflow.execute_activity(
+                            "RunNucleiActivity",
+                            args=[severity_ctx, severity_filter, batch],
+                            start_to_close_timeout=timedelta(hours=6),
+                            heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_LONG_SCAN,
+                            task_queue="python-orchestrator-queue",
+                        )
                 except Exception as _nuclei_err:
                     # Nuclei failure is isolated — remaining tier 6 tools (cpanel, wpscan,
                     # s3scanner, vigolium, etc.) must still run. The parent workflow
@@ -1124,20 +1152,38 @@ class NucleiPlannerWorkflow:
                     )
                     tag_batches = nuclei_tag_result.get('batches') or [None]
 
-                    for severity in severities:
-                        for batch in tag_batches:
-                            severity_ctx = {
-                                **ctx,
-                                "nuclei_severity_filter": severity
-                            }
-                            await workflow.execute_activity(
-                                "RunNucleiActivity",
-                                args=[severity_ctx, severity, batch],
-                                start_to_close_timeout=timedelta(hours=6),
-                                heartbeat_timeout=timedelta(minutes=5),
-                                retry_policy=_RETRY_LONG_SCAN,
-                                task_queue="python-orchestrator-queue",
+                    # Same collapse as the patched branch above: every severity in
+                    # one -severity flag, one run per tag batch, bounded budget.
+                    severity_filter = (
+                        ','.join(severities)
+                        if isinstance(severities, (list, tuple))
+                        else str(severities)
+                    )
+                    _nuclei_deadline = workflow.now() + timedelta(
+                        hours=NUCLEI_STAGE_BUDGET_HOURS
+                    )
+                    for _idx, batch in enumerate(tag_batches, start=1):
+                        if workflow.now() >= _nuclei_deadline:
+                            workflow.logger.warning(
+                                "[NUCLEI] BUDGET SPENT | scan_id=%s — %dh budget used "
+                                "after %d of %d tag batches. Skipping the rest so the "
+                                "remaining Tier 6 tools and Tier 7 still run.",
+                                ctx.get('scan_history_id'),
+                                NUCLEI_STAGE_BUDGET_HOURS, _idx - 1, len(tag_batches),
                             )
+                            break
+                        severity_ctx = {
+                            **ctx,
+                            "nuclei_severity_filter": severity_filter
+                        }
+                        await workflow.execute_activity(
+                            "RunNucleiActivity",
+                            args=[severity_ctx, severity_filter, batch],
+                            start_to_close_timeout=timedelta(hours=6),
+                            heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_LONG_SCAN,
+                            task_queue="python-orchestrator-queue",
+                        )
                 except Exception as _nuclei_err:
                     workflow.logger.error(
                         "[NUCLEI] ABANDONED | scan_id=%s — nuclei gave up after retries, "
