@@ -30,6 +30,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/*
 
 ENV GO111MODULE=on
+# Several tools below are installed at @latest, so any of them can start
+# requiring a newer Go than this image ships. The golang images default to
+# GOTOOLCHAIN=local, which turns that into a hard build failure rather than a
+# toolchain download. See the same note in the vigolium stage.
+ENV GOTOOLCHAIN=auto
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
 # retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols. 
@@ -122,6 +127,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.34"
 ENV PATH="/root/.bun/bin:${PATH}"
 ENV GO111MODULE=on
+# The official golang images set GOTOOLCHAIN=local, which makes `go build` fail
+# outright when a module asks for a newer Go than the image ships. vigolium is
+# cloned from its default branch just below, unpinned, so whatever Go version it
+# requires today is whatever we have to satisfy — it has already moved from 1.26
+# to 1.27 under us. `auto` lets the toolchain named in go.mod be fetched instead
+# of failing the build.
+#
+# The real fix is to pin the clone to a release tag, as the comment below has
+# always claimed it does. Until that tag is chosen, this keeps the image
+# buildable as vigolium moves.
+ENV GOTOOLCHAIN=auto
 
 # Clone vigolium at the pinned release tag
 RUN git clone --depth 1 https://github.com/vigolium/vigolium /build/vigolium
