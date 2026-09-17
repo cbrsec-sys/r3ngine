@@ -12,10 +12,21 @@ services:
     restart: always
     logging: *default-logging
     image: "postgres:16-alpine"
+    # These -c flags are the live configuration. docker/postgres/postgresql.conf
+    # is not mounted into this container and has no effect, so tuning must go
+    # here. random_page_cost defaults to 4.0, which models a spinning disk and
+    # makes the planner prefer sequential scans over the index on the scan
+    # result tables; 1.1 reflects the SSD the host actually runs on.
+    # work_mem stays modest because max_connections is 200 and the container
+    # ceiling is 1536M.
     command: >
       postgres
       -c max_connections=200
       -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c random_page_cost=1.1
       -c idle_in_transaction_session_timeout=30000
       -c statement_timeout=300000
     environment:
