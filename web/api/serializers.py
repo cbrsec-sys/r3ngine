@@ -1,6 +1,6 @@
 from dashboard.models import *
 from django.contrib.humanize.templatetags.humanize import (naturalday, naturaltime)
-from django.db.models import F, JSONField, Value, Q
+from django.db.models import F, JSONField, Value
 from django.forms.models import model_to_dict
 from recon_note.models import *
 from reNgine.common_func import *
@@ -436,10 +436,15 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 		depth = 1
 
 	def get_is_spiderfoot_running(self, obj):
-		return obj.scanactivity_set.filter(
-			Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
-			status=RUNNING_TASK
-		).exists()
+		# Read from the related manager rather than filtering in SQL, so a
+		# prefetch_related('scanactivity_set') on the caller's queryset serves
+		# this, get_tier_info and the task counts from one shared fetch.
+		return any(
+			a.status == RUNNING_TASK
+			and (a.name == 'spiderfoot_scan'
+				 or 'spiderfoot' in (a.title or '').lower())
+			for a in obj.scanactivity_set.all()
+		)
 
 	def _get_cached_task_counts(self, obj):
 		cache_attr = f'_task_counts_{obj.pk}'
@@ -523,19 +528,26 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	def get_current_tier_progress(self, obj):
 		return self.get_tier_info(obj)['current_tier_progress']
 
+	SEVERITY_NAMES = {
+		4: 'critical',
+		3: 'high',
+		2: 'medium',
+		1: 'low',
+		0: 'info',
+		-1: 'unknown',
+	}
+
 	def get_max_severity(self, scan_history):
+		if hasattr(scan_history, 'max_severity_ann'):
+			severity = scan_history.max_severity_ann
+			if severity is None:
+				return 'none'
+			return self.SEVERITY_NAMES.get(severity, 'unknown')
+
 		from startScan.models import Vulnerability
 		max_vuln = Vulnerability.objects.filter(scan_history=scan_history).order_by('-severity').first()
 		if max_vuln:
-			severity_map = {
-				4: 'critical',
-				3: 'high',
-				2: 'medium',
-				1: 'low',
-				0: 'info',
-				-1: 'unknown'
-			}
-			return severity_map.get(max_vuln.severity, 'unknown')
+			return self.SEVERITY_NAMES.get(max_vuln.severity, 'unknown')
 		return 'none'
 
 	def get_engine_name(self, scan_history):
@@ -543,17 +555,20 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			return scan_history.scan_type.engine_name
 		return 'Standard'
 
+	# The three counts below prefer an annotation supplied by the caller's
+	# queryset and fall back to the per-row query. Several views share this
+	# serializer without annotating, so the fallback is load-bearing.
 	def get_subdomain_count(self, scan_history):
-		if scan_history.get_subdomain_count:
-			return scan_history.get_subdomain_count()
+		count = getattr(scan_history, 'subdomain_count_ann', None)
+		return count if count is not None else scan_history.get_subdomain_count()
 
 	def get_endpoint_count(self, scan_history):
-		if scan_history.get_endpoint_count:
-			return scan_history.get_endpoint_count()
+		count = getattr(scan_history, 'endpoint_count_ann', None)
+		return count if count is not None else scan_history.get_endpoint_count()
 
 	def get_vulnerability_count(self, scan_history):
-		if scan_history.get_vulnerability_count:
-			return scan_history.get_vulnerability_count()
+		count = getattr(scan_history, 'vulnerability_count_ann', None)
+		return count if count is not None else scan_history.get_vulnerability_count()
 
 	def get_progress(self, scan_history):
 		return scan_history.get_progress()
@@ -568,7 +583,10 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 		return scan_history.get_completed_ago()
 
 	def get_organizations(self, scan_history):
-		return [org.name for org in scan_history.domain.get_organization()]
+		# Domain.get_organization() builds a fresh Organization queryset, which
+		# no prefetch can serve. The reverse accessor returns the same set and
+		# is satisfied by prefetch_related('domain__domains').
+		return [org.name for org in scan_history.domain.domains.all()]
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
