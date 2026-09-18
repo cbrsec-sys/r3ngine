@@ -521,7 +521,7 @@ class Parameter(models.Model):
 
 class VulnerabilityTags(models.Model):
 	id = models.AutoField(primary_key=True)
-	name = models.CharField(max_length=100)
+	name = models.CharField(max_length=100, db_index=True)
 
 	def __str__(self):
 		return self.name
@@ -594,7 +594,7 @@ class EpssFeedData(models.Model):
 
 class CweId(models.Model):
 	id = models.AutoField(primary_key=True)
-	name = models.CharField(max_length=100)
+	name = models.CharField(max_length=100, db_index=True)
 
 	def __str__(self):
 		return self.name
@@ -865,6 +865,19 @@ class Vulnerability(models.Model):
 	group_key = models.CharField(max_length=500, null=True, blank=True, db_index=True)
 	validation_reason = models.TextField(blank=True, null=True, help_text="Reason/justification for status change")
 
+	class Meta:
+		indexes = [
+			# Scan detail vuln list and the "max severity of this scan" lookup.
+			models.Index(fields=['scan_history', '-severity'], name='vuln_scan_sev_idx'),
+			# Per-target severity counts and the severity/date-ordered highlights.
+			models.Index(
+				fields=['target_domain', '-severity', '-discovered_date'],
+				name='vuln_target_sev_date_idx',
+			),
+			# Per-subdomain severity buckets in the visualisation tree.
+			models.Index(fields=['subdomain', 'severity'], name='vuln_subdomain_sev_idx'),
+		]
+
 	def get_path(self):
 		if self.http_url:
 			return urlparse(self.http_url).path
@@ -1021,6 +1034,16 @@ class ScanActivity(models.Model):
 	error_message = models.CharField(max_length=300, blank=True, null=True)
 	traceback = models.TextField(blank=True, null=True)
 	execution_id = models.CharField(max_length=100, blank=True, null=True)
+
+	class Meta:
+		indexes = [
+			# Row claim executed at the start of every single task.
+			models.Index(fields=['scan_of', 'name'], name='sa_scan_name_idx'),
+			# Timeline ordering on the scan detail page.
+			models.Index(fields=['scan_of', 'tier', 'time_started'], name='sa_scan_tier_started_idx'),
+			# Abort, orphan reconciliation and zombie sweeps.
+			models.Index(fields=['scan_of', 'status', 'time_started'], name='sa_scan_status_started_idx'),
+		]
 
 	def __str__(self):
 		return str(self.title)

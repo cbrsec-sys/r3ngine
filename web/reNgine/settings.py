@@ -120,7 +120,12 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD'),
         'HOST': env('POSTGRES_HOST'),
         'PORT': env('POSTGRES_PORT'),
-        'CONN_MAX_AGE': 0,
+        # Persistent connections: sslmode defaults to 'prefer', so CONN_MAX_AGE=0
+        # made every request pay a fresh TCP + TLS handshake and SCRAM auth, and
+        # left CONN_HEALTH_CHECKS as dead config. Safe for the Temporal worker
+        # because DjangoAwareThreadPoolExecutor closes connections per activity
+        # (scanEngine/management/commands/run_temporal_orchestrator.py:51).
+        'CONN_MAX_AGE': 60,
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
             'sslmode': env('POSTGRES_SSLMODE', default='prefer') or 'prefer',
