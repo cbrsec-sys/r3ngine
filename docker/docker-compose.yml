@@ -288,11 +288,14 @@ services:
     networks:
       - r3ngine_network
     healthcheck:
-      test: [ "CMD", "tctl", "namespace", "list" ]
+      # tctl defaults to 127.0.0.1:7233, but the frontend binds to the container's
+      # network address, not loopback — so the check answered "connection refused"
+      # against a perfectly healthy server and the container sat unhealthy forever.
+      test: [ "CMD", "tctl", "--address", "temporal:7233", "namespace", "list" ]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -325,8 +328,8 @@ services:
       - NEO4J_USER=${NEO4J_USER}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
     depends_on:
-      #temporal:
-      #  condition: service_healthy
+      temporal:
+        condition: service_healthy
       db:
         condition: service_healthy
       neo4j:
@@ -376,8 +379,8 @@ services:
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
     depends_on:
-      #temporal:
-      #  condition: service_healthy
+      temporal:
+        condition: service_healthy
       db:
         condition: service_healthy
     volumes:
