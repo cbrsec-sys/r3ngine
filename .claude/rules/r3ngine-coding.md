@@ -37,6 +37,13 @@ Keep the project modular and layered to avoid circular dependencies:
 - Follow PEP8; lint with `flake8`, format with `black`:
   - Run inside the container: `docker exec -it r3ngine-web-1 bash -c "cd /usr/src/app && flake8 ."`
   - Format: `docker exec -it r3ngine-web-1 bash -c "cd /usr/src/app && black ."`
+  - `web/` is mounted into the container, so Python edits take effect without a rebuild —
+    only restart the affected service (`make restart-apps`). Frontend changes DO need an
+    image rebuild; see `r3ngine-frontend.md`.
+- Common compose operations have Makefile targets, which pass the right `--env-file` and
+  `-f docker/docker-compose.yml`: `make up`, `make build-web`, `make restart-apps`,
+  `make migrate`, `make logs`. A bare `docker compose …` from the repo root finds no
+  compose file.
 
 ## API usage
 
@@ -55,5 +62,5 @@ Keep the project modular and layered to avoid circular dependencies:
 - Do not perform radical changes without explicit discussion.
 - Do not add new Python dependencies without approval; add them to `web/requirements.txt`.
 - Do not add new npm dependencies without approval; add them to `frontend/package.json`.
-- Do not modify `docker-compose.yml` or `web/Dockerfile` without understanding the full build pipeline.
+- Do not modify `docker/docker-compose.yml` or `docker/web/Dockerfile` without understanding the full build pipeline (the Dockerfile builds the frontend in its own stage — see `r3ngine-frontend.md`).
 - Any change that touches `temporal/workflows/__init__.py` (or the shim `temporal_workflows.py`) must be reviewed for determinism violations (see `r3ngine-temporal.md`).

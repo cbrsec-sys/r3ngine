@@ -55,6 +55,54 @@ result = await workflow.execute_activity(
 )
 ```
 
+## Retry policies — every activity call needs one
+
+**Never call `workflow.execute_activity` without an explicit `retry_policy`.** Temporal's
+default is *unlimited* attempts with a 100s maximum interval. Scan tasks report failure by
+returning `False`, which `_run_task` turns into an exception, so one unreachable backend
+produced 200+ failed timeline rows over 13 hours before anyone noticed.
+
+Use the presets at the top of `temporal/workflows/__init__.py` — do not inline a new
+`RetryPolicy` when one of these fits:
+
+| Preset | Attempts | Use for |
+|--------|----------|---------|
+| `_RETRY_SCANNER` | 3 | Tier 6 scanners (nuclei DAST, acunetix, wpscan, semgrep, …) |
+| `_RETRY_LONG_SCAN` | 2 | Hours-long tools where a retry re-runs everything |
+| `_RETRY_NETWORK_SCAN` | 3 | Short network probes |
+| `_RETRY_INTERNAL` | 5 | DB bookkeeping and finalisation activities |
+| `_RETRY_LLM` | 3 | LLM calls |
+
+Three things to check before picking one:
+
+- **Idempotency.** A retry that inserts a row (rather than updating one keyed on the scan)
+  leaves orphaned records — give such an activity `maximum_attempts=1` or key the write.
+  The same applies to notifications: they are re-sent on every attempt.
+- **Total wall-time.** `start_to_close_timeout` is *per attempt*. For a long-running tool add
+  `schedule_to_close_timeout`, the only bound across all retries, and keep the product under
+  the parent workflow's `run_timeout`.
+- **Retries are visible.** Attempt 1 claims the pre-planned `ScanActivity` row; every later
+  attempt inserts a new one, so N attempts mean N rows in the scan timeline.
+
+`execute_child_workflow` is the opposite case: its default is a single attempt, so omitting
+the policy there is safe.
+
+The policy is captured by the server when the activity is **scheduled**. Redeploying a worker
+does not change the policy of an execution that is already retrying — those have to be
+cancelled (or the scan aborted, which trips the non-retryable guard in `_run_task`).
+
+## Making a task's timeline entry useful
+
+`TemporalTaskProxy` fills `ScanActivity.target_host` from the activity context
+(`subdomain_name` → `host[:port]` → `url` → the scan's domain) so fan-out tasks are
+distinguishable in the UI. Two things a task function should do:
+
+- Set `self.target_host` when it resolves a more precise target than the context carried
+  (see `acunetix_scan`).
+- Set `self.error` before returning `False`. Without it the timeline can only show
+  "Task <name> execution returned False/failed."; with it, `_run_task` uses the reason as the
+  exception message and stores the traceback on the row.
+
 ## Django imports in workflows
 
 Workflows must not import Django directly. Use the workaround:
@@ -70,10 +118,13 @@ Temporal UI is available at `http://localhost:8080` — full workflow history, s
 
 ```bash
 # Python orchestrator logs
-docker compose logs temporal-python-orchestrator
+docker compose --env-file .env -f docker/docker-compose.yml logs temporal-python-orchestrator
 
 # Go executor logs
-docker compose logs temporal-go-executor
+docker compose --env-file .env -f docker/docker-compose.yml logs temporal-go-executor
+
+# Or tail everything through the Makefile
+make logs
 ```
 
 ## Starting a scan workflow (from Django)
@@ -109,8 +160,9 @@ Cancel is tracked via `TemporalWorkflowExecution` FK on `ScanHistory`.
 
 1. Add the activity function to `web/reNgine/temporal/activities/__init__.py` (decorate with `@activity.defn`).
 2. Register it in the worker in `run_temporal_orchestrator.py` (add to `activities=[]`).
-3. Call it from the appropriate tier in `MasterScanWorkflow` or `SubScanWorkflow` in `temporal/workflows/__init__.py`.
-4. If the activity shells out to a tool, consider using the Go executor (`go-executor-queue`) for subprocess management.
+3. Call it from the appropriate tier in `MasterScanWorkflow` or `SubScanWorkflow` in `temporal/workflows/__init__.py`, **with an explicit `retry_policy`** (see "Retry policies" above).
+4. Add the task name to `_TASK_TIER` in `web/reNgine/task_plan.py`, otherwise its retry rows land in Tier 7 in the timeline.
+5. If the activity shells out to a tool, consider using the Go executor (`go-executor-queue`) for subprocess management.
 
 **Note**: Existing imports via `from reNgine.temporal_activities import X` continue to work through the compatibility shim. New code should import directly: `from reNgine.temporal.activities import X`.
 
@@ -134,8 +186,8 @@ result = await workflow.execute_activity(
 ## Debugging workflows
 
 1. **Temporal UI**: `http://localhost:8080` — event history, replay, cancellation.
-2. **Python orchestrator logs**: `docker compose logs temporal-python-orchestrator`
-3. **Go executor logs**: `docker compose logs temporal-go-executor`
+2. **Python orchestrator logs**: `docker compose --env-file .env -f docker/docker-compose.yml logs temporal-python-orchestrator`
+3. **Go executor logs**: `docker compose --env-file .env -f docker/docker-compose.yml logs temporal-go-executor`
 4. **DB audit**: Query `startScan_scanactivity` and `startScan_temporalworkflowexecution` tables.
 5. **Redis inspect**: `redis-cli` to inspect channel layer state.
 
