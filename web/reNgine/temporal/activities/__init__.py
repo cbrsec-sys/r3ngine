@@ -1790,6 +1790,26 @@ def run_acunetix_activity(ctx: dict) -> bool:
         subdomain_http_url=ctx.get('subdomain_http_url'),
     )
 
+@activity.defn(name="SubmitLiveSubdomainsToAcunetixActivity")
+def submit_live_subdomains_to_acunetix_activity(ctx: dict) -> bool:
+    """Register every live, externally reachable subdomain as an Acunetix target.
+
+    Runs right after the HTTP crawl, which is the first point where liveness is
+    known. Hosts sent within the configured window are skipped, and every
+    decision is recorded as a Command row on this activity's timeline entry.
+    """
+    from reNgine.tasks import acunetix_submit_live_subdomains
+    activity.logger.info(
+        "[SubmitLiveSubdomainsToAcunetixActivity] scan_id=%s", ctx.get('scan_history_id')
+    )
+    return _run_task(
+        acunetix_submit_live_subdomains,
+        ctx,
+        task_name='acunetix_submit',
+        description='Acunetix Target Submission',
+        scan_history_id=ctx.get('scan_history_id'),
+    )
+
 @activity.defn(name="RunCpanelScanActivity")
 def run_cpanel_scan_activity(ctx: dict) -> bool:
     from reNgine.tasks.vulnerability import cpanel_scan

@@ -467,6 +467,20 @@ class MasterScanWorkflow:
                 )
                 await _fan_out_search_vulns(ctx, services or [])
 
+            # Push every live subdomain to Acunetix as soon as liveness is known,
+            # rather than waiting for Tier 6. Hosts already submitted inside the
+            # configured window are skipped by the activity itself.
+            acunetix_cfg = (yaml_config.get('vulnerability_scan') or {}).get('acunetix') or {}
+            if acunetix_cfg.get('submit_live_subdomains', False) and "http_crawl" in tasks:
+                await workflow.execute_activity(
+                    "SubmitLiveSubdomainsToAcunetixActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=1),
+                    heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
+
             await self._check_paused()
             # Post-Tier-2: dispatch any enabled "run after tier_2" plugins
             await _dispatch_tier_plugins(ctx, "tier_2", str(ctx.get('scan_history_id', 'scan')))

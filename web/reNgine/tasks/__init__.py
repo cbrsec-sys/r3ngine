@@ -87,6 +87,8 @@ from reNgine.tasks.acunetix import (
     _start_acunetix_scan_direct,
     _fetch_acunetix_vulnerabilities,
     acunetix_scan,
+    acunetix_submit_live_subdomains,
+    get_live_subdomains_for_submission,
 )
 from reNgine.tasks.geo import (
     geo_localize,

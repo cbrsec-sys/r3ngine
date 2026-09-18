@@ -331,6 +331,15 @@ vulnerability_scan:
   run_dalfox: true
   run_crlfuzz: true
   run_acunetix: true
+  # Push every live, externally reachable subdomain to Acunetix as a target as
+  # soon as the HTTP crawl establishes liveness, instead of only scanning the
+  # apex domain in Tier 6. Each host is sent at most once per
+  # resubmit_after_days; every submission and skip is written to the scan
+  # timeline under "Acunetix Target Submission".
+  acunetix:
+    submit_live_subdomains: false
+    resubmit_after_days: 3
+    start_scan_on_submit: false
   run_wpscan: true
   run_wptaint_scan: true
   run_s3scanner: true

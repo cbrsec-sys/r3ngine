@@ -20,6 +20,7 @@ _TASK_TITLES = {
     # Tier 2
     'http_crawl':                 'HTTP Crawl',
     'port_scan':                  'Port Scan',
+    'acunetix_submit':            'Acunetix Target Submission',
     # Tier 3
     'fetch_url':                  'URL Fetching',
     'http_crawl_bridge':          'HTTP Crawl Bridge',
@@ -82,6 +83,7 @@ _TASK_TIER = {
     'dalfox_xss_scan':       6,
     's3scanner':             6,
     'acunetix_scan':         6,
+    'acunetix_submit':       2,
     'wpscan_scan':           6,
     'vigolium_scan':         6,
     'cpanel_scan':           6,
@@ -159,6 +161,12 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
             add(t)
         elif t == 'http_crawl_bridge' and 'fetch_url' in tasks:
             add(t)
+
+    # Acunetix target submission rides on http_crawl, which is what establishes
+    # liveness — it is independent of whether the Acunetix scanner itself runs.
+    acunetix_cfg = (yaml_configuration.get('vulnerability_scan') or {}).get('acunetix') or {}
+    if 'http_crawl' in tasks and acunetix_cfg.get('submit_live_subdomains', False):
+        add('acunetix_submit')
 
     # Vigolium tasks: harvest + discovery auto-added when vulnerability_scan is selected
     # (unless explicitly disabled in yaml_configuration).

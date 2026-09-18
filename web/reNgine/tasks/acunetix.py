@@ -484,3 +484,212 @@ def acunetix_scan(
 	except Exception as e:
 		logger.exception("Error in Acunetix scan for %s", target_name)
 		return _fail(self, f"{type(e).__name__}: {e}")
+
+
+def _record_submission(task, command: str, output: str, return_code: int = 0) -> None:
+	"""Write one line of the submission log onto the task's timeline entry.
+
+	The scan detail overlay lists a task's Command rows, so recording each decision
+	here is what makes "which hosts were added" visible in the UI.
+	"""
+	from django.utils import timezone as _tz
+
+	from startScan.models import Command
+
+	try:
+		Command.objects.create(
+			command=command,
+			output=output,
+			return_code=return_code,
+			time=_tz.now(),
+			scan_history=getattr(task, 'scan', None),
+			activity=getattr(task, 'activity', None),
+		)
+	except Exception as exc:
+		logger.warning("Could not record Acunetix submission for %s: %s", command, exc)
+
+
+def get_live_subdomains_for_submission(scan_history_id: int):
+	"""Return the subdomains of a scan that are worth sending to Acunetix.
+
+	"Live and externally reachable" means: it answered HTTP with a usable status
+	(the same definition the scan summary uses for its alive count), it has a URL
+	to scan, and it is not resolved exclusively to private addresses.
+
+	Args:
+		scan_history_id: ScanHistory PK the subdomains were discovered in.
+
+	Returns:
+		QuerySet[Subdomain]: ordered by name so submissions are deterministic.
+	"""
+	from django.db.models import Count, Q
+
+	return (
+		Subdomain.objects
+		.filter(scan_history_id=scan_history_id)
+		.filter(http_status__gt=0, http_status__lt=500)
+		.exclude(http_status=404)
+		.exclude(Q(http_url__isnull=True) | Q(http_url__exact=''))
+		.annotate(
+			public_ip_count=Count('ip_addresses', filter=Q(ip_addresses__is_private=False)),
+			ip_count=Count('ip_addresses'),
+		)
+		.filter(Q(public_ip_count__gt=0) | Q(ip_count=0))
+		.order_by('name')
+		.distinct()
+	)
+
+
+def _recently_submitted_hosts(hosts: list, resubmit_after_days: int) -> dict:
+	"""Map host -> last submission time for hosts pushed within the window."""
+	from datetime import timedelta
+
+	from django.utils import timezone as _tz
+
+	from dashboard.models import AcunetixTargetSubmission
+
+	cutoff = _tz.now() - timedelta(days=resubmit_after_days)
+	rows = AcunetixTargetSubmission.objects.filter(
+		host__in=hosts, last_submitted_at__gte=cutoff
+	).values_list('host', 'last_submitted_at')
+	return dict(rows)
+
+
+def acunetix_submit_live_subdomains(
+		self,
+		scan_history_id=None,
+		ctx=None,
+		description=None):
+	"""Register every live subdomain of a scan as an Acunetix target.
+
+	Each host is submitted at most once per `resubmit_after_days` window, and every
+	decision — submitted, skipped, failed — is written as a Command row on this
+	task's timeline entry, so the scan timeline shows exactly what was added.
+
+	Args:
+		scan_history_id: ScanHistory PK.
+		ctx: Temporal workflow context; carries the engine's yaml configuration.
+		description: Human-readable task description (unused, kept for the task API).
+
+	Returns:
+		bool: True when the submission pass completed, False when it could not run.
+	"""
+	from django.utils import timezone as _tz
+
+	from dashboard.models import AcunetixTargetSubmission
+
+	ctx = ctx or {}
+	scan_history_id = scan_history_id or ctx.get('scan_history_id')
+	yaml_configuration = ctx.get('yaml_configuration') or getattr(self, 'yaml_configuration', {}) or {}
+	acunetix_config = (yaml_configuration.get('vulnerability_scan') or {}).get('acunetix') or {}
+
+	resubmit_after_days = int(acunetix_config.get('resubmit_after_days', 3))
+	start_scan_on_submit = bool(acunetix_config.get('start_scan_on_submit', False))
+
+	creds = AcunetixAPIKey.objects.first()
+	if not (creds and creds.server_url and creds.api_key):
+		return _fail(self, "Acunetix API keys not fully configured in vault.")
+
+	subdomains = list(get_live_subdomains_for_submission(scan_history_id))
+	if not subdomains:
+		logger.info("No live subdomains to submit to Acunetix for scan %s", scan_history_id)
+		return True
+
+	hosts = [s.name for s in subdomains]
+	recent = _recently_submitted_hosts(hosts, resubmit_after_days)
+	logger.info(
+		"Acunetix submission for scan %s: %d live subdomains, %d already sent in the last %d day(s)",
+		scan_history_id, len(hosts), len(recent), resubmit_after_days,
+	)
+
+	base_url = str(creds.server_url).rstrip('/')
+	headers = {'X-Auth': creds.api_key, 'Content-Type': 'application/json'}
+	import os as _os
+	verify = _os.environ.get('ACUNETIX_CA_BUNDLE', False)
+
+	submitted, skipped, failed = 0, 0, 0
+	for subdomain in subdomains:
+		host = subdomain.name
+		target_url = subdomain.http_url or f"https://{host}"
+
+		if host in recent:
+			skipped += 1
+			_record_submission(
+				self,
+				f"acunetix submit {host}",
+				f"SKIPPED — already submitted {recent[host].isoformat()} "
+				f"(within {resubmit_after_days}d window)",
+				return_code=0,
+			)
+			continue
+
+		try:
+			target_id = _create_or_reuse_acunetix_target(
+				base_url=base_url,
+				headers=headers,
+				verify=verify,
+				timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+				target_name=host,
+				target_url=target_url,
+			)
+		except Exception as exc:
+			target_id = None
+			logger.error("Acunetix target submission failed for %s: %s", host, exc)
+
+		if not target_id:
+			failed += 1
+			_record_submission(
+				self, f"acunetix submit {host}",
+				"FAILED — could not create or locate the Acunetix target",
+				return_code=1,
+			)
+			continue
+
+		scan_started = False
+		if start_scan_on_submit:
+			scan_info = _start_acunetix_scan_direct(
+				base_url=base_url,
+				headers=headers,
+				verify=verify,
+				timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+				target_id=target_id,
+			)
+			scan_started = bool(scan_info)
+
+		now = _tz.now()
+		row, created = AcunetixTargetSubmission.objects.get_or_create(
+			host=host,
+			defaults={
+				'target_url': target_url,
+				'acunetix_target_id': str(target_id),
+				'last_submitted_at': now,
+				'last_scan_history_id': scan_history_id,
+			},
+		)
+		if not created:
+			row.target_url = target_url
+			row.acunetix_target_id = str(target_id)
+			row.last_submitted_at = now
+			row.submission_count += 1
+			row.last_scan_history_id = scan_history_id
+			row.save(update_fields=[
+				'target_url', 'acunetix_target_id', 'last_submitted_at',
+				'submission_count', 'last_scan_history_id',
+			])
+
+		submitted += 1
+		_record_submission(
+			self, f"acunetix submit {host}",
+			"SUBMITTED — target_id=%s url=%s%s" % (
+				target_id, target_url, " (scan started)" if scan_started else ""
+			),
+			return_code=0,
+		)
+
+	logger.info(
+		"Acunetix submission complete for scan %s: submitted=%d skipped=%d failed=%d",
+		scan_history_id, submitted, skipped, failed,
+	)
+	if failed and not submitted:
+		return _fail(self, f"All {failed} Acunetix target submissions failed.")
+	return True

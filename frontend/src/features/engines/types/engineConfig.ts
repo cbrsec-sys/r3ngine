@@ -201,6 +201,15 @@ export interface VigoliumVulnConfig {
   skip_spidering: boolean;
 }
 
+export interface AcunetixConfig {
+  /** Register every live, externally reachable subdomain as an Acunetix target. */
+  submit_live_subdomains: boolean;
+  /** A host already submitted within this many days is skipped. */
+  resubmit_after_days: number;
+  /** Also start an Acunetix scan for each freshly submitted target. */
+  start_scan_on_submit: boolean;
+}
+
 export interface VulnerabilityScanConfig {
   run_nuclei: boolean;
   run_dalfox: boolean;
@@ -222,6 +231,7 @@ export interface VulnerabilityScanConfig {
   enable_http_crawl: boolean;
   wpscan_enumeration: string;
   wpscan_detection_mode: 'mixed' | 'passive' | 'aggressive';
+  acunetix?: AcunetixConfig;
   nuclei: NucleiConfig;
   cpanel_scanner: CpanelScannerConfig;
   vigolium: VigoliumVulnConfig;
@@ -386,6 +396,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       concurrency: 50, rate_limit: 150, retries: 1, timeout: 5,
       intensity: 'normal', fetch_gpt_report: true, enable_http_crawl: true,
       wpscan_enumeration: 'vp,vt,u', wpscan_detection_mode: 'mixed',
+      acunetix: { submit_live_subdomains: false, resubmit_after_days: 3, start_scan_on_submit: false },
       nuclei: { use_nuclei_config: false, severities: ['unknown', 'info', 'low', 'medium', 'high', 'critical'], tags: [], templates: [], custom_templates: [] },
       cpanel_scanner: { run_cpanel2shell: true, cpanel_user_wordlist: '/usr/src/app/wordlist/cpanel_users.txt', proxy_type: 'rotating' },
       vigolium: { strategy: 'balanced', concurrency: 50, rate_limit: 100, timeout: '15s', run_phase_a: true, run_phase_b: true, scope_origin: 'balanced', skip_spidering: false },
