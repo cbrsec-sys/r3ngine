@@ -68,8 +68,8 @@ class PriorityProxyTests(TestCase):
         proxy.refresh_from_db()
         self.assertEqual(proxy.priority_proxies, PAID)
 
-    @patch('reNgine.tasks.check_proxy_robust')
-    @patch('reNgine.tasks.requests.get')
+    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.tasks.proxies.requests.get')
     def test_proxy_fetch_cannot_touch_them(self, mock_get, mock_check):
         """fetch_proxies_task rewrites the scraped field only."""
         mock_get.return_value.status_code = 200
