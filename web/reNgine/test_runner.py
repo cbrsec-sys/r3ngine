@@ -1,14 +1,21 @@
 """Test runner that turns off persistent database connections.
 
 `CONN_MAX_AGE` is set for production, where a reused connection saves a TCP and
-TLS handshake per request. It is actively harmful under test: `TransactionTestCase`
-truncates tables and closes connections between tests, while the persistent
-connection pool keeps handing the closed one back, which surfaces as
-`OperationalError: could not receive data from server: Bad file descriptor` and
-`InterfaceError: connection already closed` across whole test classes.
+TLS handshake per request. Under test it buys nothing: every test opens and
+discards its own state, and a connection carried across a `TransactionTestCase`
+boundary is one more thing that can be stale when the next test picks it up.
 
-Django has no setting for "persistent connections except in tests", so the runner
-is the explicit place to say it once, for every way tests are started.
+Honest caveat on why this exists: it was added while chasing a wave of
+`OperationalError: could not receive data from server: Bad file descriptor`
+failures that appeared after CONN_MAX_AGE was raised. Those failures were later
+reproduced and traced to interactions between individual tests, not to
+persistent connections, and Django has no connection pool that could have
+handed a closed connection back — the original explanation was wrong. The
+setting is still right for tests on its own merits, so it stays, but it should
+not be credited with fixing anything.
+
+Django has no setting for "persistent connections except in tests", so the
+runner is the explicit place to say it once, for every way tests are started.
 """
 from django.conf import settings
 from django.db import connections
@@ -20,9 +27,10 @@ class RengineTestRunner(DiscoverRunner):
 
     def setup_databases(self, **kwargs):
         for alias in connections:
+            # settings_dict is the same object as settings.DATABASES[alias], so
+            # one assignment would do; both are written to keep the intent
+            # obvious if Django ever stops sharing them.
             settings.DATABASES[alias]['CONN_MAX_AGE'] = 0
-            # Connections created before this point carry their own copy of the
-            # settings dict, so update those too rather than only the template.
             connections[alias].settings_dict['CONN_MAX_AGE'] = 0
         connections.close_all()
         return super().setup_databases(**kwargs)
