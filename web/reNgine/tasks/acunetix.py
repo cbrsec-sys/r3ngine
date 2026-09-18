@@ -394,36 +394,34 @@ def acunetix_scan(
 			# Fallback to querying by target_id
 			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
 
-		active_vulns_url = vulns_url
-		logger.info(f"Fetching Acunetix vulnerabilities from: {active_vulns_url}")
-		vulns_resp = requests.get(active_vulns_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
-		logger.info(f"Acunetix vulnerabilities response code: {vulns_resp.status_code}")
-
-		# If the URL returned 400 or 404, try fallbacks
-		if vulns_resp.status_code in [400, 404]:
-			fallback_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
-			logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
-			vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
-			logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
-			active_vulns_url = fallback_url
-
-			if vulns_resp.status_code in [400, 404]:
-				fallback_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
-				logger.info(f"Retrying with fallback 2 URL: {fallback_url}")
-				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
-				logger.info(f"Fallback 2 response code: {vulns_resp.status_code}")
-				active_vulns_url = fallback_url
-
-		v_list = []
-		if vulns_resp.status_code == 200:
-			_, v_list = _fetch_acunetix_vulnerabilities(
-				active_vulns_url,
+		# The AWVS API exposes the result list under different paths across versions,
+		# so each candidate is tried in turn. _fetch_acunetix_vulnerabilities both
+		# probes the URL and walks its pagination, returning the failing response
+		# when there is one — probing separately first would fetch every page twice.
+		def _collect(url: str, label: str):
+			logger.info("Fetching Acunetix vulnerabilities from %s (%s)", url, label)
+			return _fetch_acunetix_vulnerabilities(
+				url,
 				headers=headers,
 				verify=_acunetix_verify,
 				timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
 			)
-		elif vulns_resp.status_code in [400, 404]:
-			logger.warning("Acunetix vulnerability fetch did not return a valid list after fallbacks.")
+
+		failed_resp, v_list = _collect(vulns_url, "primary")
+		if failed_resp is not None and failed_resp.status_code in (400, 404):
+			failed_resp, v_list = _collect(
+				f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities", "fallback 1"
+			)
+			if failed_resp is not None and failed_resp.status_code in (400, 404):
+				failed_resp, v_list = _collect(
+					f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}", "fallback 2"
+				)
+
+		if failed_resp is not None:
+			logger.warning(
+				"Acunetix vulnerability fetch did not return a valid list after fallbacks "
+				"(last status %s).", failed_resp.status_code
+			)
 
 		if v_list:
 			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
