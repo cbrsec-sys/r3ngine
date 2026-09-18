@@ -125,6 +125,7 @@ DATABASES = {
         # left CONN_HEALTH_CHECKS as dead config. Safe for the Temporal worker
         # because DjangoAwareThreadPoolExecutor closes connections per activity
         # (scanEngine/management/commands/run_temporal_orchestrator.py:51).
+        # Tests force this back to 0 — see reNgine.test_runner.
         'CONN_MAX_AGE': 60,
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
@@ -133,6 +134,8 @@ DATABASES = {
         }
     }
 }
+
+TEST_RUNNER = 'reNgine.test_runner.RengineTestRunner'
 
 # Application definition
 INSTALLED_APPS = [
