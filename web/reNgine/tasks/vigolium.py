@@ -20,6 +20,7 @@ from reNgine.definitions import (
     VIGOLIUM_AUDIT_TIMEOUT,
     VIGOLIUM_AUDIT_USE_AI,
     VIGOLIUM_CONCURRENCY,
+    VIGOLIUM_DISCOVERY,
     VIGOLIUM_HARVEST,
     VIGOLIUM_MODULES,
     VIGOLIUM_RATE_LIMIT,
@@ -171,6 +172,35 @@ def parse_vigolium_http_record(task_instance, record_data):
         is_default=False,
         http_status=record_data.get('status_code') or 0,
     )
+
+
+def _analysis_phases(skip_spidering: bool, discovery_already_ran: bool) -> str:
+    """Build the --only phase list for the Tier 5 analysis pass.
+
+    Two phases are deliberately absent from it:
+
+    - `external-harvest` is skipped by vigolium itself in `--stateless` mode, which
+      every r3ngine invocation uses, because it needs a database session to ingest
+      passive sources. Asking for it only lengthened the flag.
+    - `discovery` is the same phase, over the same subdomain roots, that
+      `vigolium_discovery` ran minutes earlier in Tier 2, and whose endpoints are
+      already in the database. It stays in the list only when that Tier 2 pass is
+      disabled, so a scan configured without it loses no coverage.
+
+    Args:
+        skip_spidering: Engine config — run without the browser crawl.
+        discovery_already_ran: Whether Tier 2 vigolium_discovery is enabled.
+
+    Returns:
+        str: Comma-separated phase list for `--only`.
+    """
+    phases = []
+    if not skip_spidering:
+        phases.append('spidering')
+    if not discovery_already_ran:
+        phases.append('discovery')
+    phases += ['known-issue-scan', 'dynamic-assessment']
+    return ','.join(phases)
 
 
 def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_records=False, proxy=None):
@@ -593,7 +623,12 @@ def vigolium_analysis(self, ctx={}, description=None):
 
     output_file = f"{results_dir}/analysis.jsonl"
 
-    only_phases = "external-harvest,discovery,known-issue-scan,dynamic-assessment" if skip_spidering else "external-harvest,spidering,discovery,known-issue-scan,dynamic-assessment"
+    only_phases = _analysis_phases(
+        skip_spidering=skip_spidering,
+        discovery_already_ran=bool(
+            (self.yaml_configuration.get(VIGOLIUM_DISCOVERY) or {}).get(RUN_VIGOLIUM_DISCOVERY, True)
+        ),
+    )
 
     cmd = (
         f"cat {targets_file} | vigolium scan"
