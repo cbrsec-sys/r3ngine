@@ -17,18 +17,22 @@ services:
     # here. random_page_cost defaults to 4.0, which models a spinning disk and
     # makes the planner prefer sequential scans over the index on the scan
     # result tables; 1.1 reflects the SSD the host actually runs on.
-    # max_connections is sized to real demand, not to a round number: the Temporal
-    # worker runs 10 activity threads, gunicorn 4 workers, plus the Temporal server
-    # — about 40 in total. At 200 the arithmetic never closed, because 200 backends
-    # of private memory on top of shared_buffers already exceeds the 1536M ceiling,
-    # so Postgres would be OOM-killed long before it ran out of connection slots.
-    # Halving the cap pays for the doubled work_mem the scan-summary aggregates use.
+    # max_connections stays at 200. Lowering it to 80 on a "real demand is about
+    # 40" estimate took the stack down with "FATAL: sorry, too many clients
+    # already": the estimate counted application threads but not the Temporal
+    # server's own pools (it keeps separate ones for its default and visibility
+    # stores), and not the fact that CONN_MAX_AGE now holds a connection open per
+    # ASGI worker thread instead of returning it after each request. The theoretical
+    # memory argument against 200 did not survive contact with measurement either —
+    # this container idles at 380M of its 1536M.
+    # work_mem stays at 8MB for the same reason: it is per sort, so raising it
+    # multiplies against whatever the real connection count turns out to be.
     command: >
       postgres
-      -c max_connections=80
+      -c max_connections=200
       -c shared_buffers=256MB
       -c effective_cache_size=1152MB
-      -c work_mem=16MB
+      -c work_mem=8MB
       -c maintenance_work_mem=128MB
       -c random_page_cost=1.1
       -c idle_in_transaction_session_timeout=30000
