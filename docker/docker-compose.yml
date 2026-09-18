@@ -17,14 +17,18 @@ services:
     # here. random_page_cost defaults to 4.0, which models a spinning disk and
     # makes the planner prefer sequential scans over the index on the scan
     # result tables; 1.1 reflects the SSD the host actually runs on.
-    # work_mem stays modest because max_connections is 200 and the container
-    # ceiling is 1536M.
+    # max_connections is sized to real demand, not to a round number: the Temporal
+    # worker runs 10 activity threads, gunicorn 4 workers, plus the Temporal server
+    # — about 40 in total. At 200 the arithmetic never closed, because 200 backends
+    # of private memory on top of shared_buffers already exceeds the 1536M ceiling,
+    # so Postgres would be OOM-killed long before it ran out of connection slots.
+    # Halving the cap pays for the doubled work_mem the scan-summary aggregates use.
     command: >
       postgres
-      -c max_connections=200
+      -c max_connections=80
       -c shared_buffers=256MB
-      -c effective_cache_size=1GB
-      -c work_mem=8MB
+      -c effective_cache_size=1152MB
+      -c work_mem=16MB
       -c maintenance_work_mem=128MB
       -c random_page_cost=1.1
       -c idle_in_transaction_session_timeout=30000
@@ -36,6 +40,10 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
     ports:
       - "127.0.0.1:5432:5432"
+    # Docker gives a container 64M of /dev/shm; parallel query workers allocate
+    # their shared memory there and fail with "could not resize shared memory
+    # segment" on the aggregate-heavy scan-summary queries.
+    shm_size: 256mb
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     networks:
@@ -217,8 +225,12 @@ services:
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
       - NEO4J_PLUGINS=["apoc"]
+      # heap + pagecache must leave room for the JVM's own overhead (metaspace,
+      # thread stacks, direct buffers) inside the 2560M container limit. At
+      # 1536 + 512 that was about 512M, which the container was already using
+      # 1.6G of — one GC pause away from an OOM kill.
       - NEO4J_server_memory_heap_initial__size=768M
-      - NEO4J_server_memory_heap_max__size=1536M
+      - NEO4J_server_memory_heap_max__size=1024M
       - NEO4J_server_memory_pagecache_size=512M
     volumes:
       - neo4j_data:/data
