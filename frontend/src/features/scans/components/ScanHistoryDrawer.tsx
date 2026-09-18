@@ -241,7 +241,8 @@ const SectionHeader = ({ title, count }: { title: string, count?: number }) => {
 export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onClose, projectSlug }) => {
   const { tokens, isLight, isCyber } = useThemeTokens();
   const [activeTab, setActiveTab] = useState(0);
-  const { data: status, isLoading, refetch } = useScanStatus(projectSlug);
+  // The drawer is mounted on every page; only poll while it is actually visible.
+  const { data: status, isLoading, refetch } = useScanStatus(projectSlug, { enabled: open });
   const stopScan = useStopScanAction(projectSlug);
   const deleteScan = useDeleteScanAction(projectSlug);
 

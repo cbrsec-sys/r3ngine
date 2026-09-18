@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { getSeverityColor as getSemanticSeverityColor, getSeverityLabel } from '../../../theme/semanticColors';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
@@ -1086,25 +1086,81 @@ const SubScanWidget: React.FC<{ subscans: SubScan[], targetName: string }> = ({ 
   );
 };
 
-const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploitable: number }> = ({ counts, exploitable }) => {
+const FULL_HEIGHT_SX = { height: '100%' } as const;
+const EMPTY_VULNERABILITIES: Vulnerability[] = [];
+const EMPTY_SUBDOMAINS: Subdomain[] = [];
+const EMPTY_PARTIAL_SUBDOMAINS: Partial<Subdomain>[] = [];
+
+interface VulnerabilityCounts {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  unknown: number;
+  total: number;
+}
+
+const VULN_BREAKDOWN_LABELS = ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown', 'Exploitable'];
+
+// react-apexcharts deep-compares `options` on every render and treats any function
+// (the donut `formatter`) as changed, which triggers a full SVG rebuild. Memoising the
+// options object so it only changes with the data or the theme avoids that.
+const VulnerabilityBreakdown = React.memo(function VulnerabilityBreakdown({ counts, exploitable }: { counts: VulnerabilityCounts, exploitable: number }) {
   const { tokens, isLight } = useThemeTokens();
-  const series = [counts.critical, counts.high, counts.medium, counts.low, counts.info, counts.unknown, exploitable];
-  const labels = ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown', 'Exploitable'];
-  const colors = [
-    isLight ? tokens.accent.error : '#ff003c',
+  const { critical, high, medium, low, info, unknown, total } = counts;
+  const series = useMemo(
+    () => [critical, high, medium, low, info, unknown, exploitable],
+    [critical, high, medium, low, info, unknown, exploitable]
+  );
+  const errorColor = tokens.accent.error;
+  const infoColor = tokens.accent.info;
+  const successColor = tokens.accent.success;
+  const disabledColor = tokens.text.disabled;
+  const secondaryTextColor = tokens.text.secondary;
+  const colors = useMemo(() => [
+    isLight ? errorColor : '#ff003c',
     isLight ? '#d97706' : '#ff5722',
     isLight ? '#b45309' : '#ff9800',
     isLight ? '#9a6700' : '#ffeb3b',
-    isLight ? tokens.accent.info : '#2196f3',
-    tokens.text.disabled,
-    isLight ? tokens.accent.success : '#00ff62'
-  ];
+    isLight ? infoColor : '#2196f3',
+    disabledColor,
+    isLight ? successColor : '#00ff62'
+  ], [isLight, errorColor, infoColor, disabledColor, successColor]);
+
+  const options = useMemo(() => ({
+    chart: { type: 'donut' as const, background: 'transparent' },
+    theme: { mode: isLight ? 'light' : 'dark' as any },
+    stroke: { show: false },
+    labels: VULN_BREAKDOWN_LABELS,
+    dataLabels: { enabled: false },
+    legend: { show: true, position: 'bottom' as const, fontSize: '10px', labels: { colors: isLight ? secondaryTextColor : 'rgba(255,255,255,0.7)' } },
+    colors,
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '65%',
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: 'Total',
+              color: 'text.secondary',
+              fontSize: '12px',
+              formatter: () => total.toString()
+            },
+            value: { color: 'text.primary', fontSize: '20px', fontWeight: 900 }
+          }
+        }
+      }
+    }
+  }), [isLight, secondaryTextColor, colors, total]);
 
   return (
     <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} color={isLight ? tokens.accent.error : '#ff003c'} />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
       <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, textAlign: 'center', width: '100%', px: 1 }}>
-          {labels.map((l, i) => (
+          {VULN_BREAKDOWN_LABELS.map((l, i) => (
             <Box key={l} sx={{ flex: 1 }}>
               <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>{l.substring(0, 4)}</Typography>
               <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
@@ -1113,33 +1169,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
         </Box>
         <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Chart
-            options={{
-              chart: { type: 'donut', background: 'transparent' },
-              theme: { mode: isLight ? 'light' : 'dark' as any },
-              stroke: { show: false },
-              labels: labels,
-              dataLabels: { enabled: false },
-              legend: { show: true, position: 'bottom', fontSize: '10px', labels: { colors: isLight ? tokens.text.secondary : 'rgba(255,255,255,0.7)' } },
-              colors: colors,
-              plotOptions: {
-                pie: {
-                  donut: {
-                    size: '65%',
-                    labels: {
-                      show: true,
-                      total: {
-                        show: true,
-                        label: 'Total',
-                        color: 'text.secondary',
-                        fontSize: '12px',
-                        formatter: () => counts.total.toString()
-                      },
-                      value: { color: 'text.primary', fontSize: '20px', fontWeight: 900 }
-                    }
-                  }
-                }
-              }
-            }}
+            options={options}
             series={series}
             type="donut"
             width="100%"
@@ -1149,9 +1179,9 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
       </Box>
     </TacticalPanel>
   );
-};
+});
 
-const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => {
+const VulnHighlights = React.memo(function VulnHighlights({ highlights, onVulnClick }: { highlights: Vulnerability[], onVulnClick: (v: any) => void }) {
   const { tokens, isLight } = useThemeTokens();
   return (
     <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color={tokens.accent.error} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -1226,7 +1256,7 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
       </TableContainer>
     </TacticalPanel>
   );
-};
+});
 
 interface SubdomainVulnCounts {
   host: string;
@@ -1237,35 +1267,35 @@ interface SubdomainVulnCounts {
   total: number;
 }
 
-const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
+const MostVulnerableSubdomain = React.memo(function MostVulnerableSubdomain({ vulnerabilities = EMPTY_VULNERABILITIES, sx = FULL_HEIGHT_SX }: { vulnerabilities: Vulnerability[], sx?: any }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
-  const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
-
-  const subdomainMap = filteredVulns.reduce(
-    (acc: Record<string, SubdomainVulnCounts>, v: Vulnerability) => {
-      try {
-        if (!v.http_url) return acc;
-        const normalizedUrl = v.http_url.match(/^https?:\/\//) ? v.http_url : `http://${v.http_url}`;
-        const host = new URL(normalizedUrl).hostname;
-        if (!host) return acc;
-        if (!acc[host]) acc[host] = { host, critical: 0, high: 0, medium: 0, low: 0, total: 0 };
-        const sev = Number(v.severity);
-        if (sev === 4) acc[host].critical += 1;
-        else if (sev === 3) acc[host].high += 1;
-        else if (sev === 2) acc[host].medium += 1;
-        else if (sev === 1) acc[host].low += 1;
-        acc[host].total += 1;
-      } catch {
-        // ignore invalid URLs
-      }
-      return acc;
-    },
-    {}
-  );
-
-  const rows = Object.values(subdomainMap).sort((a, b) => b.total - a.total);
+  const rows = useMemo(() => {
+    const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
+    const subdomainMap = filteredVulns.reduce(
+      (acc: Record<string, SubdomainVulnCounts>, v: Vulnerability) => {
+        try {
+          if (!v.http_url) return acc;
+          const normalizedUrl = v.http_url.match(/^https?:\/\//) ? v.http_url : `http://${v.http_url}`;
+          const host = new URL(normalizedUrl).hostname;
+          if (!host) return acc;
+          if (!acc[host]) acc[host] = { host, critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+          const sev = Number(v.severity);
+          if (sev === 4) acc[host].critical += 1;
+          else if (sev === 3) acc[host].high += 1;
+          else if (sev === 2) acc[host].medium += 1;
+          else if (sev === 1) acc[host].low += 1;
+          acc[host].total += 1;
+        } catch {
+          // ignore invalid URLs
+        }
+        return acc;
+      },
+      {}
+    );
+    return Object.values(subdomainMap).sort((a, b) => b.total - a.total);
+  }, [vulnerabilities, ignoreInfo]);
 
   const cellStyle = { borderBottom: 1, borderColor: 'divider', py: 0.75 };
 
@@ -1332,21 +1362,22 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
       )}
     </TacticalPanel>
   );
-};
+});
 
-const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVulnClick: (v: any) => void, sx?: any }> = ({ vulnerabilities = [], onVulnClick, sx = {} }) => {
+const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulnerabilities = EMPTY_VULNERABILITIES, onVulnClick, sx = FULL_HEIGHT_SX }: { vulnerabilities: Vulnerability[], onVulnClick: (v: any) => void, sx?: any }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
-  const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
 
-  // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
-  const commonMap = filtered.reduce((acc: Record<string, any>, v: Vulnerability) => {
-    acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity, vulnerability: v };
-    acc[v.name].count += 1;
-    return acc;
-  }, {});
-
-  const data = Object.values(commonMap).sort((a: { count: number }, b: { count: number }) => b.count - a.count).slice(0, 10);
+  const data = useMemo(() => {
+    const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
+    // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
+    const commonMap = filtered.reduce((acc: Record<string, any>, v: Vulnerability) => {
+      acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity, vulnerability: v };
+      acc[v.name].count += 1;
+      return acc;
+    }, {});
+    return Object.values(commonMap).sort((a: { count: number }, b: { count: number }) => b.count - a.count).slice(0, 10);
+  }, [vulnerabilities, ignoreInfo]);
 
   return (
     <TacticalPanel
@@ -1405,9 +1436,9 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVuln
       </TableContainer>
     </TacticalPanel>
   );
-};
+});
 
-const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+const ImportantSubdomainsWidget = React.memo(function ImportantSubdomainsWidget({ subdomains = EMPTY_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Subdomain[], sx?: any }) {
   const { tokens } = useThemeTokens();
   return (
     <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
@@ -1426,7 +1457,7 @@ const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }>
       </Box>
     </TacticalPanel>
   );
-};
+});
 
 const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
@@ -1461,9 +1492,12 @@ const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx
   );
 };
 
-const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+const IpAddressesWidget = React.memo(function IpAddressesWidget({ subdomains = EMPTY_PARTIAL_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Partial<Subdomain>[], sx?: any }) {
   const { tokens, isLight } = useThemeTokens();
-  const ips = Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0')));
+  const ips = useMemo(
+    () => Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0'))),
+    [subdomains]
+  );
   return (
     <TacticalPanel title="IP ADDRESSES" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ips.length}</Box>} sx={{ height: '100%', ...sx }}>
       <Box sx={{ p: 2 }}>
@@ -1478,7 +1512,7 @@ const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }
       </Box>
     </TacticalPanel>
   );
-};
+});
 
 const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
@@ -1536,10 +1570,29 @@ export const ScanDetailPage = () => {
   const [selectedVulnForInfo, setSelectedVulnForInfo] = useState<any | null>(null);
   const [vulnInfoModalOpen, setVulnInfoModalOpen] = useState(false);
 
-  const handleVulnClick = (v: any) => {
+  // Stable identity so the memoised summary widgets do not re-render on every poll.
+  const handleVulnClick = useCallback((v: any) => {
     setSelectedVulnForInfo(v);
     setVulnInfoModalOpen(true);
-  };
+  }, []);
+
+  const vulnCounts = useMemo<VulnerabilityCounts>(() => ({
+    critical: data?.critical_count ?? 0,
+    high: data?.high_count ?? 0,
+    medium: data?.medium_count ?? 0,
+    low: data?.low_count ?? 0,
+    info: data?.info_count ?? 0,
+    unknown: data?.unknown_count ?? 0,
+    total: data?.vulnerability_count ?? 0
+  }), [
+    data?.critical_count,
+    data?.high_count,
+    data?.medium_count,
+    data?.low_count,
+    data?.info_count,
+    data?.unknown_count,
+    data?.vulnerability_count
+  ]);
 
 
   const [selectedScanId, setSelectedScanId] = useState<number | null>(null);
@@ -2067,28 +2120,17 @@ export const ScanDetailPage = () => {
 
       {/* Row 3: Vulnerability Distribution & Highlights */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2, mb: 2, width: '100%' }}>
-        <VulnerabilityBreakdown
-          counts={{
-            critical: data.critical_count,
-            high: data.high_count,
-            medium: data.medium_count,
-            low: data.low_count,
-            info: data.info_count,
-            unknown: data.unknown_count,
-            total: data.vulnerability_count
-          }}
-          exploitable={data.exploitable_count}
-        />
+        <VulnerabilityBreakdown counts={vulnCounts} exploitable={data.exploitable_count} />
         <VulnHighlights highlights={data.vulnerability_highlights} onVulnClick={handleVulnClick} />
       </Box>
 
       {/* Row 4: Vulnerability Deep Dive */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
+          <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={FULL_HEIGHT_SX} />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} onVulnClick={handleVulnClick} sx={{ height: '100%' }} />
+          <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} onVulnClick={handleVulnClick} sx={FULL_HEIGHT_SX} />
         </Grid>
       </Grid>
 
@@ -2101,7 +2143,7 @@ export const ScanDetailPage = () => {
       {/* Row 5: Contextual Assets */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={{ height: '100%' }} />
+          <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={FULL_HEIGHT_SX} />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           <ReconNotesWidget notes={data.todo_notes} sx={{ height: '100%' }} />
@@ -2111,7 +2153,7 @@ export const ScanDetailPage = () => {
       {/* Row 6: Infrastructure & Fingerprinting */}
       <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 4 }}>
-          <IpAddressesWidget subdomains={data.subdomains} sx={{ height: '100%' }} />
+          <IpAddressesWidget subdomains={data.subdomains} sx={FULL_HEIGHT_SX} />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <DiscoveredPortsWidget ports={data.discovered_ports} sx={{ height: '100%' }} />

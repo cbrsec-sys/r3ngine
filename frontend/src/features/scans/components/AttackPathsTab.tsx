@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Stack,
@@ -590,8 +590,9 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
         </Box>
       )}
 
-      {/* Expanded steps */}
-      <Collapse in={expanded}>
+      {/* Expanded steps. unmountOnExit keeps collapsed cards from mounting AttackTreeViewer,
+          whose useAttackTree query would otherwise fire one request per path on tab open. */}
+      <Collapse in={expanded} unmountOnExit>
         <Divider sx={{ borderColor: `${riskColor}20`, my: 0.5 }} />
         <Box sx={{ px: 2.5, pb: 2.5, pt: 1.5 }}>
           {/* Executive Narrative */}
@@ -710,7 +711,7 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
           
           <AttackPathTimeline steps={path.steps} projectSlug={projectSlug} onViewVuln={onViewVuln} />
           
-          {path.steps.length > 0 && scanId && (
+          {expanded && path.steps.length > 0 && scanId && (
             <AttackTreeViewer scanId={scanId} targetId={path.steps[path.steps.length - 1].to} />
           )}
         </Box>
@@ -722,10 +723,13 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
 // ─── Risk Summary Bar ─────────────────────────────────────────────────────────
 const RiskSummaryBar: React.FC<{ paths: AttackPath[] }> = ({ paths }) => {
   const { tokens } = useThemeTokens();
-  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
-  paths.forEach((p) => {
-    if (p.risk in counts) counts[p.risk as keyof typeof counts]++;
-  });
+  const counts = useMemo(() => {
+    const acc = { critical: 0, high: 0, medium: 0, low: 0 };
+    paths.forEach((p) => {
+      if (p.risk in acc) acc[p.risk as keyof typeof acc]++;
+    });
+    return acc;
+  }, [paths]);
   const items = [
     { label: 'CRITICAL', count: counts.critical, color: tokens.accent.error },
     { label: 'HIGH',     count: counts.high,     color: '#f97316' },

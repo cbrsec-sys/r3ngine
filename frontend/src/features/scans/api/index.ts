@@ -329,18 +329,23 @@ export const useBulkScanAction = (projectSlug: string) => {
   });
 };
 
+const scanSummaryQueryKey = (projectSlug: string, scanId: number) =>
+  ['scan-summary', projectSlug, scanId] as const;
+
+const fetchScanSummary = async (projectSlug: string, scanId: number): Promise<ScanSummaryResponse> => {
+  const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/`, {
+    credentials: 'include'
+  });
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+  return response.json();
+};
+
 export const useScanSummary = (projectSlug: string, scanId: number) => {
   return useQuery<ScanSummaryResponse>({
-    queryKey: ['scan-summary', projectSlug, scanId],
-    queryFn: async () => {
-      const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return response.json();
-    },
+    queryKey: scanSummaryQueryKey(projectSlug, scanId),
+    queryFn: () => fetchScanSummary(projectSlug, scanId),
     enabled: !!projectSlug && !!scanId,
     refetchInterval: (query) => {
       const data = query.state.data;
@@ -398,19 +403,16 @@ export const useDownloadAiExport = (projectSlug: string, scanId: number) => {
   });
 };
 
+const EMPTY_SECRET_LEAKS: SecretLeak[] = [];
+const selectSecretLeaks = (data: ScanSummaryResponse): SecretLeak[] => data.secret_leaks || EMPTY_SECRET_LEAKS;
+
+// Shares the scan-summary cache entry instead of fetching the whole payload a second time;
+// the summary observer's refetchInterval keeps this view fresh.
 export const useSecretLeaks = (projectSlug: string, scanId: number) => {
-  return useQuery<SecretLeak[]>({
-    queryKey: ['secret-leaks', projectSlug, scanId],
-    queryFn: async () => {
-      const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const data = await response.json() as ScanSummaryResponse;
-      return data.secret_leaks || [];
-    },
+  return useQuery<ScanSummaryResponse, Error, SecretLeak[]>({
+    queryKey: scanSummaryQueryKey(projectSlug, scanId),
+    queryFn: () => fetchScanSummary(projectSlug, scanId),
+    select: selectSecretLeaks,
     enabled: !!projectSlug && !!scanId,
   });
 };
@@ -457,7 +459,7 @@ export const useCheckEmailBreach = () => {
 };
 
 
-export const useScanStatus = (projectSlug: string) => {
+export const useScanStatus = (projectSlug: string, options: { enabled?: boolean } = {}) => {
   return useQuery({
     queryKey: ['scan-status', projectSlug],
     queryFn: async () => {
@@ -469,8 +471,8 @@ export const useScanStatus = (projectSlug: string) => {
       }
       return response.json();
     },
-    enabled: !!projectSlug,
-    refetchInterval: 10000, // Poll every 10 seconds
+    enabled: !!projectSlug && (options.enabled ?? true),
+    refetchInterval: 10000, // Poll every 10 seconds while enabled
   });
 };
 

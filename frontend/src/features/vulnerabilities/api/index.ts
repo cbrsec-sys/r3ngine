@@ -182,6 +182,7 @@ export const useUpdateVulnerabilityValidationStatus = () => {
 };
 
 export const useGenerateImpact = (projectSlug: string) => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (vulnId: number) => {
       const response = await fetch(`/${projectSlug}/api/impact/vulnerability/${vulnId}/generate/`, {
@@ -195,6 +196,12 @@ export const useGenerateImpact = (projectSlug: string) => {
         throw new Error('Failed to trigger impact generation');
       }
       return response.json();
+    },
+    onSuccess: (_data, vulnId) => {
+      // Generation runs in a backend thread with no job status endpoint. Resetting the
+      // assessment query zeroes its fetch counter, which re-opens the bounded polling
+      // window in useImpactAssessment for this generation run.
+      queryClient.resetQueries({ queryKey: ['impact-assessment', projectSlug, vulnId] });
     }
   });
 };
@@ -235,6 +242,10 @@ export interface ImpactAssessmentResponse {
   is_ai_generated?: boolean;
 }
 
+const IMPACT_ASSESSMENT_POLL_MS = 5000;
+// 24 polls at 5s = a two-minute window, comfortably above a single LLM generation run.
+const IMPACT_ASSESSMENT_MAX_POLLS = 24;
+
 export const useImpactAssessment = (projectSlug: string, vulnId: number | null) => {
   return useQuery<ImpactAssessmentResponse>({
     queryKey: ['impact-assessment', projectSlug, vulnId],
@@ -249,8 +260,13 @@ export const useImpactAssessment = (projectSlug: string, vulnId: number | null) 
     },
     enabled: !!projectSlug && !!vulnId,
     refetchInterval: (query) => {
-      if (!query.state.data || query.state.data.status === false) return 5000;
-      return false;
+      // `status === false` means no assessment row exists yet. That is also the steady
+      // state for a vulnerability nobody asked to assess, so cap the polling window
+      // instead of polling forever. useGenerateImpact resets the query (and this counter)
+      // when a new generation run is started.
+      if (query.state.data?.status) return false;
+      if (query.state.dataUpdateCount >= IMPACT_ASSESSMENT_MAX_POLLS) return false;
+      return IMPACT_ASSESSMENT_POLL_MS;
     }
   });
 };
