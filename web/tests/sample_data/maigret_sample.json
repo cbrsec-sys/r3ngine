@@ -1,0 +1,23 @@
+{
+  "username": "scott",
+  "results": {
+    "ExampleSocial": {
+      "status": "CLAIMED",
+      "url_main": "https://example.com/",
+      "url_user": "https://example.com/users/scott",
+      "http_status": 200
+    },
+    "TestForum": {
+      "status": "CLAIMED",
+      "url_main": "https://test.example/",
+      "url_user": "https://test.example/u/scott",
+      "http_status": 200
+    },
+    "SampleGallery": {
+      "status": "AVAILABLE",
+      "url_main": "https://gallery.test.example/",
+      "url_user": "https://gallery.test.example/scott",
+      "http_status": 404
+    }
+  }
+}

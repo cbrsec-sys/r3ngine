@@ -202,15 +202,20 @@ class ToolExecutionTest(TransactionTestCase):
     def test_acunetix_execution(self):
         print(f"\n[DEBUG] Starting Acunetix test.")
         if self.is_real_mode:
-            # Use real credentials provided by user
+            # Real mode talks to an actual AWVS instance, so its credentials come
+            # from the environment. They were literals here until the key ended up
+            # published in the repository's history.
+            real_url = os.environ.get('TEST_ACUNETIX_URL')
+            real_key = os.environ.get('TEST_ACUNETIX_API_KEY')
+            if not (real_url and real_key):
+                self.skipTest(
+                    'TEST_REAL_MODE needs TEST_ACUNETIX_URL and TEST_ACUNETIX_API_KEY'
+                )
             AcunetixAPIKey.objects.update_or_create(
                 id=1,
-                defaults={
-                    'server_url': "https://acunetix-instance:3443",
-                    'api_key': "1986ad8c0a5b3df4d7028d5f3c06e936c09609203fb71403f82b9c499552f1186"
-                }
+                defaults={'server_url': real_url, 'api_key': real_key},
             )
-            print("[DEBUG] Updated Acunetix API Key with real credentials.")
+            print("[DEBUG] Updated Acunetix API Key from the environment.")
             # We patch time.sleep to avoid waiting too long during polling
             with patch('reNgine.tasks.acunetix.time.sleep', return_value=None):
                 res = acunetix_scan(self.task, self.domain.id, self.scan.id, self.ctx)
