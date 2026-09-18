@@ -215,6 +215,8 @@ from reNgine.temporal_activities import (
     fetch_proxies_activity,
     create_proxy_list_activity,
     cleanup_proxy_list_activity,
+    check_target_blocking_activity,
+    get_proxy_policy_activity,
 
     # Phase 1 — rengine-ng workflow tool activities
     get_discovered_services_activity,
@@ -618,6 +620,8 @@ class Command(BaseCommand):
                 fetch_proxies_activity,
                 create_proxy_list_activity,
                 cleanup_proxy_list_activity,
+                check_target_blocking_activity,
+                get_proxy_policy_activity,
 
                 # Phase 1 — rengine-ng workflow tool activities
                 get_discovered_services_activity,

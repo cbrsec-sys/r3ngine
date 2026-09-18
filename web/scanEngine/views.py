@@ -433,6 +433,9 @@ def proxy_settings(request, slug):
             'proxies': proxy.proxies if proxy else "",
             'use_proxychains': proxy.use_proxychains if proxy else False,
             'use_tor': proxy.use_tor if proxy else False,
+            'priority_proxies': (proxy.priority_proxies or "") if proxy else "",
+            'use_priority_proxies': proxy.use_priority_proxies if proxy else True,
+            'proxy_only_after_ban': proxy.proxy_only_after_ban if proxy else False,
         })
 
     context['settings_nav_active'] = 'active'

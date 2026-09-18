@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import json
 import time
 import yaml
@@ -125,7 +126,12 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	# Config
 	config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
 	severity_filter = severity or ctx.get('nuclei_severity_filter')
-	severity_suffix = f"_{severity_filter}" if severity_filter else ""
+	# severity_filter is now a comma-separated list of every severity rather than
+	# one level, so strip the separators before it becomes part of a filename.
+	severity_suffix = (
+		"_" + re.sub(r'[^A-Za-z0-9]+', '-', str(severity_filter))
+		if severity_filter else ""
+	)
 	input_path = f'{self.results_dir}/input_endpoints_vulnerability_scan{severity_suffix}.txt'
 	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 	concurrency = config.get(NUCLEI_CONCURRENCY) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
@@ -358,7 +364,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		self.scan_id, severities_str or '-', tags or '-',
 		','.join(templates) or '-', _target_count,
 	)
-	logger.warning('[NUCLEI] CMD | scan_id=%s | %s', self.scan_id, cmd)
+	logger.warning(
+		'[NUCLEI] CMD | scan_id=%s | %s', self.scan_id, redact_proxy_credentials(cmd)
+	)
 
 	results = []
 	notif = Notification.objects.first()

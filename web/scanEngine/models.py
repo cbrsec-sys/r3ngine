@@ -123,6 +123,35 @@ class Proxy(models.Model):
         default=120,
         help_text='Minutes before the verified proxy list is considered stale (default 120).',
     )
+    # Routing nuclei through a proxy pool costs a great deal of speed: the
+    # concurrency and rate caps that keep nuclei from deadlocking on flaky
+    # proxies also make a large scan take days. Most targets do not block us at
+    # all, so paying that price unconditionally is waste.
+    # Hand-entered proxies the operator vouches for — typically paid, long-lived
+    # and authenticated. Kept in their own field rather than mixed into
+    # `proxies` so that fetch_proxies_task, which rewrites the scraped pool
+    # wholesale, can never overwrite them, and so they can be tried first.
+    priority_proxies = models.TextField(
+        blank=True,
+        null=True,
+        help_text=(
+            'One proxy per line, tried before the scraped pool. Never touched '
+            'by the automatic proxy fetch and never dropped by a health check.'
+        ),
+    )
+    use_priority_proxies = models.BooleanField(
+        default=True,
+        help_text='Try the manual proxies above before the scraped pool.',
+    )
+    proxy_only_after_ban = models.BooleanField(
+        default=False,
+        help_text=(
+            'Scan directly and switch to the proxy pool only when the target is '
+            'found to be blocking us. A short probe against a sample of the '
+            "target's own endpoints decides, before the vulnerability stage "
+            'starts. Leave off to always use the proxy pool.'
+        ),
+    )
 
 
 class OpSec(models.Model):

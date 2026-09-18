@@ -73,6 +73,9 @@ export const ProxySettingsPage: React.FC = () => {
   const [customLimit, setCustomLimit] = useState<string>('2000');
   const [validateOnSave, setValidateOnSave] = useState(false);
   const [useTor, setUseTor] = useState(false);
+  const [priorityProxies, setPriorityProxies] = useState('');
+  const [usePriorityProxies, setUsePriorityProxies] = useState(true);
+  const [proxyOnlyAfterBan, setProxyOnlyAfterBan] = useState(false);
   const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
   const [isFetchingQuick, setIsFetchingQuick] = useState<string | null>(null);
 
@@ -95,6 +98,9 @@ export const ProxySettingsPage: React.FC = () => {
       setUseProxychains(settings.use_proxychains);
       setProxyList(settings.proxies);
       setUseTor(settings.use_tor ?? false);
+      setPriorityProxies(settings.priority_proxies ?? '');
+      setUsePriorityProxies(settings.use_priority_proxies ?? true);
+      setProxyOnlyAfterBan(settings.proxy_only_after_ban ?? false);
     }
   }, [settings]);
 
@@ -132,6 +138,9 @@ export const ProxySettingsPage: React.FC = () => {
       proxies,
       skip_validation: skipValidation,
       use_tor: useTor,
+      priority_proxies: priorityProxies,
+      use_priority_proxies: usePriorityProxies,
+      proxy_only_after_ban: proxyOnlyAfterBan,
     }, {
       onSuccess: () => {
         setSnackbar({ open: true, message: 'Proxy settings saved successfully.', severity: 'success' });
@@ -537,7 +546,75 @@ export const ProxySettingsPage: React.FC = () => {
               </Typography>
             </Box>
 
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2, mb: 1, fontWeight: 600 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 3, mb: 1, fontWeight: 600 }}>
+              PRIORITY PROXIES (ONE PER LINE)
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+              Your own proxies. Tried before the list below, never overwritten by the
+              automatic fetch, and never dropped when a health check fails.
+            </Typography>
+
+            <TextField
+              multiline
+              rows={5}
+              fullWidth
+              variant="outlined"
+              value={priorityProxies}
+              onChange={(e) => setPriorityProxies(e.target.value)}
+              disabled={!useProxy}
+              placeholder="socks5h://user:pass@proxy.example.com:1080"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: 'text.primary',
+                  bgcolor: 'action.hover',
+                  fontFamily: 'monospace',
+                  fontSize: '0.85rem',
+                  '& fieldset': { borderColor: 'divider' },
+                  '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                  '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+                },
+                '& .Mui-disabled': { opacity: 0.5, bgcolor: 'rgba(0,0,0,0.2)' }
+              }}
+            />
+
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
+              <Switch
+                checked={usePriorityProxies}
+                onChange={(e) => setUsePriorityProxies(e.target.checked)}
+                disabled={!useProxy}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
+                }}
+              />
+              <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                Use these first
+              </Typography>
+            </Stack>
+
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
+              <Switch
+                checked={proxyOnlyAfterBan}
+                onChange={(e) => setProxyOnlyAfterBan(e.target.checked)}
+                disabled={!useProxy}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.secondary },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.secondary }
+                }}
+              />
+              <Box>
+                <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                  Scan direct, use proxies only when blocked
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  Much faster, because proxy mode throttles the scanner hard. A short
+                  probe of the target decides — note that it shows this server's own
+                  address to the target before any proxy is used.
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 3, mb: 1, fontWeight: 600 }}>
               PROXY LIST (ONE PER LINE)
             </Typography>
 
