@@ -21,6 +21,7 @@ from reNgine.definitions import (
 )
 from reNgine.common_func import (
     get_subdomain_from_url,
+    redact_proxy_credentials,
     remove_ansi_escape_sequences,
     sanitize_url,
 )
@@ -167,7 +168,8 @@ def get_tool_color(cmd):
 def sanitize_command_for_db(cmd):
     """
     Strips 'export HTTP_PROXY=... &&' and 'proxychains4 -f ...' from command
-    to ensure the UI displays the actual tool name and clean command.
+    to ensure the UI displays the actual tool name and clean command, and masks
+    proxy passwords so credentials are never persisted or shown.
     Accepts both str and list commands.
     """
     if not cmd:
@@ -182,7 +184,7 @@ def sanitize_command_for_db(cmd):
     cmd = re.sub(r'^(?:[/\w]*/)?proxychains4\s+-f\s+\S+\s+', '', cmd)
     # Strip leading cat <file> | pipes
     cmd = re.sub(r'^cat\s+[^\s|]+\s*\|\s*', '', cmd)
-    return cmd
+    return redact_proxy_credentials(cmd)
 
 
 def _publish_to_redis_log(redis_client, soc_config, scan_id, command_id, line):
@@ -264,7 +266,7 @@ def run_command(
         tuple: Tuple with return_code, output.
     """
     color = get_tool_color(cmd)
-    logger.debug(f"{color}{cmd}{COLOR_RESET}")
+    logger.debug(f"{color}{redact_proxy_credentials(cmd)}{COLOR_RESET}")
 
     conf_path = None
     if proxy:
@@ -932,7 +934,7 @@ def stream_command(
 		str/dict: Output line.
 	"""
 	color = get_tool_color(cmd)
-	logger.debug(f"{color}{cmd}{COLOR_RESET}")
+	logger.debug(f"{color}{redact_proxy_credentials(cmd)}{COLOR_RESET}")
 
 	conf_path = None
 	if proxy:

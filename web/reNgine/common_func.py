@@ -1106,16 +1106,87 @@ def get_valid_proxy_count(proxy_obj=None):
 	return len([line for line in proxy_obj.proxies.splitlines() if line.strip()])
 
 
+# Matches the userinfo part of any URL, e.g. socks5://user:pass@host:1234.
+# Deliberately narrow: the password must not contain '@', '/' or whitespace,
+# which is exactly the shape a usable proxy URL has (specials percent-encoded).
+_URL_CREDENTIALS_RE = re.compile(
+	r'([a-zA-Z][a-zA-Z0-9+.\-]*://)([^:/@\s]+):([^@/\s]+)@'
+)
+
+
+def redact_proxy_credentials(text):
+	"""Mask the password in any credentialed URL inside `text`.
+
+	An authenticated proxy (socks5://user:pass@host:port) reaches the scan tools
+	as a plain command-line argument, so without this the password lands in the
+	Command table, the scan log shown in the UI, the Redis log stream and
+	`docker logs`. The username is kept so a run stays identifiable.
+	"""
+	if not text:
+		return text
+	if not isinstance(text, str):
+		text = str(text)
+	return _URL_CREDENTIALS_RE.sub(r'\1\2:***@', text)
+
+
+def get_priority_proxies(proxy_obj=None):
+	"""Return the operator's hand-entered proxies, in the order they were typed.
+
+	These live in their own field, which is what keeps fetch_proxies_task from
+	overwriting them and remove_proxy_from_pool from evicting them: both operate
+	on the scraped `proxies` field only.
+	"""
+	proxy_obj = proxy_obj or Proxy.objects.first()
+	if not proxy_obj or not getattr(proxy_obj, 'use_priority_proxies', True):
+		return []
+	return [
+		line.strip()
+		for line in (getattr(proxy_obj, 'priority_proxies', '') or '').splitlines()
+		if line.strip()
+	]
+
+
+def proxy_has_credentials(proxy_line):
+	"""True when a proxy line carries userinfo, e.g. socks5://user:pass@host:1234.
+
+	Credentialed entries are hand-entered paid endpoints, never scraped ones, so
+	this doubles as the test for "the operator typed this in and wants it kept".
+	"""
+	proxy_line = (proxy_line or '').strip()
+	if not proxy_line:
+		return False
+	authority = proxy_line.split('://', 1)[-1]
+	# Trim anything after the host:port part before looking for userinfo.
+	authority = authority.split('/', 1)[0]
+	return '@' in authority
+
+
 def remove_proxy_from_pool(proxy_value, proxy_obj=None):
 	"""Remove a proxy from the persisted pool safely and idempotently.
 
 	Proxies that were successfully used within the last 24 hours are protected
 	from removal even if they temporarily fail a liveness check.
+
+	Credentialed proxies are never removed at all. Both callers are automatic
+	health checks, and a single timed-out check used to delete a paid endpoint
+	from the database permanently — the check is far less reliable than the
+	proxy it judges.
 	"""
 	if is_proxy_recently_used(proxy_value):
 		logger.info(
 			'Proxy %s was recently used — skipping removal to honour 24-hour retention.',
-			proxy_value,
+			redact_proxy_credentials(proxy_value),
+		)
+		return False
+
+	proxy_obj = proxy_obj or Proxy.objects.first()
+	if not proxy_obj or not proxy_obj.proxies:
+		return False
+
+	if proxy_has_credentials(proxy_value):
+		logger.warning(
+			'Proxy %s failed its check but carries credentials — keeping it in the pool.',
+			redact_proxy_credentials(proxy_value),
 		)
 		return False
 
@@ -1160,6 +1231,14 @@ def remove_proxies_from_pool(proxy_values, proxy_obj=None):
 	targets = []
 	for pv in proxy_values:
 		if is_proxy_recently_used(pv):
+			continue
+		if proxy_has_credentials(pv):
+			# Same rule as the single-proxy path: a hand-entered paid endpoint is
+			# never dropped on the word of an automatic health check.
+			logger.warning(
+				'Proxy %s failed its check but carries credentials — keeping it in the pool.',
+				redact_proxy_credentials(pv),
+			)
 			continue
 		target = _normalize_proxy_pool_line(pv)
 		if target:
@@ -1261,17 +1340,44 @@ def get_random_proxy(http_only=False):
 	if not _proxy_obj or not _proxy_obj.use_proxy:
 		return ''
 
-	# Parse and clean the newline-separated proxy lines
+	# Hand-entered proxies come first and are tried on their own before the
+	# scraped pool is considered at all. The operator vouches for these, so a
+	# working one should always win over a free entry of unknown quality.
+	priority_raw = get_priority_proxies(_proxy_obj)
 	raw_proxies = [p.strip() for p in (_proxy_obj.proxies or '').splitlines() if p.strip()]
-	if not raw_proxies:
+	if not raw_proxies and not priority_raw:
 		return ''
 
-	# Normalise – ensure every entry has a scheme
-	proxies = []
-	for p in raw_proxies:
-		if not p.startswith('http') and not p.startswith('socks'):
-			p = f'http://{p}'
-		proxies.append(p)
+	def _normalise(lines):
+		out = []
+		for p in lines:
+			if not p.startswith('http') and not p.startswith('socks'):
+				p = f'http://{p}'
+			out.append(p)
+		return out
+
+	priority_proxies = _normalise(priority_raw)
+	proxies = _normalise(raw_proxies)
+
+	if priority_proxies:
+		server_ip_pre = ''
+		for candidate in priority_proxies:
+			if check_proxy_robust(candidate, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=server_ip_pre):
+				logger.info(
+					'Using priority proxy %s', redact_proxy_credentials(candidate)
+				)
+				return candidate
+			logger.warning(
+				'Priority proxy %s did not answer; it stays configured, trying the next.',
+				redact_proxy_credentials(candidate),
+			)
+		if not proxies:
+			logger.error('All priority proxies failed and no scraped pool is configured.')
+			return ''
+		logger.warning(
+			'All %d priority proxies failed — falling back to the scraped pool.',
+			len(priority_proxies),
+		)
 
 	if http_only:
 		proxies = [p for p in proxies if p.lower().startswith('http')]
@@ -1289,34 +1395,49 @@ def get_random_proxy(http_only=False):
 		candidates = proxies
 
 	# ------------------------------------------------------------------
-	# Freshness short-circuit
-	# If the batch verification is recent enough, trust it and return a
-	# random candidate without any individual re-validation.
+	# Freshness handling — three tiers rather than one blind window.
+	#
+	# 1. Inside PROXY_TRUST_WINDOW_SECONDS the batch verification is recent
+	#    enough to take on trust; this is the "fetch_proxies_task just
+	#    finished" case and costs nothing.
+	# 2. Past that but inside proxy_ttl_minutes, the pool is still not
+	#    re-validated wholesale, but the proxy about to be handed out is
+	#    checked. Previously an unchecked entry was returned for the entire
+	#    TTL, two hours by default, so a free proxy that died five minutes
+	#    after the batch run kept being fed into scans as if it were good.
+	# 3. Past the TTL, the existing full parallel re-validation runs.
 	# ------------------------------------------------------------------
 	ttl_minutes = getattr(_proxy_obj, 'proxy_ttl_minutes', 120) or 120
 	verified_at = getattr(_proxy_obj, 'proxies_verified_at', None)
+	within_ttl = False
+	age_minutes = 0.0
 	if verified_at is not None:
 		now_utc = _dt.datetime.now(_tz.utc)
-		age_minutes = (now_utc - verified_at).total_seconds() / 60
-		if age_minutes <= ttl_minutes:
+		age_seconds = (now_utc - verified_at).total_seconds()
+		age_minutes = age_seconds / 60
+		within_ttl = age_minutes <= ttl_minutes
+		if age_seconds <= PROXY_TRUST_WINDOW_SECONDS:
 			chosen = random.choice(candidates)
 			mark_proxy_used(chosen)
 			logger.info(
-				'Proxy list is fresh (%.1f min old, TTL %d min). '
-				'Returning %s without re-validation.',
-				age_minutes, ttl_minutes, chosen,
+				'Proxy list was verified %.0fs ago (trust window %ds). '
+				'Returning %s unchecked.',
+				age_seconds, PROXY_TRUST_WINDOW_SECONDS,
+				redact_proxy_credentials(chosen),
 			)
 			return chosen
-		logger.info(
-			'Proxy list is stale (%.1f min old, TTL %d min). '
-			'Falling back to parallel re-validation.',
-			age_minutes, ttl_minutes,
-		)
+		if not within_ttl:
+			logger.info(
+				'Proxy list is stale (%.1f min old, TTL %d min). '
+				'Falling back to parallel re-validation.',
+				age_minutes, ttl_minutes,
+			)
 	else:
 		logger.info('No proxies_verified_at timestamp found. Performing parallel re-validation.')
 
 	# ------------------------------------------------------------------
-	# Optional transparent-proxy detection (opt-in via OpSec setting)
+	# Optional transparent-proxy detection (opt-in via OpSec setting).
+	# Needed by both the sampled check below and the full re-validation.
 	# ------------------------------------------------------------------
 	server_ip = ''
 	try:
@@ -1328,6 +1449,37 @@ def get_random_proxy(http_only=False):
 				logger.info('Transparent proxy detection enabled. Server IP: %s', server_ip)
 	except Exception as _e:
 		logger.warning('Could not read OpSec settings for transparent proxy detection: %s', _e)
+
+	# ------------------------------------------------------------------
+	# Sampled verification — the cheap middle tier inside the TTL.
+	# At most PROXY_SAMPLE_ATTEMPTS checks instead of re-validating the pool.
+	# ------------------------------------------------------------------
+	if within_ttl:
+		sample = random.sample(
+			candidates, min(PROXY_SAMPLE_ATTEMPTS, len(candidates))
+		)
+		for candidate in sample:
+			if check_proxy_robust(
+				candidate, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=server_ip
+			):
+				# Same bookkeeping as the other two tiers, so a proxy verified
+				# here also earns the 24-hour removal protection.
+				mark_proxy_used(candidate)
+				logger.info(
+					'Proxy list is %.1f min old; verified %s before handing it out.',
+					age_minutes, redact_proxy_credentials(candidate),
+				)
+				return candidate
+			_failed_proxy_cache[candidate] = time.time()
+			if remove_proxy_from_pool(candidate, _proxy_obj):
+				logger.warning(
+					'Removed invalid proxy from pool: %s',
+					redact_proxy_credentials(candidate),
+				)
+		logger.warning(
+			'None of the %d sampled proxies answered; re-validating the whole pool.',
+			len(sample),
+		)
 
 	# ------------------------------------------------------------------
 	# Parallel re-validation – first live proxy wins
@@ -1343,6 +1495,7 @@ def get_random_proxy(http_only=False):
 		if check_proxy_robust(proxy_url, timeout=PROXY_VALIDATION_TIMEOUT, server_ip=server_ip):
 			return proxy_url
 		_failed_proxy_cache[proxy_url] = time.time()
+		# Pool removal is batched below via remove_proxies_from_pool().
 		return None
 
 	with ThreadPoolExecutor(max_workers=max_workers) as pool:
@@ -1368,7 +1521,10 @@ def get_random_proxy(http_only=False):
 
 	if result_holder[0]:
 		mark_proxy_used(result_holder[0])
-		logger.info('Using valid proxy (parallel validation): %s', result_holder[0])
+		logger.info(
+			'Using valid proxy (parallel validation): %s',
+			redact_proxy_credentials(result_holder[0]),
+		)
 		return result_holder[0]
 
 	logger.error('No valid proxies found after parallel re-validation!')
@@ -1387,11 +1543,20 @@ def get_proxy_list():
 	if not proxy or not proxy.use_proxy or proxy.use_tor:
 		return []
 
-	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
+	# Hand-entered proxies lead the file. Tools that read it top-down therefore
+	# reach for the vouched-for entries before anything scraped.
+	priority = get_priority_proxies(proxy)
+	proxies = priority + [
+		p.strip() for p in (proxy.proxies or '').splitlines() if p.strip()
+	]
 	cleaned_proxies = []
+	seen = set()
 	for p in proxies:
 		if not p.startswith('http') and not p.startswith('socks'):
 			p = f"http://{p}"
+		if p in seen:
+			continue
+		seen.add(p)
 		cleaned_proxies.append(p)
 
 	return cleaned_proxies
