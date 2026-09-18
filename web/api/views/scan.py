@@ -704,6 +704,267 @@ class ScanActivityRetryAPIView(APIView):
             {"status": True, "message": f"Retry started for {activity_obj.title}"}
         )
 
+#: Task names ``SingleTaskRetryWorkflow`` knows how to dispatch. Anything else
+#: makes the workflow raise a non-retryable ``ApplicationError``, so the tier
+#: retry endpoint filters those rows out and reports them instead of queueing a
+#: workflow that is guaranteed to fail. Kept in sync with the dispatch chain in
+#: ``reNgine/temporal/workflows/__init__.py`` (see test_tier_retry.py).
+RETRYABLE_TASK_NAMES = frozenset({
+    'subdomain_discovery',
+    'amass_intel_discovery',
+    'firewall_vpn_scan',
+    'dns_security',
+    'osint',
+    'spiderfoot_scan',
+    'http_crawl',
+    'port_scan',
+    'vigolium_harvest',
+    'vigolium_discovery',
+    'vigolium_scan',
+    'fetch_url',
+    'screenshot',
+    'web_api_discovery',
+    'param_discovery',
+    'dir_file_fuzz',
+    'waf_detection',
+    'secret_scanning',
+    'vigolium_analysis',
+    'vulnerability_scan',
+    'waf_bypass',
+    'post_crawl_osint',
+    'http_crawl_bridge',
+    'run_acunetix',
+})
+
+#: Highest tier the timeline uses (Tier 7 holds finalisation/post-processing).
+MAX_SCAN_TIER = 7
+
+
+def tier_retry_workflow_id(scan_id: int, tier: int, activity_id: int) -> str:
+    """Deterministic workflow id for a tier retry of a single activity row.
+
+    No timestamp: a second click while the first retry is still running hits the
+    same workflow id and Temporal rejects it with ``WorkflowAlreadyStartedError``
+    instead of launching a duplicate run of the same task.
+    """
+    return f"tier-retry-{scan_id}-t{tier}-a{activity_id}"
+
+
+class ScanTierRetryAPIView(APIView):
+    """Retry every failed activity of one tier of a scan.
+
+    ``POST /api/action/retry/tier/<scan_id>/<tier>/``
+
+    Reuses the single-task path: the same guard rails as
+    ``ScanActivityRetryAPIView`` and one ``SingleTaskRetryWorkflow`` per failed
+    row. Rows that are not FAILED are left untouched, and rows whose task name
+    the workflow cannot dispatch are skipped and reported rather than failing the
+    whole request.
+    """
+
+    permission_classes = [HasPermission]
+    permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+    def post(self, request, scan_id, tier):
+        import yaml
+        import asyncio
+        from django.db import transaction
+        from startScan.models import ScanActivity
+        from reNgine.definitions import (
+            FAILED_TASK, RUNNING_TASK, INITIATED_TASK, PAUSED_TASK,
+        )
+        from reNgine.task_plan import get_task_tier
+        from reNgine.temporal_client import TemporalClientProvider
+
+        try:
+            tier = int(tier)
+        except (TypeError, ValueError):
+            return Response(
+                {"status": False, "message": "Tier must be an integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not 0 <= tier <= MAX_SCAN_TIER:
+            return Response(
+                {"status": False, "message": f"Tier must be between 0 and {MAX_SCAN_TIER}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            scan = ScanHistory.objects.select_related('scan_type', 'domain').get(id=scan_id)
+        except ScanHistory.DoesNotExist:
+            return Response(
+                {"status": False, "message": "Scan not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Same rule as the single-task view: a live scan owns its own rows.
+        if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
+            return Response(
+                {"status": False, "message": "Cannot retry a tier while the scan is running or paused"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        original_scan_status = scan.scan_status
+
+        failed_rows = [
+            activity for activity in ScanActivity.objects.filter(
+                scan_of=scan, status=FAILED_TASK,
+            ).order_by('id')
+            if self._tier_of(activity, get_task_tier) == tier
+        ]
+
+        retryable, skipped = [], []
+        for activity in failed_rows:
+            if activity.subscan_id is not None:
+                skipped.append(self._skip(
+                    activity, 'subscan_unsupported',
+                    'Retrying subscan tasks is not yet supported',
+                ))
+            elif activity.name not in RETRYABLE_TASK_NAMES:
+                skipped.append(self._skip(
+                    activity, 'unsupported_task',
+                    f"Task '{activity.name}' cannot be retried on its own",
+                ))
+            else:
+                retryable.append(activity)
+
+        if not retryable:
+            return Response({
+                "status": True,
+                "no_op": True,
+                "scan_id": scan.id,
+                "tier": tier,
+                "queued_count": 0,
+                "skipped_count": len(skipped),
+                "queued": [],
+                "skipped": skipped,
+                "message": (
+                    f"No failed tasks in tier {tier}"
+                    if not skipped else
+                    f"No retryable failed tasks in tier {tier}; {len(skipped)} skipped"
+                ),
+            })
+
+        with transaction.atomic():
+            # Reset the failed rows so the serializer counts them as pending and
+            # _create_scan_activity can claim them normally.
+            ScanActivity.objects.filter(pk__in=[a.pk for a in retryable]).update(
+                status=INITIATED_TASK,
+                time_started=None,
+                time_ended=None,
+                error_message=None,
+                traceback=None,
+            )
+            scan.scan_status = RUNNING_TASK
+            scan.error_message = None
+            scan.stop_scan_date = None
+            scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
+
+        yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "") or {}
+
+        async def _start_all():
+            client = await TemporalClientProvider.get_client()
+            outcomes = []
+            for activity in retryable:
+                ctx = {
+                    "scan_history_id": scan.id,
+                    "engine_id": scan.scan_type.id,
+                    "domain_id": scan.domain.id,
+                    "results_dir": scan.results_dir,
+                    "yaml_configuration": yaml_config,
+                    "tasks": [activity.name],
+                    "original_scan_status": original_scan_status,
+                }
+                workflow_id = tier_retry_workflow_id(scan.id, tier, activity.id)
+                try:
+                    await client.start_workflow(
+                        "SingleTaskRetryWorkflow",
+                        args=[ctx, activity.name],
+                        id=workflow_id,
+                        task_queue="python-orchestrator-queue",
+                    )
+                    outcomes.append((activity, workflow_id, None))
+                except Exception as exc:
+                    outcomes.append((activity, workflow_id, exc))
+            return outcomes
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        outcomes = run_and_close(loop, _start_all())
+
+        queued, failed_to_start = [], []
+        for activity, workflow_id, exc in outcomes:
+            if exc is None:
+                queued.append({
+                    "activity_id": activity.id,
+                    "name": activity.name,
+                    "title": activity.title,
+                    "workflow_id": workflow_id,
+                })
+                continue
+
+            already_running = type(exc).__name__ == 'WorkflowAlreadyStartedError'
+            if already_running:
+                reason, message = 'already_running', 'A retry for this task is already running'
+            else:
+                reason, message = 'start_failed', 'Failed to start the retry workflow'
+                logger.error(
+                    "[ScanTierRetry] scan=%s tier=%s activity=%s failed to start: %s",
+                    scan.id, tier, activity.id, str(exc),
+                )
+            skipped.append(self._skip(activity, reason, message))
+            failed_to_start.append(activity)
+
+        # Put rows we could not queue back exactly where we found them, original
+        # failure reason included, so the timeline does not show a task as
+        # pending that nothing is going to run.
+        for activity in failed_to_start:
+            ScanActivity.objects.filter(pk=activity.pk).update(
+                status=FAILED_TASK,
+                time_started=activity.time_started,
+                time_ended=activity.time_ended,
+                error_message=activity.error_message,
+                traceback=activity.traceback,
+            )
+
+        if not queued:
+            scan.scan_status = original_scan_status
+            scan.save(update_fields=["scan_status"])
+
+        return Response({
+            "status": bool(queued),
+            "no_op": False,
+            "scan_id": scan.id,
+            "tier": tier,
+            "queued_count": len(queued),
+            "skipped_count": len(skipped),
+            "queued": queued,
+            "skipped": skipped,
+            "message": (
+                f"Retry started for {len(queued)} task(s) in tier {tier}"
+                if queued else
+                f"Could not start any retry in tier {tier}"
+            ),
+        })
+
+    @staticmethod
+    def _tier_of(activity, get_task_tier) -> int:
+        """Tier of a row, falling back to the plan for rows written before the
+        ``tier`` column was populated."""
+        return activity.tier if activity.tier is not None else get_task_tier(activity.name)
+
+    @staticmethod
+    def _skip(activity, reason: str, message: str) -> dict:
+        return {
+            "activity_id": activity.id,
+            "name": activity.name,
+            "title": activity.title,
+            "reason": reason,
+            "message": message,
+        }
+
+
 class DirectoryFileDispatchView(APIView):
     """Dispatch a security testing action against a specific directory file URL.
 
