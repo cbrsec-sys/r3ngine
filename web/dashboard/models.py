@@ -182,7 +182,9 @@ class AcunetixTargetSubmission(models.Model):
 	)
 
 	class Meta:
-		indexes = [models.Index(fields=['last_submitted_at'])]
+		# Named explicitly: an unnamed Index gets a hash-derived name that only
+		# makemigrations can compute, which a hand-written migration cannot match.
+		indexes = [models.Index(fields=['last_submitted_at'], name='acu_submission_sent_idx')]
 
 	def __str__(self):
 		return f"{self.host} -> {self.acunetix_target_id or 'unregistered'}"
