@@ -17,7 +17,8 @@ from startScan.models import (
     Dork, MetaFinderDocument, S3Bucket, OsintStaging
 )
 from reNgine.utilities import get_screenshot_path
-from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
+from reNgine.definitions import RUNNING_TASK, INITIATED_TASK, FAILED_TASK, ABORTED_TASK
+from reNgine.failure_reasons import classify_failure
 from reNgine.exporters.ai_bundle import AiExportOptions, FORMAT_VERSION, build_ai_export_zip
 from api.scan_task_counts import get_task_counts
 
@@ -241,6 +242,14 @@ class ScanSummaryAPIView(APIView):
             or has_role(request.user, ['sys_admin', 'penetration_tester'])
         )
         for activity in activities:
+            # Why the task failed, not just that it did. The hint is a fixed
+            # phrase per category (reNgine/failure_reasons.py) so it stays safe
+            # for the roles that never see the traceback below.
+            failure = (
+                classify_failure(activity.error_message, activity.traceback)
+                if activity.status in (FAILED_TASK, ABORTED_TASK)
+                else None
+            )
             timeline_data.append({
                 'id': activity.id,
                 'task_uid': str(activity.task_uid) if activity.task_uid else None,
@@ -253,6 +262,8 @@ class ScanSummaryAPIView(APIView):
                 'name': activity.name,
                 'target_host': activity.target_host or '',
                 'error_message': activity.error_message,
+                'failure_category': failure['category'] if failure else None,
+                'failure_hint': failure['hint'] if failure else None,
                 'traceback': (activity.traceback or '') if can_see_traceback else '',
                 'execution_id': activity.execution_id or '',
                 # Only a flag: the command rows themselves (including the unbounded
