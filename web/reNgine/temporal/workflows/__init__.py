@@ -1283,6 +1283,12 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=4),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=RetryPolicy(
+                        maximum_attempts=3,
+                        initial_interval=timedelta(minutes=2),
+                        backoff_coefficient=2.0,
+                        maximum_interval=timedelta(minutes=10),
+                    ),
                     task_queue="python-orchestrator-queue"
                 )
 
