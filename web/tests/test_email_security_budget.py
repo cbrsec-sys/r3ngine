@@ -53,10 +53,10 @@ class EmailSecurityBudgetTests(TestCase):
                 patch('reNgine.tasks.email_security.assess_spoofability', return_value=[]):
             return _run_email_security_sync(self.ctx)
 
-    @patch('reNgine.temporal.activities.EMAIL_SECURITY_BUDGET_SECONDS', 0)
+    @patch('reNgine.temporal.activities.email_security_budget_seconds', return_value=0)
     @patch('reNgine.tasks.email_security.smtp_user_enum')
     @patch('reNgine.tasks.email_security.swaks_relay_test')
-    def test_spent_budget_stops_before_probing(self, mock_relay, mock_enum) -> None:
+    def test_spent_budget_stops_before_probing(self, mock_relay, mock_enum, _budget) -> None:
         result = self._run()
 
         mock_relay.assert_not_called()
@@ -74,3 +74,35 @@ class EmailSecurityBudgetTests(TestCase):
         mock_enum.assert_called_once()
         self.assertFalse(result['partial'])
         self.assertEqual(result['smtp_hosts_checked'], 2)
+
+
+class EmailSecurityBudgetDerivationTests(TestCase):
+    """The budget must follow the attempt's real deadline, not a constant.
+
+    Temporal fixes start_to_close_timeout when the activity is scheduled, so a scan
+    started before a timeout change keeps the old, shorter deadline.
+    """
+
+    def test_budget_is_a_fraction_of_the_attempt_timeout(self) -> None:
+        from datetime import timedelta
+        from unittest.mock import MagicMock
+        from reNgine.temporal.activities import email_security_budget_seconds
+
+        info = MagicMock()
+        info.start_to_close_timeout = timedelta(minutes=30)
+        with patch('reNgine.temporal.activities.activity.info', return_value=info):
+            self.assertEqual(email_security_budget_seconds(), 1260)  # 70% of 30 min
+
+    def test_falls_back_outside_an_activity_context(self) -> None:
+        from reNgine.temporal.activities import (
+            EMAIL_SECURITY_BUDGET_SECONDS, email_security_budget_seconds,
+        )
+
+        with patch('reNgine.temporal.activities.activity.info', side_effect=RuntimeError):
+            self.assertEqual(email_security_budget_seconds(), EMAIL_SECURITY_BUDGET_SECONDS)
+
+    def test_env_override_wins(self) -> None:
+        from reNgine.temporal.activities import email_security_budget_seconds
+
+        with patch.dict('os.environ', {'EMAIL_SECURITY_BUDGET_SECONDS': '300'}):
+            self.assertEqual(email_security_budget_seconds(), 300)

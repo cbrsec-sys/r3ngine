@@ -36,10 +36,43 @@ from startScan.models import Subdomain
 
 logger = get_module_logger(__name__)
 
-# Wall-clock budget for the SMTP probing loop in the email security activity.
-# Must stay comfortably below that activity's start_to_close_timeout (2 h), or
-# Temporal discards a finished run and retries it from scratch.
-EMAIL_SECURITY_BUDGET_SECONDS: int = int(os.environ.get('EMAIL_SECURITY_BUDGET_SECONDS', 5400))
+# Fallback budget for the SMTP probing loop when the attempt's real deadline is
+# unknown (outside an activity context, e.g. in tests).
+EMAIL_SECURITY_BUDGET_SECONDS: int = 5400
+# Fraction of the attempt's own start_to_close_timeout the probing loop may use.
+# The rest is headroom for saving findings before Temporal kills the attempt.
+_EMAIL_SECURITY_BUDGET_RATIO: float = 0.7
+
+
+def email_security_budget_seconds() -> int:
+    """Wall-clock budget for SMTP probing, derived from the attempt's own deadline.
+
+    Deriving it rather than hardcoding matters for workflows scheduled before a
+    timeout change: Temporal fixes an activity's start_to_close_timeout when it is
+    scheduled, so a running scan keeps the old, shorter deadline no matter what the
+    workflow file now says. A fixed budget larger than that deadline would let the
+    activity be killed and retried forever.
+
+    Returns:
+        int: Seconds of probing allowed before the loop returns partial results.
+    """
+    override = os.environ.get('EMAIL_SECURITY_BUDGET_SECONDS')
+    if override:
+        try:
+            return max(60, int(override))
+        except ValueError:
+            logger.warning(
+                'Ignoring non-numeric EMAIL_SECURITY_BUDGET_SECONDS=%s', override
+            )
+
+    try:
+        timeout = activity.info().start_to_close_timeout
+    except Exception:
+        timeout = None
+
+    if timeout:
+        return max(60, int(timeout.total_seconds() * _EMAIL_SECURITY_BUDGET_RATIO))
+    return EMAIL_SECURITY_BUDGET_SECONDS
 
 
 def resolve_target_host(ctx: dict, subdomain=None, domain=None) -> str:
@@ -4320,8 +4353,8 @@ def run_email_security_activity(ctx: dict) -> dict:
 def _run_email_security_sync(ctx: dict) -> dict:
     """Synchronous implementation of email security checks.
 
-    Probing is bounded by EMAIL_SECURITY_BUDGET_SECONDS (default 90 min). Without
-    it a target with many mail hosts outlives the activity's start_to_close_timeout
+    Probing is bounded by `email_security_budget_seconds()`. Without it a target
+    with many mail hosts outlives the activity's start_to_close_timeout
     — Temporal then discards the result and retries from scratch, while the killed
     attempt's thread keeps holding one of the worker's activity slots.
     """
@@ -4340,7 +4373,7 @@ def _run_email_security_sync(ctx: dict) -> dict:
     domain_name: str = ctx.get('domain_name') or ctx.get('domain', '')
     logger.info('[EMAIL_SECURITY] START scan_id=%s domain=%s', scan_id, domain_name)
 
-    budget_seconds = EMAIL_SECURITY_BUDGET_SECONDS
+    budget_seconds = email_security_budget_seconds()
     deadline = _time.monotonic() + budget_seconds
 
     scan = ScanHistory.objects.select_related('domain').get(pk=scan_id)
