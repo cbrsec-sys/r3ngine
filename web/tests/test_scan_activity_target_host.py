@@ -368,6 +368,7 @@ class ScanSummaryTimelineFieldsTests(TestCase):
         self.assertEqual(entry['target_host'], 'blog.th.test.example')
         self.assertEqual(entry['traceback'], trace)
         self.assertEqual(entry['error_message'], 'Task wpscan_scan failed: boom')
+        self.assertEqual(entry['execution_id'], 'scan-42-wpscan-1')
 
     def test_auditor_does_not_receive_the_traceback(self) -> None:
         """Security rule 8.1 — raw exception text stays with operator roles."""
@@ -396,7 +397,6 @@ class ScanSummaryTimelineFieldsTests(TestCase):
         # The short, sanitised message stays visible to every role.
         self.assertEqual(entry['error_message'], 'Task wpscan_scan failed: boom')
         self.assertEqual(entry['target_host'], 'blog.th.test.example')
-        self.assertEqual(entry['execution_id'], 'scan-42-wpscan-1')
 
     def test_whole_scan_activity_reports_empty_strings_not_null(self) -> None:
         from reNgine.definitions import SUCCESS_TASK
