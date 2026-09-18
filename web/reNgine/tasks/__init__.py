@@ -300,7 +300,10 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 			"[TIER7][IMPACT] LLM disabled (LLM_ENABLED unset) — skipping | scan_id=%s",
 			scan_history_id,
 		)
-		return False
+		# Return None, not False: a disabled feature is a skip, not a failure.
+		# _run_task raises on False, which would fail the activity, exhaust its
+		# retries and mark the whole scan FAILED. run_apme skips the same way.
+		return
 
 	# Cap the per-run vuln limit so the activity stays well inside start_to_close_timeout.
 	# Single-vuln calls from the dashboard UI bypass this via vulnerability_id.
@@ -329,6 +332,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		)
 	else:
 		logger.error("[TIER7][IMPACT] Neither scan_history_id nor vulnerability_id provided — aborting.")
+		self.error = "Neither scan_history_id nor vulnerability_id was provided."
 		return False
 
 	# Check if there are other scanning tasks still running
