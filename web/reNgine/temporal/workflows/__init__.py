@@ -476,7 +476,11 @@ class MasterScanWorkflow:
                 await workflow.execute_activity(
                     "RunEmailSecurityActivity",
                     ctx,
-                    start_to_close_timeout=timedelta(minutes=30),
+                    # Probes every SMTP host found by the port scan: relay, STARTTLS,
+                    # certificate and VRFY enumeration, each with its own timeout. On a
+                    # target with many mail hosts 30 minutes was not enough, and the
+                    # activity was killed and restarted forever.
+                    start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=10),
                     retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue",

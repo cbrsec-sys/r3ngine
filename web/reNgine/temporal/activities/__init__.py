@@ -36,6 +36,11 @@ from startScan.models import Subdomain
 
 logger = get_module_logger(__name__)
 
+# Wall-clock budget for the SMTP probing loop in the email security activity.
+# Must stay comfortably below that activity's start_to_close_timeout (2 h), or
+# Temporal discards a finished run and retries it from scratch.
+EMAIL_SECURITY_BUDGET_SECONDS: int = int(os.environ.get('EMAIL_SECURITY_BUDGET_SECONDS', 5400))
+
 
 def resolve_target_host(ctx: dict, subdomain=None, domain=None) -> str:
     """Resolve the host a task runs against, for display on its timeline entry.
@@ -4313,7 +4318,15 @@ def run_email_security_activity(ctx: dict) -> dict:
 
 
 def _run_email_security_sync(ctx: dict) -> dict:
-    """Synchronous implementation of email security checks."""
+    """Synchronous implementation of email security checks.
+
+    Probing is bounded by EMAIL_SECURITY_BUDGET_SECONDS (default 90 min). Without
+    it a target with many mail hosts outlives the activity's start_to_close_timeout
+    — Temporal then discards the result and retries from scratch, while the killed
+    attempt's thread keeps holding one of the worker's activity slots.
+    """
+    import time as _time
+
     from reNgine.common_func import save_vulnerability
     from startScan.models import ScanHistory, Subdomain
     from reNgine.tasks.email_security import (
@@ -4326,6 +4339,9 @@ def _run_email_security_sync(ctx: dict) -> dict:
     scan_id: int = ctx.get('scan_history_id')
     domain_name: str = ctx.get('domain_name') or ctx.get('domain', '')
     logger.info('[EMAIL_SECURITY] START scan_id=%s domain=%s', scan_id, domain_name)
+
+    budget_seconds = EMAIL_SECURITY_BUDGET_SECONDS
+    deadline = _time.monotonic() + budget_seconds
 
     scan = ScanHistory.objects.select_related('domain').get(pk=scan_id)
     if not domain_name:
@@ -4391,7 +4407,16 @@ def _run_email_security_sync(ctx: dict) -> dict:
         raise
 
     checked_pairs: set = set()
+    budget_exhausted = False
     for (subdomain_name, ip_address, port) in smtp_hosts:
+        if _time.monotonic() >= deadline:
+            budget_exhausted = True
+            logger.warning(
+                '[EMAIL_SECURITY] Time budget of %ss spent after %d of %d SMTP hosts '
+                '— returning partial results | scan_id=%s',
+                budget_seconds, len(checked_pairs), len(smtp_hosts), scan_id,
+            )
+            break
         host = subdomain_name or ip_address
         if not host:
             continue
@@ -4456,7 +4481,9 @@ def _run_email_security_sync(ctx: dict) -> dict:
                         host_url,
                     )
 
-    enum_targets = list(checked_pairs)
+    # VRFY enumeration costs up to ~2 minutes per target, so it only runs with
+    # budget left — the relay/TLS findings above are worth keeping either way.
+    enum_targets = list(checked_pairs) if not budget_exhausted and _time.monotonic() < deadline else []
     if enum_targets:
         enum = smtp_user_enum(enum_targets, domain=domain_name)
         for host_port_key, users in enum['users_found'].items():
@@ -4466,5 +4493,12 @@ def _run_email_security_sync(ctx: dict) -> dict:
                           len(users), host_port_key, ', '.join(users[:20])),
                       'smtp://%s' % host_port_key)
 
-    logger.info('[EMAIL_SECURITY] COMPLETE scan_id=%s findings=%d', scan_id, findings_count)
-    return {'findings_count': findings_count, 'smtp_hosts_checked': len(checked_pairs)}
+    logger.info(
+        '[EMAIL_SECURITY] COMPLETE scan_id=%s findings=%d hosts=%d partial=%s',
+        scan_id, findings_count, len(checked_pairs), budget_exhausted,
+    )
+    return {
+        'findings_count': findings_count,
+        'smtp_hosts_checked': len(checked_pairs),
+        'partial': budget_exhausted,
+    }
