@@ -1,4 +1,4 @@
-from django.db.models import Count, Q, F
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q, F
 from django.http import FileResponse
 from django.utils import timezone
 from datetime import timedelta
@@ -13,10 +13,9 @@ from startScan.models import (
     Subdomain, EndPoint, Vulnerability, 
     VulnerabilityTags, IpAddress, Port, Technology, 
     MonitoringDiscovery, CountryISO, CveId, CweId,
-    Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak, Command,
+    Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak,
     Dork, MetaFinderDocument, S3Bucket, OsintStaging
 )
-from recon_note.models import TodoNote
 from reNgine.utilities import get_screenshot_path
 from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
 from reNgine.exporters.ai_bundle import AiExportOptions, FORMAT_VERSION, build_ai_export_zip
@@ -45,10 +44,25 @@ class ScanSummaryAPIView(APIView):
         """
         try:
             project = Project.objects.get(slug=slug)
-            scan = ScanHistory.objects.get(id=id, domain__project=project)
+            # Three consumers below need the activity list — the timeline, the task
+            # counts (also reached through scan.get_progress()) and the spiderfoot
+            # check. Prefetch it once, already annotated and ordered, so they all read
+            # the same cached rows instead of issuing a query each. `command_count`
+            # replaces a per-activity Command query: the timeline only needs to know
+            # whether commands exist, and Command.output is unbounded tool stdout.
+            activity_qs = (
+                ScanActivity.objects
+                .annotate(command_count=Count('command'))
+                .order_by('tier', 'time_started', 'time')
+            )
+            scan = ScanHistory.objects.prefetch_related(
+                Prefetch('scanactivity_set', queryset=activity_qs)
+            ).get(id=id, domain__project=project)
             target = scan.domain
         except (Project.DoesNotExist, ScanHistory.DoesNotExist):
             return Response({'error': 'Scan not found'}, status=404)
+
+        scan_activities = list(scan.scanactivity_set.all())
 
         # Scans related to this target (for timeline/recent scans)
         all_scans = ScanHistory.objects.filter(domain=target).order_by('-start_scan_date')
@@ -70,27 +84,56 @@ class ScanSummaryAPIView(APIView):
         vulnerabilities = Vulnerability.objects.filter(target_domain=target)
         # Auto-mark RESOLVED vulnerabilities if this scan included vuln scan and is finished
         if scan.scan_status == 2 and scan.tasks and 'vulnerability_scan' in scan.tasks:
-            current_vulns = vulnerabilities.filter(scan_history=scan)
-            current_vuln_keys = set((v.name, v.http_url) for v in current_vulns)
-            
-            # Find open vulns from previous scans that were NOT found in this scan
-            previous_open_vulns = vulnerabilities.filter(
+            # An open vulnerability from an earlier scan is resolved when this scan
+            # found nothing carrying the same (name, http_url) pair. The membership
+            # test is split in two because SQL and Python disagree on NULL: the Python
+            # tuple key treated two missing URLs as equal, while `http_url = NULL` is
+            # never true, so rows without a URL get their own comparison and keep the
+            # exact behaviour of the loop this replaces.
+            current_same_url = Vulnerability.objects.filter(
+                target_domain=target,
+                scan_history=scan,
+                name=OuterRef('name'),
+                http_url=OuterRef('http_url'),
+            )
+            current_without_url = Vulnerability.objects.filter(
+                target_domain=target,
+                scan_history=scan,
+                name=OuterRef('name'),
+                http_url__isnull=True,
+            )
+            # One UPDATE rather than a save() per row. This is a read endpoint the
+            # frontend polls every 5 seconds for the whole duration of a scan, and a
+            # finished-but-still-running scan re-entered this branch on every poll:
+            # per-row writes turned a GET into a write storm against the same table
+            # the scan is inserting into, for a result that is idempotent anyway.
+            vulnerabilities.filter(
                 open_status=True,
-                is_suppressed=False
-            ).exclude(scan_history=scan)
-            
-            for v in previous_open_vulns:
-                if (v.name, v.http_url) not in current_vuln_keys:
-                    v.open_status = False
-                    v.save()
+                is_suppressed=False,
+            ).exclude(scan_history=scan).filter(
+                (Q(http_url__isnull=False) & ~Exists(current_same_url))
+                | (Q(http_url__isnull=True) & ~Exists(current_without_url))
+            ).update(open_status=False)
 
-        critical_count = vulnerabilities.filter(severity=4).count()
-        high_count = vulnerabilities.filter(severity=3).count()
-        medium_count = vulnerabilities.filter(severity=2).count()
-        low_count = vulnerabilities.filter(severity=1).count()
-        info_count = vulnerabilities.filter(severity=0).count()
-        unknown_count = vulnerabilities.filter(severity=-1).count()
-        
+        # One pass over the table for every severity bucket plus the total, instead of
+        # seven separate COUNT queries over the same rows.
+        severity_counts = vulnerabilities.aggregate(
+            critical=Count('id', filter=Q(severity=4)),
+            high=Count('id', filter=Q(severity=3)),
+            medium=Count('id', filter=Q(severity=2)),
+            low=Count('id', filter=Q(severity=1)),
+            info=Count('id', filter=Q(severity=0)),
+            unknown=Count('id', filter=Q(severity=-1)),
+            total=Count('id'),
+        )
+        critical_count = severity_counts['critical']
+        high_count = severity_counts['high']
+        medium_count = severity_counts['medium']
+        low_count = severity_counts['low']
+        info_count = severity_counts['info']
+        unknown_count = severity_counts['unknown']
+        vulnerability_count = severity_counts['total']
+
         # Aggregations
         most_common_vulnerability = vulnerabilities.exclude(severity=0).values("name", "severity").annotate(count=Count('name')).order_by("-count")[:10]
         most_common_tags = VulnerabilityTags.objects.filter(vuln_tags__in=vulnerabilities).annotate(nused=Count('vuln_tags')).order_by('-nused').values('name', 'nused')[:7]
@@ -179,9 +222,10 @@ class ScanSummaryAPIView(APIView):
         # Timeline/Activities — ordered by tier then time_started, PENDING rows last within tier.
         # Exclude ghost INITIATED rows (time_started=None) left over from a previous failed
         # workflow run that were never claimed; a successful re-run creates fresh records.
-        activities = ScanActivity.objects.filter(scan_of=scan).exclude(
-            status=INITIATED_TASK, time_started__isnull=True
-        ).order_by('tier', 'time_started', 'time')
+        activities = [
+            activity for activity in scan_activities
+            if not (activity.status == INITIATED_TASK and activity.time_started is None)
+        ]
         timeline_data = []
         _STATUS_MAP = {
             2: 'SUCCESS',
@@ -211,7 +255,10 @@ class ScanSummaryAPIView(APIView):
                 'error_message': activity.error_message,
                 'traceback': (activity.traceback or '') if can_see_traceback else '',
                 'execution_id': activity.execution_id or '',
-                'commands': list(Command.objects.filter(activity=activity).values('command', 'output', 'return_code'))
+                # Only a flag: the command rows themselves (including the unbounded
+                # `output` TextField) are fetched on demand by /api/listActivityLogs/
+                # when the operator opens a task, not shipped on every 5s poll.
+                'has_commands': bool(activity.command_count),
             })
 
         # OSINT - Cumulative for target
@@ -229,7 +276,17 @@ class ScanSummaryAPIView(APIView):
                     'count': endpoint_qs.filter(matched_gf_patterns__icontains=gf).count()
                 })
 
+        # Reads the prefetched activities — no query. scan.get_progress() below goes
+        # through the same helper on the same instance, so it costs nothing either.
         _tc = get_task_counts(scan)
+        is_spiderfoot_running = any(
+            activity.status == RUNNING_TASK
+            and (
+                activity.name == 'spiderfoot_scan'
+                or 'spiderfoot' in (activity.title or '').lower()
+            )
+            for activity in scan_activities
+        )
         data = {
             'subdomain_count': subdomain_count,
             'alive_count': alive_count,
@@ -242,7 +299,7 @@ class ScanSummaryAPIView(APIView):
             'info_count': info_count,
             'unknown_count': unknown_count,
             'total_vul_ignore_info_count': sum([low_count, medium_count, high_count, critical_count]),
-            'vulnerability_count': vulnerabilities.count(),
+            'vulnerability_count': vulnerability_count,
             'most_common_vulnerability': list(most_common_vulnerability),
             'most_common_tags': list(most_common_tags),
             'most_common_cve': list(most_common_cve),
@@ -253,7 +310,6 @@ class ScanSummaryAPIView(APIView):
             'secret_leaks_count': secret_leaks_count,
             'exploitable_count': exploitable_count,
             'matched_gf_count': matched_gf_count,
-            'buckets_count': S3Bucket.objects.filter(buckets__domain=target).distinct().count(),
             'email_count': emails.count(),
             'employees_count': Employee.objects.filter(employees__domain=target).distinct().count(),
             'emails': EmailSerializer(emails, many=True).data,
@@ -261,7 +317,6 @@ class ScanSummaryAPIView(APIView):
             'dorks': DorkSerializer(Dork.objects.filter(dorks__domain=target).distinct(), many=True).data,
             'documents': MetafinderDocumentSerializer(MetaFinderDocument.objects.filter(target_domain=target), many=True).data,
             'buckets': S3BucketSerializer(S3Bucket.objects.filter(buckets__domain=target).distinct(), many=True).data,
-            'todo_notes': list(TodoNote.objects.filter(scan_history=scan).values('id', 'title', 'description', 'is_done', 'is_important')),
             'monitoring_discoveries_list': MonitoringDiscoverySerializer(monitoring_discoveries, many=True).data,
             'subscans': SubScanSerializer(subscans, many=True).data,
             'recent_scans': recent_scans_data,
@@ -324,10 +379,7 @@ class ScanSummaryAPIView(APIView):
                 'cfg_excluded_paths': scan.cfg_excluded_paths or [],
                 'tasks': scan.tasks or [],
                 'used_gf_patterns': scan.used_gf_patterns.split(',') if scan.used_gf_patterns else [],
-                'is_spiderfoot_running': scan.scanactivity_set.filter(
-                    Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
-                    status=RUNNING_TASK
-                ).exists(),
+                'is_spiderfoot_running': is_spiderfoot_running,
                 'successful_task_count': _tc[0],
                 'failed_task_count': _tc[1],
                 'total_task_count': _tc[2],
