@@ -212,7 +212,7 @@ class ToolExecutionTest(TransactionTestCase):
             )
             print("[DEBUG] Updated Acunetix API Key with real credentials.")
             # We patch time.sleep to avoid waiting too long during polling
-            with patch('reNgine.tasks.time.sleep', return_value=None):
+            with patch('reNgine.tasks.acunetix.time.sleep', return_value=None):
                 res = acunetix_scan(self.task, self.domain.id, self.scan.id, self.ctx)
                 print(f"[DEBUG] Real Acunetix scan result: {res}")
         else:
@@ -223,8 +223,8 @@ class ToolExecutionTest(TransactionTestCase):
             )
             
             # Patch direct AWVS REST requests in reNgine.tasks
-            with patch('reNgine.tasks.requests.get') as mock_requests_get, \
-                 patch('reNgine.tasks.requests.post') as mock_requests_post:
+            with patch('reNgine.tasks.acunetix.requests.get') as mock_requests_get, \
+                 patch('reNgine.tasks.acunetix.requests.post') as mock_requests_post:
 
                 # Mock target discovery, profile discovery, scan status, scan details, vulnerabilities
                 mock_targets_resp = MagicMock()
@@ -312,8 +312,8 @@ class ToolExecutionTest(TransactionTestCase):
             http_url="https://test.defijn.io"
         )
 
-        with patch('reNgine.tasks.requests.get') as mock_requests_get, \
-             patch('reNgine.tasks.requests.post') as mock_requests_post:
+        with patch('reNgine.tasks.acunetix.requests.get') as mock_requests_get, \
+             patch('reNgine.tasks.acunetix.requests.post') as mock_requests_post:
             mock_targets_resp = MagicMock()
             mock_targets_resp.status_code = 200
             mock_targets_resp.json.return_value = {'targets': []}
@@ -379,8 +379,8 @@ class ToolExecutionTest(TransactionTestCase):
             http_url="https://enjoy-gaming.live"
         )
 
-        with patch('reNgine.tasks.requests.get') as mock_requests_get, \
-             patch('reNgine.tasks.requests.post') as mock_requests_post:
+        with patch('reNgine.tasks.acunetix.requests.get') as mock_requests_get, \
+             patch('reNgine.tasks.acunetix.requests.post') as mock_requests_post:
             mock_targets_resp = MagicMock()
             mock_targets_resp.status_code = 200
             mock_targets_resp.json.return_value = {'targets': []}
