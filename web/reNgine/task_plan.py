@@ -88,6 +88,14 @@ _TASK_TIER = {
     'react2shell_scan':      6,
     'waf_bypass':            6,
 
+    # Runtime-only tasks: never part of the planned list, but their activity rows
+    # need a tier so they are not all filed under Tier 7 in the timeline.
+    'search_vulns_scan':     2,
+    'smugglex_scan':         6,
+    'second_order_scan':     6,
+    'nuclei_dast_scan':      6,
+    'semgrep_scan':          6,
+    'wptaint_scan':          6,
 }
 
 _TIER7_TASKS = [
@@ -112,11 +120,16 @@ _TIER1_TO_5 = [
 ]
 
 
+def get_task_tier(name: str) -> int:
+    """Return the timeline tier a task belongs to (7 for unplanned/post-processing)."""
+    return _TASK_TIER.get(name, 7)
+
+
 def _entry(name: str) -> dict:
     return {
         'name': name,
         'title': _TASK_TITLES.get(name, name.replace('_', ' ').title()),
-        'tier': _TASK_TIER.get(name, 7),
+        'tier': get_task_tier(name),
         'status': INITIATED_TASK,
     }
 

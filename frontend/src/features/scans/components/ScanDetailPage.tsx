@@ -488,26 +488,179 @@ const getToolColor = (binary: string, tokens: any, isLight?: boolean) => {
   return tokens.accent.secondary;
 };
 
+const TIER_LABELS: Record<number, string> = {
+  0: 'Initialization',
+  1: 'Discovery',
+  2: 'Enumeration',
+  3: 'URL & Screenshots',
+  4: 'Fuzzing',
+  5: 'Analysis',
+  6: 'Security Assessment',
+  7: 'Post-Processing',
+};
+
+type ActivityStatusConfig = { color: string, label: string };
+
+const getActivityStatusConfig = (
+  status: ScanActivity['status'],
+  tokens: ReturnType<typeof useThemeTokens>['tokens'],
+  fallbackColor: string
+): ActivityStatusConfig => {
+  const statusConfig: Record<string, ActivityStatusConfig> = {
+    'SUCCESS': { color: tokens.accent.success, label: 'Completed' },
+    'RUNNING': { color: tokens.accent.primary, label: 'In Progress' },
+    'FAILED': { color: tokens.accent.error, label: 'Failed' },
+    'ABORTED': { color: tokens.accent.error, label: 'Aborted' },
+    'PENDING': { color: tokens.accent.warning, label: 'Pending' }
+  };
+  return statusConfig[status] || { color: fallbackColor, label: status };
+};
+
+const getActivityDurationSeconds = (activity: Pick<ScanActivity, 'time_started' | 'time_ended'>): number | null => {
+  if (!activity.time_started || !activity.time_ended) return null;
+  return Math.round((new Date(activity.time_ended).getTime() - new Date(activity.time_started).getTime()) / 1000);
+};
+
+const ActivityDetailField: React.FC<{ label: string; value: React.ReactNode; monospace?: boolean }> = ({ label, value, monospace }) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography sx={{ fontSize: '0.55rem', color: 'text.disabled', fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase' }}>
+      {label}
+    </Typography>
+    <Typography
+      component="div"
+      sx={{
+        fontSize: '0.7rem',
+        color: 'text.primary',
+        fontWeight: 600,
+        fontFamily: monospace ? 'monospace' : undefined,
+        wordBreak: 'break-all'
+      }}
+    >
+      {value}
+    </Typography>
+  </Box>
+);
+
+const ActivityDetailsPanel: React.FC<{ activity: ScanActivity }> = ({ activity }) => {
+  const { tokens, isLight, theme } = useThemeTokens();
+  const [showTraceback, setShowTraceback] = useState(false);
+  const config = getActivityStatusConfig(activity.status, tokens, theme.palette.text.primary);
+  const durationSeconds = getActivityDurationSeconds(activity);
+  const traceback = activity.traceback || '';
+  const isFailed = activity.status === 'FAILED' || activity.status === 'ABORTED';
+
+  return (
+    <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: { xs: 1.5, sm: 3 } }}>
+        <Box sx={{
+          alignSelf: 'center',
+          px: 1,
+          py: 0.2,
+          borderRadius: 1,
+          bgcolor: `${config.color}20`,
+          border: `1px solid ${config.color}40`,
+          color: config.color,
+          fontSize: '0.65rem',
+          fontWeight: 800,
+          whiteSpace: 'nowrap'
+        }}>
+          {config.label}
+        </Box>
+        {activity.target_host && (
+          <ActivityDetailField label="Target host" value={activity.target_host} monospace />
+        )}
+        {activity.tier !== null && activity.tier !== undefined && (
+          <ActivityDetailField label="Tier" value={`${activity.tier} — ${TIER_LABELS[activity.tier] ?? 'Unknown'}`} />
+        )}
+        <ActivityDetailField label="Started" value={activity.time_started ? new Date(activity.time_started).toLocaleString() : 'N/A'} />
+        <ActivityDetailField label="Ended" value={activity.time_ended ? new Date(activity.time_ended).toLocaleString() : 'N/A'} />
+        {durationSeconds !== null && (
+          <ActivityDetailField label="Duration" value={`${durationSeconds}s`} />
+        )}
+        {activity.execution_id && (
+          <ActivityDetailField label="Execution ID" value={activity.execution_id} monospace />
+        )}
+      </Box>
+
+      {isFailed && activity.error_message && (
+        <Typography sx={{
+          mt: 1.5,
+          p: 1,
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          color: tokens.accent.error,
+          bgcolor: `${tokens.accent.error}15`,
+          border: `1px solid ${tokens.accent.error}33`,
+          borderRadius: 0.5,
+          wordBreak: 'break-word'
+        }}>
+          ERROR: {activity.error_message}
+        </Typography>
+      )}
+
+      {traceback && (
+        <Box sx={{ mt: 1.5 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button
+              size="small"
+              startIcon={showTraceback ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              onClick={() => setShowTraceback((v) => !v)}
+              sx={{ color: 'text.secondary', fontSize: '0.6rem', border: 1, borderColor: 'divider', '&:hover': { color: 'text.primary', border: `1px solid ${tokens.accent.primary}` } }}
+            >
+              {showTraceback ? 'Hide traceback' : 'Show traceback'}
+            </Button>
+            <Button
+              size="small"
+              startIcon={<Copy size={12} />}
+              onClick={() => navigator.clipboard.writeText(traceback)}
+              sx={{ color: 'text.secondary', fontSize: '0.6rem', border: 1, borderColor: 'divider', '&:hover': { color: 'text.primary', border: `1px solid ${tokens.accent.primary}` } }}
+            >
+              Copy traceback
+            </Button>
+          </Stack>
+          {showTraceback && (
+            <Box sx={{
+              mt: 1,
+              p: 1.5,
+              maxHeight: '30vh',
+              overflow: 'auto',
+              bgcolor: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.5)',
+              border: 1, borderColor: 'divider',
+              borderLeft: `3px solid ${tokens.accent.error}`,
+              borderRadius: 1,
+              fontFamily: 'monospace',
+              fontSize: '0.7rem',
+              color: 'text.primary',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all'
+            }}>
+              {traceback}
+            </Box>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 const TaskOverlay: React.FC<{
   open: boolean;
   onClose: () => void;
   activityId: number | null;
   scanId?: number | null;
   activityTitle: string;
-}> = ({ open, onClose, activityId, scanId, activityTitle }) => {
+  activity: ScanActivity | null;
+}> = ({ open, onClose, activityId, scanId, activityTitle, activity }) => {
   const { tokens, isLight, theme } = useThemeTokens();
   const { data: logs, isLoading } = useScanLogs(activityId, scanId ?? null);
 
-  const [selectedLog, setSelectedLog] = useState<Command | null>(null);
-
-  // Set first log as selected when logs load
-  React.useEffect(() => {
-    if (logs && logs.length > 0) {
-      if (!selectedLog || !logs.find((l: Command) => l.id === selectedLog.id)) {
-        setSelectedLog(logs[0]);
-      }
-    }
-  }, [logs]);
+  const [selectedLogId, setSelectedLogId] = useState<Command['id'] | null>(null);
+  const hasCommands = !!logs && logs.length > 0;
+  // Derived rather than synced via an effect: a selection that no longer exists
+  // (or belongs to a previously opened task) falls back to the first command.
+  const selectedLog: Command | null = hasCommands
+    ? (logs.find((l: Command) => l.id === selectedLogId) ?? logs[0])
+    : null;
 
   return (
     <Dialog
@@ -541,15 +694,26 @@ const TaskOverlay: React.FC<{
           <X size={20} />
         </IconButton>
       </DialogTitle>
-      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-        <Grid container sx={{ height: '60vh' }}>
+      <DialogContent sx={{ p: 0, overflow: 'auto' }}>
+        {activity && <ActivityDetailsPanel activity={activity} />}
+        <Grid container sx={{ height: { xs: 'auto', md: '60vh' } }}>
           {/* Command List */}
-          <Grid size={{ xs: 4 }} sx={{ borderRight: 1, borderColor: 'divider', height: '100%', overflowY: 'auto' }}>
+          <Grid
+            size={{ xs: 12, md: 4 }}
+            sx={{
+              borderRight: { xs: 0, md: 1 },
+              borderBottom: { xs: 1, md: 0 },
+              borderColor: 'divider',
+              height: { xs: 'auto', md: '100%' },
+              maxHeight: { xs: '30vh', md: 'none' },
+              overflowY: 'auto'
+            }}
+          >
             {isLoading ? (
               <Box sx={{ p: 4, textAlign: 'center' }}>
                 <CircularProgress size={24} sx={{ color: tokens.accent.primary }} />
               </Box>
-            ) : logs && logs.length > 0 ? (
+            ) : hasCommands ? (
               <List sx={{ p: 0 }}>
                 {logs.map((log: Command) => {
                   const cmdStr = log.command || '';
@@ -562,7 +726,7 @@ const TaskOverlay: React.FC<{
                     <ListItem
                       key={log.id}
                       component="div"
-                      onClick={() => setSelectedLog(log)}
+                      onClick={() => setSelectedLogId(log.id)}
                       sx={{
                         cursor: 'pointer',
                         borderBottom: 1,
@@ -624,14 +788,25 @@ const TaskOverlay: React.FC<{
               </List>
             ) : (
               <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography sx={{ color: 'text.disabled', fontSize: '0.8rem' }}>
-                  No commands found.
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.8rem', fontWeight: 600 }}>
+                  This task records no shell commands (it runs via an HTTP API).
+                </Typography>
+                <Typography sx={{ color: 'text.disabled', fontSize: '0.7rem', mt: 1 }}>
+                  Use the status, error message and traceback above to diagnose it.
                 </Typography>
               </Box>
             )}
           </Grid>
           {/* Command Output */}
-          <Grid size={{ xs: 8 }} sx={{ height: '100%', overflowY: 'auto', bgcolor: isLight ? 'rgba(0,0,0,0.01)' : 'background.default' }}>
+          <Grid
+            size={{ xs: 12, md: 8 }}
+            sx={{
+              height: { xs: 'auto', md: '100%' },
+              minHeight: { xs: '30vh', md: 0 },
+              overflowY: 'auto',
+              bgcolor: isLight ? 'rgba(0,0,0,0.01)' : 'background.default'
+            }}
+          >
             {selectedLog ? (
               <Box sx={{ p: 2 }}>
                 {/* Clean Command Box Header */}
@@ -730,9 +905,11 @@ const TaskOverlay: React.FC<{
                 </Box>
               </Box>
             ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.3 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.3, p: 2, textAlign: 'center' }}>
                 <Terminal size={48} />
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>Select a command to view output</Typography>
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>
+                  {!isLoading && !hasCommands ? 'No command output to display' : 'Select a command to view output'}
+                </Typography>
               </Box>
             )}
           </Grid>
@@ -742,27 +919,10 @@ const TaskOverlay: React.FC<{
   );
 };
 
-const TIER_LABELS: Record<number, string> = {
-  0: 'Initialization',
-  1: 'Discovery',
-  2: 'Enumeration',
-  3: 'URL & Screenshots',
-  4: 'Fuzzing',
-  5: 'Analysis',
-  6: 'Security Assessment',
-  7: 'Post-Processing',
-};
-
 const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onRetry?: (activity: ScanActivity) => void, isTerminal?: boolean, allowRetryAny?: boolean }> = ({ activity, onClick, onRetry, isTerminal, allowRetryAny }) => {
   const { theme, isLight, tokens } = useThemeTokens();
-  const statusConfig: Record<string, { color: string, label: string }> = {
-    'SUCCESS': { color: tokens.accent.success, label: 'Completed' },
-    'RUNNING': { color: tokens.accent.primary, label: 'In Progress' },
-    'FAILED': { color: tokens.accent.error, label: 'Failed' },
-    'ABORTED': { color: tokens.accent.error, label: 'Aborted' },
-    'PENDING': { color: tokens.accent.warning, label: 'Pending' }
-  };
-  const config = statusConfig[activity.status] || { color: theme.palette.text.primary, label: activity.status };
+  const config = getActivityStatusConfig(activity.status, tokens, theme.palette.text.primary);
+  const durationSeconds = getActivityDurationSeconds(activity);
 
   return (
     <Box
@@ -850,6 +1010,23 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
             </MuiTooltip>
           )}
         </Stack>
+        {activity.target_host && (
+          <Typography
+            title={activity.target_host}
+            sx={{
+              fontSize: '0.7rem',
+              fontFamily: 'monospace',
+              fontWeight: 600,
+              color: 'text.secondary',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '100%'
+            }}
+          >
+            {activity.target_host}
+          </Typography>
+        )}
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Typography sx={{ fontSize: '0.7rem', color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
             {activity.status === 'PENDING'
@@ -858,9 +1035,9 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
                 ? new Date(activity.time_started).toLocaleString()
                 : new Date(activity.time).toLocaleString()}
           </Typography>
-          {activity.time_started && activity.time_ended && (
+          {durationSeconds !== null && (
             <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', fontWeight: 600 }}>
-              ({Math.round((new Date(activity.time_ended).getTime() - new Date(activity.time_started).getTime()) / 1000)}s)
+              ({durationSeconds}s)
             </Typography>
           )}
         </Stack>
@@ -1352,7 +1529,7 @@ export const ScanDetailPage = () => {
   const [aiExportModalOpen, setAiExportModalOpen] = useState(false);
   const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
   const [taskOverlayOpen, setTaskOverlayOpen] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<{ id: number; title: string } | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ScanActivity | null>(null);
   const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
   const [pendingRetryActivity, setPendingRetryActivity] = useState<ScanActivity | null>(null);
 
@@ -1373,10 +1550,7 @@ export const ScanDetailPage = () => {
       setSelectedActivity(null);
     } else {
       setSelectedScanId(null);
-      setSelectedActivity({
-        id: Number(activity.id),
-        title: activity.title
-      });
+      setSelectedActivity(activity);
     }
     setTaskOverlayOpen(true);
   };
@@ -2405,9 +2579,10 @@ export const ScanDetailPage = () => {
       <TaskOverlay
         open={taskOverlayOpen}
         onClose={() => setTaskOverlayOpen(false)}
-        activityId={selectedActivity?.id || null}
+        activityId={selectedActivity ? Number(selectedActivity.id) : null}
         scanId={selectedScanId}
         activityTitle={selectedActivity?.title || (selectedScanId ? 'Raw Scan History' : '')}
+        activity={selectedActivity}
       />
 
       {startScanTargets && (

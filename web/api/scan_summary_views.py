@@ -5,6 +5,7 @@ from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rolepermissions.checkers import has_role
 
 from dashboard.models import Project
 from targetApp.models import Domain
@@ -189,6 +190,12 @@ class ScanSummaryAPIView(APIView):
             3: 'ABORTED',
             -1: 'PENDING',
         }
+        # Tracebacks are operator-facing debug output (security rule 8.1): expose them
+        # only to the roles that can already run scans, never to plain viewers.
+        can_see_traceback = bool(
+            request.user.is_superuser
+            or has_role(request.user, ['sys_admin', 'penetration_tester'])
+        )
         for activity in activities:
             timeline_data.append({
                 'id': activity.id,
@@ -200,7 +207,10 @@ class ScanSummaryAPIView(APIView):
                 'tier': activity.tier,
                 'status': _STATUS_MAP.get(activity.status, 'UNKNOWN'),
                 'name': activity.name,
+                'target_host': activity.target_host or '',
                 'error_message': activity.error_message,
+                'traceback': (activity.traceback or '') if can_see_traceback else '',
+                'execution_id': activity.execution_id or '',
                 'commands': list(Command.objects.filter(activity=activity).values('command', 'output', 'return_code'))
             })
 

@@ -15,6 +15,18 @@ from dashboard.models import AcunetixAPIKey
 logger = logging.getLogger(__name__)
 
 
+def _fail(task, message: str) -> bool:
+	"""Log why the scan gave up and expose the reason on the task object.
+
+	The Temporal wrapper turns a False return into a generic
+	"execution returned False/failed" exception; storing the reason on
+	`task.error` lets it surface the real cause on the scan timeline.
+	"""
+	logger.error("Acunetix scan failed: %s", message)
+	task.error = message
+	return False
+
+
 def map_acunetix_severity(severity):
 	# Acunetix: 3 (High), 2 (Medium), 1 (Low), 0 (Informational)
 	# reNgine: 4 (Critical), 3 (High), 2 (Medium), 1 (Low), 0 (Info)
@@ -260,8 +272,7 @@ def acunetix_scan(
 		try:
 			_validate_subdomain_name(subdomain_name)
 		except ValueError as e:
-			logger.error(f"Invalid subdomain provided to acunetix_scan: {e}")
-			return False
+			return _fail(self, f"Invalid subdomain provided to acunetix_scan: {e}")
 
 	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
@@ -286,13 +297,16 @@ def acunetix_scan(
 	target_name = subdomain_name or domain.name
 	target_url = subdomain_http_url or f"https://{target_name}"
 
+	# Show the exact host on this task's timeline entry — one activity row is
+	# created per Acunetix target, and they are otherwise indistinguishable.
+	self.target_host = target_name[:500]
+
 	subscan = getattr(self, 'subscan', None)
 
 	# Get credentials from vault
 	creds = AcunetixAPIKey.objects.first()
 	if not (creds and creds.server_url and creds.api_key):
-		logger.error("Acunetix API keys not fully configured in vault. Skipping.")
-		return False
+		return _fail(self, "Acunetix API keys not fully configured in vault.")
 	logger.info(f"Acunetix credentials configured for: {creds.server_url}")
 	try:
 		logger.info(f"Starting Acunetix scan for {target_url}")
@@ -314,8 +328,7 @@ def acunetix_scan(
 			target_url=target_url,
 		)
 		if not target_id:
-			logger.error(f"Could not create or locate Acunetix target for {target_name}")
-			return False
+			return _fail(self, f"Could not create or locate Acunetix target for {target_name}")
 
 		scan_info = _start_acunetix_scan_direct(
 			base_url=base_url,
@@ -327,8 +340,7 @@ def acunetix_scan(
 		scan_id = scan_info.get('scan_id')
 
 		if not target_id:
-			logger.error(f"Target {target_name} not found in Acunetix after start_scan.")
-			return False
+			return _fail(self, f"Target {target_name} not found in Acunetix after start_scan.")
 
 		# If scan_id wasn't in scan_info, try to find it from scans query by target_id
 		if not scan_id:
@@ -340,8 +352,7 @@ def acunetix_scan(
 					scan_id = scans_list[0].get('scan_id')
 
 		if not scan_id:
-			logger.error(f"Could not determine scan_id for Acunetix scan on target {target_name}")
-			return False
+			return _fail(self, f"Could not determine scan_id for Acunetix scan on target {target_name}")
 
 		# Wait for scan to complete
 		max_retries = settings.ACUNETIX_MAX_RETRIES
@@ -359,16 +370,14 @@ def acunetix_scan(
 					logger.info(f"Acunetix scan for {target_name} completed.")
 					break
 				elif current_status in ['failed', 'aborted']:
-					logger.error(f"Acunetix scan for {target_name} ended with status: {current_status}.")
-					return False
+					return _fail(self, f"Acunetix scan for {target_name} ended with status: {current_status}.")
 			else:
 				logger.warning(f"Failed to fetch scan status for {scan_id}, status code: {scan_resp.status_code}")
 
 			time.sleep(poll_interval)
 			retries += 1
 		else:
-			logger.error(f"Acunetix scan for {target_name} timed out after {max_retries} retries.")
-			return False
+			return _fail(self, f"Acunetix scan for {target_name} timed out after {max_retries} retries.")
 
 		# Fetch Vulnerabilities for the specific scan
 		vulns_url = None
@@ -473,5 +482,5 @@ def acunetix_scan(
 		return True
 
 	except Exception as e:
-		logger.error(f"Error in Acunetix scan: {str(e)}")
-		return False
+		logger.exception("Error in Acunetix scan for %s", target_name)
+		return _fail(self, f"{type(e).__name__}: {e}")

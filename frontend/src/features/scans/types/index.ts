@@ -39,6 +39,9 @@ export interface ScanActivity {
   tier: number | null;
   has_commands: boolean;
   error_message?: string | null;
+  target_host?: string;
+  traceback?: string | null;
+  execution_id?: string | null;
 }
 
 export interface ScanSummaryResponse {

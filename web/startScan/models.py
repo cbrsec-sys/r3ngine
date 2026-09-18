@@ -1013,6 +1013,9 @@ class ScanActivity(models.Model):
 	)
 	title = models.CharField(max_length=1000)
 	name = models.CharField(max_length=1000)
+	# Host, host:port or URL this task ran against. Empty for whole-scan tasks
+	# (correlation, notifications) that have no single target.
+	target_host = models.CharField(max_length=500, blank=True, null=True)
 	time = models.DateTimeField()
 	status = models.IntegerField()
 	error_message = models.CharField(max_length=300, blank=True, null=True)

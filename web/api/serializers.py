@@ -1527,7 +1527,7 @@ class ScanActivitySerializer(serializers.ModelSerializer):
 		fields = [
 			'id', 'task_uid', 'title', 'name',
 			'time', 'time_started', 'time_ended',
-			'tier', 'status', 'error_message',
+			'tier', 'status', 'error_message', 'target_host',
 			'domain', 'completed_ago',
 		]
 

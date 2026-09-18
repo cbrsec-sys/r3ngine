@@ -37,6 +37,43 @@ from startScan.models import Subdomain
 logger = get_module_logger(__name__)
 
 
+def resolve_target_host(ctx: dict, subdomain=None, domain=None) -> str:
+    """Resolve the host a task runs against, for display on its timeline entry.
+
+    Fan-out activities (acunetix, per-service CVE lookup, wpscan, ...) run once per
+    subdomain or per service, so without this the timeline shows a row of identical
+    titles with no way to tell which host each one covered.
+
+    Args:
+        ctx: Temporal workflow context of the activity.
+        subdomain: Subdomain instance already resolved by the caller, if any.
+        domain: Domain instance the scan belongs to, used as the last resort.
+
+    Returns:
+        str: Host, `host:port` or URL, empty when the task has no single target.
+    """
+    from urllib.parse import urlparse
+
+    host = (ctx.get('subdomain_name') or '').strip()
+    if not host and subdomain is not None:
+        host = (getattr(subdomain, 'name', '') or '').strip()
+    if not host:
+        host = str(ctx.get('host') or '').strip()
+    if not host:
+        url = str(ctx.get('url') or ctx.get('subdomain_http_url') or '').strip()
+        if url:
+            host = urlparse(url).hostname or url
+    if not host and domain is not None:
+        host = (getattr(domain, 'name', '') or '').strip()
+
+    port = ctx.get('port')
+    if host and port and ':' not in host:
+        suffix = ':%s' % port
+        host = '%s%s' % (host[:500 - len(suffix)], suffix)
+
+    return host[:500]
+
+
 
 # ---------------------------------------------------------------------------
 # TemporalTaskProxy
@@ -138,6 +175,12 @@ class TemporalTaskProxy:
             self.engine_id = self.engine.id if self.engine else None
         self.domain = self.scan.domain if self.scan else Domain.objects.filter(id=self.domain_id).first()
         self.subdomain = self.subscan.subdomain if self.subscan else None
+        if not self.subdomain and self.subdomain_id:
+            self.subdomain = Subdomain.objects.filter(pk=self.subdomain_id).first()
+
+        # Host shown next to this task in the scan timeline. Task functions may refine
+        # it (see acunetix_scan) once they know the exact target they resolved.
+        self.target_host = resolve_target_host(ctx, self.subdomain, self.domain)
 
         # Create a ScanActivity record in the DB to track this task
         if self.track and self.scan:
@@ -152,6 +195,7 @@ class TemporalTaskProxy:
         """
         from startScan.models import ScanActivity
         from reNgine.definitions import RUNNING_TASK
+        from reNgine.task_plan import get_task_tier
         from django.db import transaction
 
         try:
@@ -172,17 +216,24 @@ class TemporalTaskProxy:
                     activity_row.time_started = now
                     activity_row.time = now
                     activity_row.execution_id = execution_id
+                    activity_row.target_host = self.target_host
                     activity_row.save(
-                        update_fields=['status', 'time_started', 'time', 'execution_id']
+                        update_fields=[
+                            'status', 'time_started', 'time', 'execution_id', 'target_host',
+                        ]
                     )
                     self.activity = activity_row
                     self.activity_id = activity_row.id
                 else:
                     # No unclaimed row found — create one for this retry attempt.
+                    # Carry the planned tier over so retries stay in their own tier
+                    # instead of collapsing into Tier 7 in the timeline.
                     self.activity = ScanActivity.objects.create(
                         scan_of=self.scan,
                         name=self.task_name,
                         title=self.description,
+                        target_host=self.target_host,
+                        tier=get_task_tier(self.task_name),
                         status=RUNNING_TASK,
                         time=now,
                         time_started=now,
@@ -199,12 +250,14 @@ class TemporalTaskProxy:
             )
             raise  # let Temporal retry — do not silently proceed untracked
 
-    def update_scan_activity(self, status, error_message=None):
+    def update_scan_activity(self, status, error_message=None, traceback_text=None):
         """Update the ScanActivity record with the final task status and time_ended.
 
         Args:
             status (int): Task status code (SUCCESS_TASK, FAILED_TASK, etc.)
             error_message (str, optional): Error message if the task failed.
+            traceback_text (str, optional): Full traceback, shown in the task detail
+                overlay so a failure can be diagnosed without reading container logs.
         """
         from startScan.models import ScanActivity
         from reNgine.definitions import SUCCESS_TASK
@@ -216,8 +269,17 @@ class TemporalTaskProxy:
                     'time': now,
                     'time_ended': now,
                 }
+                # Task functions may have narrowed the host while running. Keep the
+                # write additive — never blank out what _create_scan_activity stored.
+                final_host = str(getattr(self, 'target_host', '') or '')[:500]
+                if final_host:
+                    update_kwargs['target_host'] = final_host
                 if error_message is not None:
                     update_kwargs['error_message'] = str(error_message)[:300]
+                    # Only callers that captured a traceback overwrite the stored one —
+                    # the other failure paths must not blank out what _run_task saved.
+                    if traceback_text is not None:
+                        update_kwargs['traceback'] = traceback_text
                 elif status == SUCCESS_TASK:
                     # Clear stale error fields from any previous failed attempt on this record
                     update_kwargs['error_message'] = ''
@@ -416,14 +478,25 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
 
         res = raw_func(proxy, **kwargs)
         if res is False:
-            raise Exception(f"Task {task_name} execution returned False/failed.")
+            # Task functions report why they gave up via proxy.error; without it the
+            # timeline can only show the generic "returned False" message.
+            reason = getattr(proxy, 'error', None)
+            raise Exception(
+                f"Task {task_name} failed: {reason}" if reason
+                else f"Task {task_name} execution returned False/failed."
+            )
         proxy.update_scan_activity(SUCCESS_TASK)
         logger.log_line("[TEMPORAL]", "COMPLETE", "task=%s scan_id=%s" % (task_name, _scan_id))
         return True
     except Exception as exc:
+        import traceback as _traceback
         logger.log_line("[TEMPORAL]", "ERROR", "task=%s scan_id=%s error=%s" % (task_name, _scan_id, format_exception_for_log(exc)), level="error")
         activity.logger.exception(f"[_run_task] Task {task_name} failed: {exc}")
-        proxy.update_scan_activity(FAILED_TASK, error_message=repr(exc))
+        proxy.update_scan_activity(
+            FAILED_TASK,
+            error_message=repr(exc),
+            traceback_text=_traceback.format_exc(),
+        )
         raise
     finally:
         activity_running = False
@@ -1794,6 +1867,7 @@ def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
     """
     from startScan.models import ScanHistory, ScanActivity
     from reNgine.definitions import SUCCESS_TASK
+    from reNgine.task_plan import get_task_tier
     from django.utils import timezone
 
     scan_id = ctx.get('scan_history_id')
@@ -1807,6 +1881,8 @@ def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
         name='vulnerability_scan',
         defaults={
             'title': 'Vulnerability Scan',
+            'tier': get_task_tier('vulnerability_scan'),
+            'target_host': resolve_target_host(ctx, domain=scan.domain),
             'time': timezone.now(),
             'status': SUCCESS_TASK,
         }

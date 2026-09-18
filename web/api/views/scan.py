@@ -664,6 +664,7 @@ class ScanActivityRetryAPIView(APIView):
                 time_started=None,
                 time_ended=None,
                 error_message=None,
+                traceback=None,
             )
 
             # Flip scan back to RUNNING so the UI reflects active state.
