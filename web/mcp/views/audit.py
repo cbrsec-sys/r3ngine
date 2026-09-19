@@ -16,7 +16,21 @@ def _is_admin(user):
     return bool(user and (user.is_superuser or has_role(user, 'sys_admin')))
 
 
+def _event_queryset():
+    return McpAuditEvent.objects.select_related(
+        'user', 'key', 'session', 'session__agent', 'session__key',
+    )
+
+
 def _serialize_event(row):
+    session = row.session
+    agent = session.agent if session is not None else None
+    key = row.key or (session.key if session is not None else None)
+    agent_id = ''
+    if session is not None and session.agent_id:
+        agent_id = session.agent_id
+    elif agent is not None:
+        agent_id = agent.id
     return {
         'id': row.id,
         'session_id': str(row.session_id) if row.session_id else None,
@@ -31,6 +45,19 @@ def _serialize_event(row):
         'truncated': row.truncated,
         'error_message': row.error_message,
         'username': row.user.username if row.user_id else None,
+        'agent_id': agent_id or None,
+        'provider': ((session.provider if session else '') or (agent.provider if agent else '')),
+        'ide': ((session.ide if session else '') or (agent.ide if agent else '')),
+        'hostname': ((session.hostname if session else '') or (agent.hostname if agent else '')),
+        'os_name': ((session.os_name if session else '') or (agent.os_name if agent else '')),
+        'agent_username': (
+            (session.agent_username if session else '') or (agent.username if agent else '')
+        ),
+        'key_id': key.id if key else None,
+        'key_name': key.name if key else '',
+        'key_prefix': key.prefix if key else '',
+        'transport': session.transport if session else '',
+        'client_name': session.client_name if session else '',
     }
 
 
@@ -75,12 +102,12 @@ class McpSessionEventsView(APIView):
         if session.user_id != request.user.id and not _is_admin(request.user):
             return Response({'error': 'Not found'}, status=404)
         if session.agent_id:
-            qs = McpAuditEvent.objects.filter(
+            qs = _event_queryset().filter(
                 session__agent_id=session.agent_id,
                 session__user_id=session.user_id,
             ).order_by('created_at')
         else:
-            qs = McpAuditEvent.objects.filter(session=session).order_by('created_at')
+            qs = _event_queryset().filter(session=session).order_by('created_at')
         return Response(page_queryset(qs, request, _serialize_event))
 
 
@@ -90,7 +117,7 @@ class McpAuditListView(APIView):
     http_method_names = ['get', 'head', 'options']
 
     def get(self, request):
-        qs = McpAuditEvent.objects.select_related('user', 'session').order_by('-created_at')
+        qs = _event_queryset().order_by('-created_at')
         if not (request.query_params.get('all') == '1' and _is_admin(request.user)):
             qs = qs.filter(user=request.user)
         tool_name = request.query_params.get('tool_name')

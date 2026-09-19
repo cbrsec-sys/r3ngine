@@ -24,10 +24,12 @@ import {
   useMcpAudit,
   useMcpSettings,
   useUpdateMcpSettings,
+  type McpAuditEvent,
   type McpTransportMode,
 } from '../api/mcp';
 import { McpKeysPanel } from './McpKeysPanel';
 import { McpConnectedAgentsPanel } from './McpConnectedAgentsPanel';
+import { McpReplayDialog } from './McpReplayDialog';
 
 export const McpAccessPage: React.FC = () => {
   const { user } = useAuth();
@@ -39,6 +41,7 @@ export const McpAccessPage: React.FC = () => {
   const [statusCode, setStatusCode] = useState('');
   const [allUsers, setAllUsers] = useState(false);
   const [focusKeyId, setFocusKeyId] = useState<number | null>(null);
+  const [replay, setReplay] = useState<McpAuditEvent | null>(null);
   const { data: audit } = useMcpAudit({
     tool_name: toolName,
     status_code: statusCode,
@@ -124,33 +127,58 @@ export const McpAccessPage: React.FC = () => {
               <TableRow>
                 <TableCell>Time</TableCell>
                 <TableCell>Tool</TableCell>
+                <TableCell>Agent</TableCell>
                 <TableCell>Path</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Duration</TableCell>
+                <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
-              {(audit?.items || []).map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>
-                    {row.created_at ? new Date(row.created_at).toLocaleString() : ''}
-                  </TableCell>
-                  <TableCell>{row.tool_name}</TableCell>
-                  <TableCell>{row.path}</TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={row.status_code}
-                      variant="outlined"
-                      sx={{
-                        color: getHttpStatusColor(row.status_code, tokens),
-                        borderColor: getHttpStatusColor(row.status_code, tokens),
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>{row.duration_ms}ms</TableCell>
-                </TableRow>
-              ))}
+              {(audit?.items || []).map((row) => {
+                const agentLabel = row.provider
+                  ? row.hostname
+                    ? `${row.provider} @ ${row.hostname}`
+                    : row.provider
+                  : row.hostname || 'Unknown agent';
+                return (
+                  <TableRow
+                    key={row.id}
+                    hover
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Replay ${row.tool_name || row.path}`}
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => setReplay(row)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setReplay(row);
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      {row.created_at ? new Date(row.created_at).toLocaleString() : ''}
+                    </TableCell>
+                    <TableCell>{row.tool_name}</TableCell>
+                    <TableCell>{agentLabel}</TableCell>
+                    <TableCell>{row.path}</TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={row.status_code}
+                        variant="outlined"
+                        sx={{
+                          color: getHttpStatusColor(row.status_code, tokens),
+                          borderColor: getHttpStatusColor(row.status_code, tokens),
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>{row.duration_ms}ms</TableCell>
+                    <TableCell>Replay</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           {!audit?.items?.length && (
@@ -160,6 +188,14 @@ export const McpAccessPage: React.FC = () => {
           )}
         </TacticalPanel>
       </Box>
+      <McpReplayDialog
+        event={replay}
+        onClose={() => setReplay(null)}
+        onFocusKey={(keyId) => {
+          setFocusKeyId(keyId);
+          document.getElementById(`mcp-key-${keyId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }}
+      />
     </Box>
   );
 };

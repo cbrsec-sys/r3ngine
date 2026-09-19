@@ -70,6 +70,8 @@ Unauthorized HTTP clients (missing or invalid API key) are rate-limited **in the
 
 The MCP process opens a session and heartbeats every 30 seconds. **Settings → MCP Access** lists connected agents grouped by a fingerprint of provider + device (OS, IDE, hostname). Click a row for the redacted request/response chain. Click the **key name** to jump to that API key. **Ban** blocks that fingerprint from reconnecting even with a new session. Sys-admins can **Delete** an agent (this removes audit logs) and choose to **keep the ban** or **unban**. Heartbeats are not audited.
 
+Click any tool call in the Audit table, or **Replay** on an audit-chain event, to open a stored overlay: the calling agent (provider, device, key), the request, and the returned payload. Replay is inspect-only — it never re-sends the call or starts, pauses, or retries a scan.
+
 ## What agents cannot do
 
 Delete or edit targets, vulns, notes, users, or files. They cannot list keys, read audit events, or revoke sessions — those stay in this UI. MCP keys do not authenticate on `/api/action/` delete routes.

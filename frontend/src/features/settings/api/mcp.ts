@@ -76,6 +76,17 @@ export interface McpAuditEvent {
   truncated: boolean;
   error_message: string;
   username: string | null;
+  agent_id: string | null;
+  provider: string;
+  ide: string;
+  hostname: string;
+  os_name: string;
+  agent_username: string;
+  key_id: number | null;
+  key_name: string;
+  key_prefix: string;
+  transport: string;
+  client_name: string;
 }
 
 export interface McpPage<T> {

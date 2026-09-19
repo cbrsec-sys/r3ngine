@@ -102,13 +102,13 @@ export const McpConnectedAgentsPanel: React.FC<{
                   >
                     {row.key_name}
                   </Link>
-                  <Typography variant="caption" display="block" sx={{ color: theme.palette.text.secondary }}>
+                  <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary }}>
                     {row.key_prefix}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   {row.ide || '—'}
-                  <Typography variant="caption" display="block" sx={{ color: theme.palette.text.secondary }}>
+                  <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary }}>
                     {row.os_name || '—'}
                   </Typography>
                 </TableCell>
@@ -237,7 +237,11 @@ export const McpConnectedAgentsPanel: React.FC<{
         </DialogActions>
       </Dialog>
 
-      <McpAuditChainDrawer sessionId={auditId} onClose={() => setAuditId(null)} />
+      <McpAuditChainDrawer
+        sessionId={auditId}
+        onClose={() => setAuditId(null)}
+        onFocusKey={onFocusKey}
+      />
     </>
   );
 };

@@ -4,7 +4,7 @@ from rest_framework.test import APIClient
 from rolepermissions.roles import assign_role
 
 from mcp.keys import display_prefix, generate_mcp_secret, hash_mcp_secret
-from mcp.models import McpApiKey, McpAuditEvent
+from mcp.models import McpApiKey, McpAuditEvent, McpSession
 from mcp.redact import redact_payload
 
 User = get_user_model()
@@ -103,3 +103,58 @@ class McpAuditApiTests(TestCase):
         session_ids = {item['session_id'] for item in listed.json()['items']}
         self.assertIn(str(mine), session_ids)
         self.assertNotIn(str(theirs), session_ids)
+
+    def test_audit_payload_includes_agent_and_key_for_replay(self):
+        fingerprint = {
+            'transport': 'stdio',
+            'client_name': 'cursor',
+            'client_version': '1',
+            'agent_id': 'c' * 64,
+            'provider': 'cursor',
+            'ide': 'cursor',
+            'device_id': 'dev',
+            'os_name': 'windows',
+            'hostname': 'host',
+            'username': 'aud',
+        }
+        sid = self.mcp.post('/api/mcp/sessions/', fingerprint, format='json').json()['session_id']
+        listed = self.ui.get('/api/mcp/audit/')
+        self.assertEqual(listed.status_code, 200)
+        row = next(item for item in listed.json()['items'] if item['session_id'] == str(sid))
+        self.assertEqual(row['agent_id'], 'c' * 64)
+        self.assertEqual(row['provider'], 'cursor')
+        self.assertEqual(row['hostname'], 'host')
+        self.assertEqual(row['os_name'], 'windows')
+        self.assertEqual(row['agent_username'], 'aud')
+        self.assertEqual(row['key_name'], 'k')
+        self.assertTrue(row['key_prefix'])
+        self.assertEqual(row['transport'], 'stdio')
+        events = self.ui.get(f'/api/mcp/sessions/{sid}/events/')
+        self.assertEqual(events.status_code, 200)
+        event = events.json()['items'][0]
+        self.assertEqual(event['agent_id'], 'c' * 64)
+        self.assertEqual(event['key_name'], 'k')
+
+    def test_audit_replay_survives_missing_session(self):
+        key = McpApiKey.objects.get(user=self.user, name='k')
+        McpAuditEvent.objects.create(
+            session=None,
+            key=key,
+            user=self.user,
+            tool_name='list_targets',
+            method='GET',
+            path='/api/mcp/targets/',
+            status_code=200,
+            duration_ms=4,
+            request_body={'limit': 10},
+            response_body={'count': 0},
+        )
+        listed = self.ui.get('/api/mcp/audit/')
+        self.assertEqual(listed.status_code, 200)
+        row = next(item for item in listed.json()['items'] if item['tool_name'] == 'list_targets')
+        self.assertIsNone(row['agent_id'])
+        self.assertEqual(row['provider'], '')
+        self.assertEqual(row['key_name'], 'k')
+        self.assertEqual(row['request_body'], {'limit': 10})
+        self.assertEqual(row['response_body'], {'count': 0})
+        self.assertFalse(McpSession.objects.filter(events__id=row['id']).exists())
