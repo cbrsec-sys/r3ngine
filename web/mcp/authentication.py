@@ -49,3 +49,6 @@ class McpApiKeyAuthentication(BaseAuthentication):
             McpSession.objects.filter(pk=session.pk).update(last_seen_at=timezone.now())
             request.mcp_session = session
         return (key.user, None)
+
+    def authenticate_header(self, request):
+        return 'Bearer realm="r3ngine-mcp"'

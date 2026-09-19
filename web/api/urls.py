@@ -109,6 +109,7 @@ router.register(r'workers', ScanWorkerViewSet, basename='workers')
 
 
 urlpatterns = [
+    path('mcp/', include('mcp.urls')),
     re_path(r'^', include(router.urls)),
     path('settings/workers/heartbeat/', WorkerHeartbeatAPIView.as_view(), name='worker_heartbeat'),
     path(
