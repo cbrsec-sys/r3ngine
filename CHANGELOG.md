@@ -14,6 +14,7 @@
 - **Mailbox verification (Reacher)**:
   - Replaced noisy `smtp-user-enum` VRFY spraying in built-in email security with Reacher `check-if-email-exists` mailbox verification (CLI default, optional self-hosted HTTP).
   - Confirmed addresses (`is_reachable=safe`) are stored on the scan; catch-all MX aborts enumeration. See `documents/email-verification.md`.
+  - Scan detail timeline shows **Mailbox Verification** (`check_if_email_exists`) after port scan: pending at start, running while Reacher executes, then success/fail.
 
 ### [v3.7.4] - 2026-07-24
 

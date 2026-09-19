@@ -82,6 +82,7 @@ class TestEmailSecurityCallsVerifier(TestCase):
             result = _run_email_security_sync(ctx)
         mock_v.assert_called_once()
         self.assertEqual(mock_v.call_args[0][0], 'example.com')
+        self.assertIn('activity_id', mock_v.call_args.kwargs)
         names = [call.kwargs.get('name') for call in mock_sv.call_args_list]
         self.assertIn('Valid Mailboxes Confirmed', names)
         self.assertEqual(result.get('mailboxes_confirmed'), 1)

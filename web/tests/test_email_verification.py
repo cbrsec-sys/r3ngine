@@ -294,12 +294,15 @@ class TestVerifyAddressCli(TestCase):
         with patch('reNgine.tasks.email_verification.run_command', side_effect=fake_run):
             result = verify_address('admin@example.com', {
                 'timeout': 15, 'http_url': '', 'proxy_url': None, 'domain': 'example.com',
+                'scan_id': 42, 'activity_id': 7,
             })
         self.assertEqual(captured['cmd'][0], 'check_if_email_exists')
         self.assertEqual(captured['cmd'][-1], 'admin@example.com')
         self.assertIsInstance(captured['cmd'], list)
         self.assertFalse(captured['kwargs'].get('shell'))
         self.assertEqual(captured['kwargs']['timeout'], 20)
+        self.assertEqual(captured['kwargs']['scan_id'], 42)
+        self.assertEqual(captured['kwargs']['activity_id'], 7)
         self.assertEqual(result['is_reachable'], 'safe')
         self.assertTrue(result['is_role_account'])
 

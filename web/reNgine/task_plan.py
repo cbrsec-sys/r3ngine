@@ -20,6 +20,7 @@ _TASK_TITLES = {
     # Tier 2
     'http_crawl':                 'HTTP Crawl',
     'port_scan':                  'Port Scan',
+    'check_if_email_exists':      'Mailbox Verification',
     # Tier 3
     'fetch_url':                  'URL Fetching',
     'http_crawl_bridge':          'HTTP Crawl Bridge',
@@ -67,6 +68,7 @@ _TASK_TIER = {
     'vigolium_discovery':    1,
     'http_crawl':            2,
     'port_scan':             2,
+    'check_if_email_exists': 2,
     'fetch_url':             3,
     'http_crawl_bridge':     3,
     'screenshot':            3,
@@ -112,6 +114,23 @@ _TIER1_TO_5 = [
 ]
 
 
+def _mailbox_verification_planned(tasks: list, yaml_configuration: dict, is_subscan: bool = False) -> bool:
+    """True when MasterScanWorkflow will run mailbox verification."""
+    if is_subscan:
+        return False
+    if 'port_scan' not in tasks:
+        return False
+    section = yaml_configuration.get('email_security') if isinstance(yaml_configuration, dict) else None
+    if not isinstance(section, dict):
+        section = {}
+    raw = section.get('mailbox_verification')
+    if raw is None:
+        return True
+    if not isinstance(raw, dict):
+        return True
+    return bool(raw.get('enabled', True))
+
+
 def _entry(name: str) -> dict:
     return {
         'name': name,
@@ -121,13 +140,14 @@ def _entry(name: str) -> dict:
     }
 
 
-def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
+def build_scan_task_plan(tasks: list, yaml_configuration: dict, is_subscan: bool = False) -> list:
     """
     Return ordered list of planned-task dicts given an engine task list
     and the full parsed YAML configuration dict.
 
     Each dict: {name, title, tier, status=INITIATED_TASK}.
     Sorted by tier ascending. No I/O — pure function.
+    is_subscan: SubScanWorkflow never runs RunEmailSecurityActivity.
     """
     plan = []
     seen = set()
@@ -146,6 +166,10 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
             add(t)
         elif t == 'http_crawl_bridge' and 'fetch_url' in tasks:
             add(t)
+
+    # Post-tier-2 mailbox verification (same gate as RunEmailSecurityActivity).
+    if _mailbox_verification_planned(tasks, yaml_configuration, is_subscan=is_subscan):
+        add('check_if_email_exists')
 
     # Vigolium tasks: harvest + discovery auto-added when vulnerability_scan is selected
     # (unless explicitly disabled in yaml_configuration).

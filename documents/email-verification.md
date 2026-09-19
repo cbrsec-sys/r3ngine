@@ -12,6 +12,8 @@ SPF, DMARC, DKIM, open-relay, STARTTLS, and cert checks still run first. Mailbox
 
 Activity timeouts: start-to-close **90 minutes**, heartbeat **10 minutes** (heartbeat thread every 30s).
 
+Scan detail timeline: `InitializeScanTasksActivity` pre-creates a **Mailbox Verification** row (`name=check_if_email_exists`, tier 2) on master scans when `port_scan` is in the engine task list and mailbox verification is not disabled. Subscans do not get this row (`RunEmailSecurityActivity` is master-only). `RunEmailSecurityActivity` claims that row as running, attaches CLI `Command` rows, then marks success or failure even if SPF/SMTP work raises first. Retry from the timeline re-runs `RunEmailSecurityActivity`.
+
 ## File map
 
 | File | Role |
@@ -19,7 +21,7 @@ Activity timeouts: start-to-close **90 minutes**, heartbeat **10 minutes** (hear
 | `web/reNgine/tasks/email_verification.py` | Candidates, CLI/HTTP verify, catch-all, persist, findings |
 | `web/reNgine/tasks/email_security.py` | SPF/DMARC/DKIM/relay/STARTTLS/cert only |
 | `web/reNgine/temporal/activities/__init__.py` | `_run_email_security_sync` calls `verify_domain_mailboxes` |
-| `web/reNgine/temporal/workflows/__init__.py` | Schedules `RunEmailSecurityActivity` |
+| `web/reNgine/task_plan.py` | Pre-populates the Mailbox Verification timeline item |
 | `docker/web/Dockerfile` | Official `check_if_email_exists` v0.11.7 CLI |
 | `web/tests/test_email_verification.py` | Unit tests (mocked, no live MX) |
 

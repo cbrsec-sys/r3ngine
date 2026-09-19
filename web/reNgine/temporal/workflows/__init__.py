@@ -3668,6 +3668,14 @@ class SingleTaskRetryWorkflow:
                 await workflow.execute_activity("RunGenericTaskActivity", args=[ctx, "post_crawl_osint", "Post-Crawl OSINT"], start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=10), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
             elif task_name == "http_crawl_bridge":
                 await workflow.execute_activity("RunHTTPCrawlBridgeActivity", ctx, start_to_close_timeout=timedelta(hours=3), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            elif task_name in ("check_if_email_exists", "email_security", "mailbox_verification"):
+                await workflow.execute_activity(
+                    "RunEmailSecurityActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=90),
+                    heartbeat_timeout=timedelta(minutes=10),
+                    task_queue="python-orchestrator-queue",
+                )
             elif task_name == "run_acunetix":
                 await workflow.execute_activity("RunAcunetixActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
             else:

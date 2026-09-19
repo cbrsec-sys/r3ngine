@@ -249,7 +249,16 @@ def _normalize_reacher_payload(address: str, payload: dict) -> dict:
     }
 
 
-def _verify_via_cli(address: str, timeout: int, socks: dict | None) -> dict:
+def _optional_id(value):
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _verify_via_cli(address: str, timeout: int, socks: dict | None, scan_id=None, activity_id=None) -> dict:
     cmd = [CLI_BINARY, address]
     env = None
     if socks:
@@ -264,7 +273,12 @@ def _verify_via_cli(address: str, timeout: int, socks: dict | None) -> dict:
             env['PROXY_PASSWORD'] = socks['password']
     try:
         return_code, output = run_command(
-            cmd, timeout=timeout + CLI_TIMEOUT_PAD_SECONDS, shell=False, env=env,
+            cmd,
+            timeout=timeout + CLI_TIMEOUT_PAD_SECONDS,
+            shell=False,
+            env=env,
+            scan_id=_optional_id(scan_id),
+            activity_id=_optional_id(activity_id),
         )
     except Exception as exc:
         logger.warning('[mailbox_verify] CLI error for %s: %s', address, exc)
@@ -338,7 +352,13 @@ def verify_address(address: str, options: dict) -> dict:
         if not origin:
             return _empty_result(address, {'error': 'bad_http_url'})
         return _verify_via_http(address, origin, timeout, socks)
-    return _verify_via_cli(address, timeout, socks)
+    return _verify_via_cli(
+        address,
+        timeout,
+        socks,
+        scan_id=options.get('scan_id'),
+        activity_id=options.get('activity_id'),
+    )
 
 
 def _is_activity_cancelled() -> bool:
@@ -397,6 +417,7 @@ def verify_domain_mailboxes(
     yaml_cfg: dict | None,
     proxy_url: str | None = None,
     remaining_seconds: float | None = None,
+    activity_id=None,
 ) -> dict:
     empty = {
         'catch_all': False,
@@ -439,6 +460,8 @@ def verify_domain_mailboxes(
         'http_url': cfg['http_url'],
         'proxy_url': proxy_url,
         'domain': domain,
+        'scan_id': getattr(scan, 'id', None),
+        'activity_id': activity_id,
     }
     if proxy_url and not parse_socks_proxy(proxy_url):
         scheme = ''

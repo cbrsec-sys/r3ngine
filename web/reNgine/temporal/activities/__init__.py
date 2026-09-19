@@ -243,6 +243,16 @@ class TemporalTaskProxy:
         logger.info(f"[notify] Task '{name or self.task_name}' fields={fields}")
 
 
+def _start_scan_task_proxy(ctx: dict, task_name: str, description: str):
+    """Claim a pre-populated ScanActivity row. No-op outside a Temporal activity."""
+    try:
+        if not activity.in_activity():
+            return None
+    except Exception:
+        return None
+    return TemporalTaskProxy(ctx, task_name, description)
+
+
 # ---------------------------------------------------------------------------
 # Helper: run a RengineTask function via TemporalTaskProxy
 # ---------------------------------------------------------------------------
@@ -478,7 +488,7 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
         except SubScan.DoesNotExist:
             pass
 
-    plan = build_scan_task_plan(tasks, yaml_configuration)
+    plan = build_scan_task_plan(tasks, yaml_configuration, is_subscan=bool(subscan_id))
     created_count = 0
     existing_count = 0
     now = tz.now()
@@ -4247,8 +4257,10 @@ def _run_email_security_sync(ctx: dict) -> dict:
     )
     from reNgine.tasks.email_verification import (
         verify_domain_mailboxes,
+        parse_mailbox_config,
         ACTIVITY_START_TO_CLOSE_SECONDS,
     )
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, ABORTED_TASK
     from django.db.models import Q
     import time
 
@@ -4261,6 +4273,16 @@ def _run_email_security_sync(ctx: dict) -> dict:
     scan = ScanHistory.objects.select_related('domain').get(pk=scan_id)
     if not domain_name:
         domain_name = scan.domain.name
+
+    yaml_cfg = ctx.get('yaml_configuration') or {}
+    mailbox_proxy = None
+    if parse_mailbox_config(yaml_cfg).get('enabled', True):
+        mailbox_proxy = _start_scan_task_proxy(
+            ctx, 'check_if_email_exists', 'Mailbox Verification',
+        )
+
+    mailbox_status = SUCCESS_TASK
+    mailbox_error = None
 
     findings_count: int = 0
 
@@ -4282,112 +4304,124 @@ def _run_email_security_sync(ctx: dict) -> dict:
         except Exception as exc:
             logger.error('[EMAIL_SECURITY] save_vulnerability failed for %s: %s', name, exc)
 
-    # DNS checks (always run against the root domain)
-    spf = check_spf(domain_name)
-    dmarc = check_dmarc(domain_name)
-    dkim = check_dkim(domain_name)
-
-    if not spf['found']:
-        _vuln('SPF Record Missing', 3,
-              'No SPF TXT record found for %s.' % domain_name)
-    elif spf['weak']:
-        _vuln('SPF Weak Policy', 2,
-              'SPF record for %s uses +all or ~all: %s' % (domain_name, spf['record']))
-
-    if not dmarc['found']:
-        _vuln('DMARC Record Missing', 3,
-              'No DMARC record found at _dmarc.%s.' % domain_name)
-    elif dmarc['policy'] == 'none':
-        _vuln('DMARC Policy Not Enforced (p=none)', 2,
-              'DMARC for %s uses p=none — monitoring only.' % domain_name)
-
-    if not dkim['found']:
-        _vuln('DKIM Record Missing', 2,
-              'No DKIM record found for %s across common selectors.' % domain_name)
-
-    for spoof in assess_spoofability(spf, dmarc):
-        _vuln(spoof['name'], spoof['severity'], spoof['description'])
-
-    # SMTP tool checks — only run if SMTP ports were found during port scan
     try:
-        smtp_hosts = list(
-            Subdomain.objects.filter(scan_history_id=scan_id).filter(
-                Q(ip_addresses__ports__number__in=SMTP_PORTS) |
-                Q(ip_addresses__ports__service_name__icontains='smtp')
-            ).values_list('name', 'ip_addresses__address', 'ip_addresses__ports__number')
-            .distinct()
-        )
+            # DNS checks (always run against the root domain)
+            spf = check_spf(domain_name)
+            dmarc = check_dmarc(domain_name)
+            dkim = check_dkim(domain_name)
+
+            if not spf['found']:
+                _vuln('SPF Record Missing', 3,
+                      'No SPF TXT record found for %s.' % domain_name)
+            elif spf['weak']:
+                _vuln('SPF Weak Policy', 2,
+                      'SPF record for %s uses +all or ~all: %s' % (domain_name, spf['record']))
+
+            if not dmarc['found']:
+                _vuln('DMARC Record Missing', 3,
+                      'No DMARC record found at _dmarc.%s.' % domain_name)
+            elif dmarc['policy'] == 'none':
+                _vuln('DMARC Policy Not Enforced (p=none)', 2,
+                      'DMARC for %s uses p=none — monitoring only.' % domain_name)
+
+            if not dkim['found']:
+                _vuln('DKIM Record Missing', 2,
+                      'No DKIM record found for %s across common selectors.' % domain_name)
+
+            for spoof in assess_spoofability(spf, dmarc):
+                _vuln(spoof['name'], spoof['severity'], spoof['description'])
+
+            # SMTP tool checks — only run if SMTP ports were found during port scan
+            try:
+                smtp_hosts = list(
+                    Subdomain.objects.filter(scan_history_id=scan_id).filter(
+                        Q(ip_addresses__ports__number__in=SMTP_PORTS) |
+                        Q(ip_addresses__ports__service_name__icontains='smtp')
+                    ).values_list('name', 'ip_addresses__address', 'ip_addresses__ports__number')
+                    .distinct()
+                )
+            except Exception as exc:
+                logger.error('[EMAIL_SECURITY] DB query failed scan_id=%s: %s', scan_id, exc)
+                mailbox_status = FAILED_TASK
+                mailbox_error = format_exception_for_log(exc)
+                if mailbox_proxy:
+                    mailbox_proxy.update_scan_activity(FAILED_TASK, error_message=mailbox_error)
+                raise
+
+            checked_pairs: set = set()
+            for (subdomain_name, ip_address, port) in smtp_hosts:
+                host = subdomain_name or ip_address
+                if not host:
+                    continue
+                pair = (host, port)
+                if pair in checked_pairs:
+                    continue
+                checked_pairs.add(pair)
+                host_url = 'smtp://%s:%s' % (host, port)
+
+                relay = swaks_relay_test(host, port, domain_name)
+                if relay.get('banner'):
+                    _vuln('SMTP Service Banner Disclosure', 0,
+                          'SMTP banner on %s:%s: %s' % (host, port, relay['banner']), host_url)
+                if relay['open_relay']:
+                    _vuln('SMTP Open Relay', 4,
+                          'SMTP server at %s:%s accepted a relay attempt.' % (host, port), host_url)
+
+                # Ports 25/587 use opportunistic TLS (STARTTLS) — flag if missing
+                if port in (25, 587):
+                    tls = swaks_starttls_check(host, port)
+                    if not tls['starttls_supported']:
+                        _vuln('STARTTLS Not Supported', 3,
+                              'SMTP at %s:%s did not advertise STARTTLS.' % (host, port), host_url)
+
+                # Ports 465/993 use implicit TLS (SMTPS/IMAPS) — verify certificate validity
+                if port in (465, 993):
+                    cert = check_ssl_cert(host, port)
+                    if not cert['connected']:
+                        _vuln(
+                            'Port %d Not Responding to TLS Handshake' % port, 2,
+                            'Port %s on %s is expected to use implicit TLS (SMTPS/IMAPS) '
+                            'but did not complete the SSL handshake.' % (port, host),
+                            host_url,
+                        )
+                    else:
+                        if cert['expired']:
+                            _vuln(
+                                'Expired SSL/TLS Certificate on SMTP', 3,
+                                'The SSL/TLS certificate on %s:%s has expired.' % (host, port),
+                                host_url,
+                            )
+                        if cert['self_signed']:
+                            _vuln(
+                                'Self-Signed SSL/TLS Certificate on SMTP', 2,
+                                'The certificate on %s:%s is self-signed and will not be '
+                                'trusted by mail clients.' % (host, port),
+                                host_url,
+                            )
+                        if cert['hostname_mismatch']:
+                            _vuln(
+                                'SSL/TLS Certificate Hostname Mismatch on SMTP', 3,
+                                'The certificate on %s:%s does not match the hostname. '
+                                'Clients may refuse the connection.' % (host, port),
+                                host_url,
+                            )
+                        days = cert.get('days_until_expiry')
+                        if days is not None and 0 <= days < 30 and not cert['expired']:
+                            _vuln(
+                                'SSL/TLS Certificate Expiring Soon on SMTP', 1,
+                                'The certificate on %s:%s expires in %d day(s). '
+                                'Renew before it causes delivery failures.' % (host, port, days),
+                                host_url,
+                            )
+
     except Exception as exc:
-        logger.error('[EMAIL_SECURITY] DB query failed scan_id=%s: %s', scan_id, exc)
+        logger.error('[EMAIL_SECURITY] pre-mailbox failed scan_id=%s: %s', scan_id, exc)
+        mailbox_status = FAILED_TASK
+        mailbox_error = format_exception_for_log(exc)
+        if mailbox_proxy:
+            mailbox_proxy.update_scan_activity(FAILED_TASK, error_message=mailbox_error)
         raise
 
-    checked_pairs: set = set()
-    for (subdomain_name, ip_address, port) in smtp_hosts:
-        host = subdomain_name or ip_address
-        if not host:
-            continue
-        pair = (host, port)
-        if pair in checked_pairs:
-            continue
-        checked_pairs.add(pair)
-        host_url = 'smtp://%s:%s' % (host, port)
-
-        relay = swaks_relay_test(host, port, domain_name)
-        if relay.get('banner'):
-            _vuln('SMTP Service Banner Disclosure', 0,
-                  'SMTP banner on %s:%s: %s' % (host, port, relay['banner']), host_url)
-        if relay['open_relay']:
-            _vuln('SMTP Open Relay', 4,
-                  'SMTP server at %s:%s accepted a relay attempt.' % (host, port), host_url)
-
-        # Ports 25/587 use opportunistic TLS (STARTTLS) — flag if missing
-        if port in (25, 587):
-            tls = swaks_starttls_check(host, port)
-            if not tls['starttls_supported']:
-                _vuln('STARTTLS Not Supported', 3,
-                      'SMTP at %s:%s did not advertise STARTTLS.' % (host, port), host_url)
-
-        # Ports 465/993 use implicit TLS (SMTPS/IMAPS) — verify certificate validity
-        if port in (465, 993):
-            cert = check_ssl_cert(host, port)
-            if not cert['connected']:
-                _vuln(
-                    'Port %d Not Responding to TLS Handshake' % port, 2,
-                    'Port %s on %s is expected to use implicit TLS (SMTPS/IMAPS) '
-                    'but did not complete the SSL handshake.' % (port, host),
-                    host_url,
-                )
-            else:
-                if cert['expired']:
-                    _vuln(
-                        'Expired SSL/TLS Certificate on SMTP', 3,
-                        'The SSL/TLS certificate on %s:%s has expired.' % (host, port),
-                        host_url,
-                    )
-                if cert['self_signed']:
-                    _vuln(
-                        'Self-Signed SSL/TLS Certificate on SMTP', 2,
-                        'The certificate on %s:%s is self-signed and will not be '
-                        'trusted by mail clients.' % (host, port),
-                        host_url,
-                    )
-                if cert['hostname_mismatch']:
-                    _vuln(
-                        'SSL/TLS Certificate Hostname Mismatch on SMTP', 3,
-                        'The certificate on %s:%s does not match the hostname. '
-                        'Clients may refuse the connection.' % (host, port),
-                        host_url,
-                    )
-                days = cert.get('days_until_expiry')
-                if days is not None and 0 <= days < 30 and not cert['expired']:
-                    _vuln(
-                        'SSL/TLS Certificate Expiring Soon on SMTP', 1,
-                        'The certificate on %s:%s expires in %d day(s). '
-                        'Renew before it causes delivery failures.' % (host, port, days),
-                        host_url,
-                    )
-
-    yaml_cfg = ctx.get('yaml_configuration') or {}
     proxy_url = None
     try:
         from reNgine.common_func import get_random_proxy
@@ -4400,11 +4434,21 @@ def _run_email_security_sync(ctx: dict) -> dict:
         mailbox = verify_domain_mailboxes(
             domain_name, scan, yaml_cfg, proxy_url=proxy_url,
             remaining_seconds=remaining,
+            activity_id=getattr(mailbox_proxy, 'activity_id', None),
         )
         for finding in mailbox.get('findings') or []:
             _vuln(finding['name'], finding['severity'], finding['description'])
+        skipped = mailbox.get('skipped_reason')
+        if skipped:
+            mailbox_status = ABORTED_TASK
+            mailbox_error = skipped
     except Exception as exc:
         logger.error('[EMAIL_SECURITY] mailbox verification failed scan_id=%s: %s', scan_id, exc)
+        mailbox_status = FAILED_TASK
+        mailbox_error = format_exception_for_log(exc)
+
+    if mailbox_proxy:
+        mailbox_proxy.update_scan_activity(mailbox_status, error_message=mailbox_error)
 
     logger.info('[EMAIL_SECURITY] COMPLETE scan_id=%s findings=%d', scan_id, findings_count)
     return {

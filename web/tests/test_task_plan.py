@@ -40,6 +40,7 @@ class TestBuildScanTaskPlan(SimpleTestCase):
         names = [t['name'] for t in plan]
         self.assertIn('subdomain_discovery', names)
         self.assertIn('port_scan', names)
+        self.assertIn('check_if_email_exists', names)
         # Tier-7 tasks always present
         self.assertIn('correlate_vulnerabilities', names)
         self.assertIn('calculate_risk_scores', names)
@@ -84,3 +85,25 @@ class TestBuildScanTaskPlan(SimpleTestCase):
             'generate_impact_assessment', 'sync_graph', 'run_apme',
         ]:
             self.assertIn(expected, names)
+        self.assertNotIn('check_if_email_exists', names)
+
+    def test_mailbox_verification_omitted_when_disabled(self):
+        yaml_cfg = {
+            'port_scan': {},
+            'email_security': {'mailbox_verification': {'enabled': False}},
+        }
+        plan = build_scan_task_plan(['port_scan'], yaml_cfg)
+        names = [t['name'] for t in plan]
+        self.assertNotIn('check_if_email_exists', names)
+
+    def test_mailbox_verification_title_and_tier(self):
+        plan = build_scan_task_plan(MINIMAL_TASKS, MINIMAL_YAML)
+        entry = next(t for t in plan if t['name'] == 'check_if_email_exists')
+        self.assertEqual(entry['title'], 'Mailbox Verification')
+        self.assertEqual(entry['tier'], 2)
+
+    def test_mailbox_verification_omitted_for_subscan(self):
+        plan = build_scan_task_plan(MINIMAL_TASKS, MINIMAL_YAML, is_subscan=True)
+        names = [t['name'] for t in plan]
+        self.assertNotIn('check_if_email_exists', names)
+        self.assertIn('port_scan', names)

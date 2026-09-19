@@ -74,6 +74,8 @@ Runs HTTP crawl, port scan, and Vigolium concurrently.
 
 SPF/DMARC/DKIM plus SMTP relay/STARTTLS/cert checks on discovered mail ports. Mailbox confirmation then runs against the domain MX via `check-if-email-exists` (see [Mailbox Verification](email-verification.md)). Catch-all MX aborts enumeration. This step does not use `smtp-user-enum`.
 
+The scan detail timeline includes a **Mailbox Verification** item (`check_if_email_exists`, tier 2) so operators can see the Reacher CLI running. It is omitted when `email_security.mailbox_verification.enabled` is `false`.
+
 ---
 
 ### Tier 3: URL Fetching (Sequential)
