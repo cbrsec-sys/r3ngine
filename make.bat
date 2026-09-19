@@ -24,6 +24,8 @@ if %errorlevel% == 0 (
 if "%1" == "certs" %DOCKER_COMPOSE% --env-file .env -f docker/docker-compose.setup.yml run --rm certs
 :: Generate certificates.
 if "%1" == "setup" %DOCKER_COMPOSE% --env-file .env -f docker/docker-compose.setup.yml run --rm certs
+:: Clone r3ngine-mcp (if needed) and run its Node setup script.
+if "%1" == "install-mcp" node scripts\install-mcp.mjs %2 %3 %4 %5 %6 %7 %8 %9
 :: Build and start all services in production mode.
 if "%1" == "up" set DEBUG=0 && %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% up -d --build %SERVICES%
 :: Build and start all services in development mode.

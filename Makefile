@@ -19,13 +19,16 @@ $(info Using: $(shell echo "$(DOCKER_COMPOSE)"))
 
 # --------------------------
 
-.PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade erase
+.PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade erase install-mcp
 
 certs:		    ## Generate certificates.
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} --env-file .env -f docker/docker-compose.setup.yml run --rm certs
 
 setup:			## Generate certificates.
 	@make certs
+
+install-mcp:		## Clone r3ngine-mcp (if needed) and run its Node setup script.
+	node scripts/install-mcp.mjs $(MCP_INSTALL_ARGS)
 
 up:				## Build and start all services in production mode.
 	DEBUG=0 ${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d --build ${SERVICES}

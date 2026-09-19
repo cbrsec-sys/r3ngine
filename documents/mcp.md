@@ -40,6 +40,24 @@ Header: Authorization: Bearer <shown-once-secret>
 
 If transport is `stdio` only, HTTP MCP returns 403 even though the nginx location exists.
 
+## Install locally
+
+From r3ngine (clones `r3ngine-mcp/` if needed, then runs the Node setup):
+
+```bash
+node scripts/install-mcp.mjs --url https://<this-host> --key r3n_mcp_… --yes --write-cursor
+```
+
+Windows: `.\scripts\install-mcp.ps1 --url https://<this-host> --key r3n_mcp_… --yes`
+
+From a checkout of r3ngine-mcp:
+
+```bash
+npm run setup -- --url https://<this-host> --key r3n_mcp_… --yes
+```
+
+The setup script installs dependencies, builds `dist/`, writes `.env`, opens a throwaway MCP session against `/api/mcp/` to prove the key works, smoke-starts the process, and can merge Cursor / VS Code / Claude Desktop config.
+
 Unauthorized HTTP clients (missing or invalid API key) are rate-limited **in the sidecar** before r3ngine is contacted: **10 failures per IP per minute** by default (`MCP_UNAUTH_MAX`, `MCP_UNAUTH_WINDOW_MS`). Further attempts get `429` with `Retry-After`. Invalid keys are remembered for the same window so Django is not probed again.
 
 ## Sessions and audit
