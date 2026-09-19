@@ -1,5 +1,13 @@
 # Changelog
 
+### [v3.7.6] - 2026-09-19
+
+#### Added
+
+- **Mailbox verification (Reacher)**:
+  - Replaced noisy `smtp-user-enum` VRFY spraying in built-in email security with Reacher `check-if-email-exists` mailbox verification (CLI default, optional self-hosted HTTP).
+  - Confirmed addresses (`is_reachable=safe`) are stored on the scan; catch-all MX aborts enumeration. See `documents/email-verification.md`.
+
 ### [v3.7.4] - 2026-07-24
 
 #### Enhanced

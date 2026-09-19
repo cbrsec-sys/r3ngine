@@ -4,7 +4,9 @@ include .env
 # Credits: https://github.com/sherifabdlnaby/elastdocker/
 
 # This for future release of Compose that will use Docker Buildkit, which is much efficient.
-COMPOSE_PREFIX_CMD := DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1
+# COMPOSE_BAKE=false: Compose v5's bake backend hits "tls: bad record MAC" on
+# Docker Desktop for Windows while hashing large build contexts.
+COMPOSE_PREFIX_CMD := DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 COMPOSE_BAKE=false
 
 COMPOSE_ALL_FILES := --env-file .env -f docker/docker-compose.yml
 COMPOSE_DEV_FILES := --env-file .env -f docker/docker-compose.dev.yml

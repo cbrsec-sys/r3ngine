@@ -2,6 +2,11 @@
 
 :: Credits: https://github.com/ninjhacks
 
+:: Compose v5 defaults to `docker buildx bake`. On Docker Desktop for Windows
+:: that talks to BuildKit over a TLS gRPC session and commonly fails with:
+::   failed to compute cache key: failed to copy: local error: tls: bad record MAC
+set COMPOSE_BAKE=false
+
 set COMPOSE_ALL_FILES=--env-file .env -f docker/docker-compose.yml
 set COMPOSE_DEV_FILES=--env-file .env -f docker/docker-compose.dev.yml
 set SERVICES=db web proxy redis neo4j temporal temporal-python-orchestrator temporal-go-executor

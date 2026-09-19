@@ -467,7 +467,7 @@ class MasterScanWorkflow:
                 await workflow.execute_activity(
                     "RunEmailSecurityActivity",
                     ctx,
-                    start_to_close_timeout=timedelta(minutes=30),
+                    start_to_close_timeout=timedelta(minutes=90),
                     heartbeat_timeout=timedelta(minutes=10),
                     task_queue="python-orchestrator-queue",
                 )

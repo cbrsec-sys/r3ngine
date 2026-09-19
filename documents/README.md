@@ -7,6 +7,7 @@
 | [Architecture Overview](architecture-overview.md) | System architecture, containers, and components |
 | [Temporal System](temporal-system.md) | Temporal workflows, activities, task queues, and worker configuration |
 | [Scan Pipeline](scan-pipeline.md) | The 7-tier MasterScanWorkflow pipeline in detail |
+| [Mailbox Verification](email-verification.md) | Reacher mailbox confirmation (replaces smtp-user-enum) |
 | [Task Cancellation](task-cancellation.md) | How scan and subscan cancellation works |
 | [Task Recovery](task-recovery.md) | Crash recovery and scan resumption via Temporal |
 | [Plugin System](plugin-system.md) | Plugin architecture, installation, and Temporal integration |

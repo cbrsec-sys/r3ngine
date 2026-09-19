@@ -74,6 +74,7 @@ TOOL_COLORS = {
     'enum4linux-ng': COLOR_YELLOW,
     'dnsrecon': COLOR_CYAN,
     'fierce': COLOR_ORANGE,
+    'check_if_email_exists': COLOR_CYAN,
 }
 
 ###############################################################################

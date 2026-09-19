@@ -70,6 +70,10 @@ Runs HTTP crawl, port scan, and Vigolium concurrently.
 
 > **SeedEndpointsForCrawlActivity** pre-seeds the endpoint DB with known URLs before the crawl runs, ensuring initial coverage even if httpx hasn't seen them yet.
 
+**Post–Tier 2: Email security** (`RunEmailSecurityActivity`, if `port_scan` is enabled)
+
+SPF/DMARC/DKIM plus SMTP relay/STARTTLS/cert checks on discovered mail ports. Mailbox confirmation then runs against the domain MX via `check-if-email-exists` (see [Mailbox Verification](email-verification.md)). Catch-all MX aborts enumeration. This step does not use `smtp-user-enum`.
+
 ---
 
 ### Tier 3: URL Fetching (Sequential)

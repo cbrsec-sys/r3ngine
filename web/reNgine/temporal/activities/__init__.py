@@ -4168,12 +4168,12 @@ def get_scan_final_status_activity(scan_id: int, task_succeeded: bool) -> int:
 
 @activity.defn(name="RunEmailSecurityActivity")
 def run_email_security_activity(ctx: dict) -> dict:
-    """Perform email/SMTP security checks (SPF, DMARC, DKIM, relay, STARTTLS, user enum).
+    """Perform email/SMTP security checks (SPF, DMARC, DKIM, relay, STARTTLS, mailbox verify).
 
     Runs as a sync activity so Temporal places it in a thread.  A background
     heartbeat thread (copy_context pattern, same as _run_task) sends heartbeats
-    every 30 s so the heartbeat_timeout is never tripped by slow swaks / smtp-user-enum
-    subprocesses.
+    every 30 s so the heartbeat_timeout is never tripped by slow swaks /
+    check_if_email_exists subprocesses.
     """
     import contextvars
     import time
@@ -4242,10 +4242,17 @@ def _run_email_security_sync(ctx: dict) -> dict:
     from startScan.models import ScanHistory, Subdomain
     from reNgine.tasks.email_security import (
         check_spf, check_dmarc, check_dkim, assess_spoofability,
-        swaks_relay_test, swaks_starttls_check, smtp_user_enum,
+        swaks_relay_test, swaks_starttls_check,
         check_ssl_cert, SMTP_PORTS,
     )
+    from reNgine.tasks.email_verification import (
+        verify_domain_mailboxes,
+        ACTIVITY_START_TO_CLOSE_SECONDS,
+    )
     from django.db.models import Q
+    import time
+
+    started = time.monotonic()
 
     scan_id: int = ctx.get('scan_history_id')
     domain_name: str = ctx.get('domain_name') or ctx.get('domain', '')
@@ -4380,15 +4387,29 @@ def _run_email_security_sync(ctx: dict) -> dict:
                         host_url,
                     )
 
-    enum_targets = list(checked_pairs)
-    if enum_targets:
-        enum = smtp_user_enum(enum_targets, domain=domain_name)
-        for host_port_key, users in enum['users_found'].items():
-            if users:
-                _vuln('SMTP User Enumeration (VRFY/EXPN)', 2,
-                      '%d valid usernames at %s: %s' % (
-                          len(users), host_port_key, ', '.join(users[:20])),
-                      'smtp://%s' % host_port_key)
+    yaml_cfg = ctx.get('yaml_configuration') or {}
+    proxy_url = None
+    try:
+        from reNgine.common_func import get_random_proxy
+        proxy_url = get_random_proxy()
+    except Exception:
+        proxy_url = None
+    mailbox = {'confirmed': [], 'checked': 0}
+    try:
+        remaining = ACTIVITY_START_TO_CLOSE_SECONDS - (time.monotonic() - started)
+        mailbox = verify_domain_mailboxes(
+            domain_name, scan, yaml_cfg, proxy_url=proxy_url,
+            remaining_seconds=remaining,
+        )
+        for finding in mailbox.get('findings') or []:
+            _vuln(finding['name'], finding['severity'], finding['description'])
+    except Exception as exc:
+        logger.error('[EMAIL_SECURITY] mailbox verification failed scan_id=%s: %s', scan_id, exc)
 
     logger.info('[EMAIL_SECURITY] COMPLETE scan_id=%s findings=%d', scan_id, findings_count)
-    return {'findings_count': findings_count, 'smtp_hosts_checked': len(checked_pairs)}
+    return {
+        'findings_count': findings_count,
+        'smtp_hosts_checked': len(checked_pairs),
+        'mailboxes_confirmed': len(mailbox.get('confirmed') or []),
+        'mailboxes_checked': mailbox.get('checked') or 0,
+    }
