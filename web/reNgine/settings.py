@@ -610,6 +610,7 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     r'^/mapi/auth/token/',
     r'^/mapi/auth/token/refresh/',
     r'^/mapi/.*$',
+    r'^/api/mcp/.*$',
 ]
 
 from datetime import timedelta
