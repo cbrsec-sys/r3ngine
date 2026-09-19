@@ -50,7 +50,10 @@ export const McpAuditChainDrawer: React.FC<{
         paper: {
           sx: {
             width: { xs: '100%', sm: 480 },
-            p: 2,
+            px: 2,
+            pb: 2,
+            pt: 12,
+            overflowY: 'auto',
             ...getSurfaceSx(isLight, tokens, theme),
           },
         },

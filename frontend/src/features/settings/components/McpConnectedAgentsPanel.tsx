@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Button,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  FormControlLabel,
   IconButton,
+  Link,
+  Radio,
+  RadioGroup,
   Table,
   TableBody,
   TableCell,
@@ -15,26 +21,43 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Ban } from 'lucide-react';
+import { Ban, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useMcpSessions, useRevokeMcpSession, type McpSession } from '../api/mcp';
+import {
+  useDeleteMcpAgent,
+  useMcpSessions,
+  useRevokeMcpSession,
+  type McpSession,
+} from '../api/mcp';
 import { McpAuditChainDrawer } from './McpAuditChainDrawer';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getDialogPaperSx } from '../../../theme/semanticColors';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
-export const McpConnectedAgentsPanel: React.FC = () => {
+export const McpConnectedAgentsPanel: React.FC<{
+  isAdmin?: boolean;
+  onFocusKey?: (keyId: number) => void;
+}> = ({ isAdmin = false, onFocusKey }) => {
   const { tokens, isLight, theme } = useThemeTokens();
   const { data } = useMcpSessions();
   const revokeSession = useRevokeMcpSession();
+  const deleteAgent = useDeleteMcpAgent();
   const [auditId, setAuditId] = useState<string | null>(null);
   const [pending, setPending] = useState<McpSession | null>(null);
+  const [deleting, setDeleting] = useState<McpSession | null>(null);
+  const [persistBan, setPersistBan] = useState(true);
 
   const statusColor = (status: McpSession['status']) => {
     if (status === 'connected') return tokens.accent.success;
     if (status === 'idle') return tokens.accent.warning;
     if (status === 'revoked') return tokens.accent.error;
     return tokens.text.disabled;
+  };
+
+  const agentLabel = (row: McpSession) => {
+    const provider = row.provider || row.client_name || 'unknown';
+    const host = row.hostname || row.device_id || '';
+    return host ? `${provider} @ ${host}` : provider;
   };
 
   return (
@@ -45,9 +68,9 @@ export const McpConnectedAgentsPanel: React.FC = () => {
             <TableRow>
               <TableCell>Agent</TableCell>
               <TableCell>Key</TableCell>
-              <TableCell>Transport</TableCell>
-              <TableCell>IP</TableCell>
-              <TableCell>Connected</TableCell>
+              <TableCell>IDE / OS</TableCell>
+              <TableCell>User</TableCell>
+              <TableCell>Requests</TableCell>
               <TableCell>Last seen</TableCell>
               <TableCell>Status</TableCell>
               <TableCell />
@@ -56,22 +79,41 @@ export const McpConnectedAgentsPanel: React.FC = () => {
           <TableBody>
             {(data?.items || []).map((row) => (
               <TableRow
-                key={row.session_id}
+                key={row.agent_id || row.session_id}
                 hover
                 sx={{ cursor: 'pointer' }}
                 onClick={() => setAuditId(row.session_id)}
               >
                 <TableCell>
-                  {row.client_name || 'unknown'} {row.client_version}
+                  {agentLabel(row)}
+                  {row.banned && (
+                    <Chip size="small" label="banned" sx={{ ml: 1 }} color="error" variant="outlined" />
+                  )}
                 </TableCell>
-                <TableCell sx={{ fontFamily: 'monospace' }}>{row.key_prefix}</TableCell>
-                <TableCell>{row.transport}</TableCell>
-                <TableCell>{row.source_ip || '—'}</TableCell>
+                <TableCell sx={{ fontFamily: 'monospace' }}>
+                  <Link
+                    component="button"
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onFocusKey?.(row.key_id);
+                    }}
+                    sx={{ color: tokens.accent.primary, fontFamily: 'inherit' }}
+                  >
+                    {row.key_name}
+                  </Link>
+                  <Typography variant="caption" display="block" sx={{ color: theme.palette.text.secondary }}>
+                    {row.key_prefix}
+                  </Typography>
+                </TableCell>
                 <TableCell>
-                  {row.connected_at
-                    ? formatDistanceToNow(new Date(row.connected_at), { addSuffix: true })
-                    : '—'}
+                  {row.ide || '—'}
+                  <Typography variant="caption" display="block" sx={{ color: theme.palette.text.secondary }}>
+                    {row.os_name || '—'}
+                  </Typography>
                 </TableCell>
+                <TableCell>{row.agent_username || '—'}</TableCell>
+                <TableCell>{row.request_count ?? '—'}</TableCell>
                 <TableCell>
                   {row.last_seen_at
                     ? formatDistanceToNow(new Date(row.last_seen_at), { addSuffix: true })
@@ -86,11 +128,11 @@ export const McpConnectedAgentsPanel: React.FC = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <Tooltip title="Revoke session">
+                  <Tooltip title="Ban agent (blocks reconnect from this device + provider)">
                     <span>
                       <IconButton
                         size="small"
-                        disabled={!!row.revoked_at}
+                        disabled={!!row.revoked_at || row.banned}
                         onClick={(event) => {
                           event.stopPropagation();
                           setPending(row);
@@ -100,6 +142,20 @@ export const McpConnectedAgentsPanel: React.FC = () => {
                       </IconButton>
                     </span>
                   </Tooltip>
+                  {isAdmin && (
+                    <Tooltip title="Delete agent and audit logs">
+                      <IconButton
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setPersistBan(true);
+                          setDeleting(row);
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -117,9 +173,10 @@ export const McpConnectedAgentsPanel: React.FC = () => {
         onClose={() => setPending(null)}
         slotProps={{ paper: { sx: getDialogPaperSx(isLight, theme, tokens) } }}
       >
-        <DialogTitle>Revoke session?</DialogTitle>
+        <DialogTitle>Ban this agent?</DialogTitle>
         <DialogContent>
-          The API key stays valid. The agent must open a new session.
+          The API key stays valid. This device + provider fingerprint cannot open a new session
+          until a sys-admin deletes the agent and chooses to unban it.
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPending(null)}>Cancel</Button>
@@ -131,7 +188,51 @@ export const McpConnectedAgentsPanel: React.FC = () => {
               setPending(null);
             }}
           >
-            Revoke
+            Ban
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        slotProps={{ paper: { sx: getDialogPaperSx(isLight, theme, tokens) } }}
+      >
+        <DialogTitle>Delete agent?</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This permanently removes all audit logs for this agent. That cannot be undone.
+          </Alert>
+          <FormControl>
+            <RadioGroup
+              value={persistBan ? 'persist' : 'unban'}
+              onChange={(event) => setPersistBan(event.target.value === 'persist')}
+            >
+              <FormControlLabel
+                value="persist"
+                control={<Radio />}
+                label="Delete and keep the ban (this device + provider cannot reconnect)"
+              />
+              <FormControlLabel
+                value="unban"
+                control={<Radio />}
+                label="Delete and unban (does not disconnect a live session; they may reconnect)"
+              />
+            </RadioGroup>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleting(null)}>Cancel</Button>
+          <Button
+            color="error"
+            disabled={deleteAgent.isPending}
+            onClick={async () => {
+              if (!deleting?.agent_id) return;
+              await deleteAgent.mutateAsync({ agentId: deleting.agent_id, persistBan });
+              setDeleting(null);
+            }}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

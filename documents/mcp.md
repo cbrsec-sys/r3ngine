@@ -20,7 +20,9 @@ Paste into Cursor / Claude Desktop / VS Code. Examples are in `r3ngine-mcp/confi
       "args": ["-y", "r3ngine-mcp"],
       "env": {
         "R3NGINE_URL": "https://<this-host>",
-        "R3NGINE_MCP_API_KEY": "<shown-once-secret>"
+        "R3NGINE_MCP_API_KEY": "<shown-once-secret>",
+        "R3NGINE_CA_CERT": "<full-path-to-ca.crt>",
+        "NODE_EXTRA_CA_CERTS": "<full-path-to-ca.crt>"
       }
     }
   }
@@ -58,11 +60,15 @@ npm run setup -- --url https://<this-host> --key r3n_mcp_… --yes
 
 The setup script installs dependencies, builds `dist/`, writes `.env`, opens a throwaway MCP session against `/api/mcp/` to prove the key works, smoke-starts the process, and can merge Cursor / VS Code / Claude Desktop config.
 
+On a local checkout the installer uses the **full path** to **`secrets/certs/ca.crt`** and writes it into `.env` and MCP client env (`R3NGINE_CA_CERT` / `NODE_EXTRA_CA_CERTS`) so agents know where the cert is. It verifies TLS as the DNS name in **`secrets/certs/r3ngine.pem`** (your `DOMAIN_NAME`). Connecting to `https://127.0.0.1` is supported; the cert itself is issued for that domain, not the loopback IP.
+
+If this machine does not have that file, setup tells you to copy `secrets/certs/ca.crt` from the r3ngine host and asks for the **full local path** (or pass `--ca C:\full\path\to\ca.crt`). Suggested destination: `r3ngine-mcp/certs/ca.crt`. Setup will not continue over HTTPS until agents have that path.
+
 Unauthorized HTTP clients (missing or invalid API key) are rate-limited **in the sidecar** before r3ngine is contacted: **10 failures per IP per minute** by default (`MCP_UNAUTH_MAX`, `MCP_UNAUTH_WINDOW_MS`). Further attempts get `429` with `Retry-After`. Invalid keys are remembered for the same window so Django is not probed again.
 
 ## Sessions and audit
 
-The MCP process opens a session and heartbeats every 30 seconds. **Settings → MCP Access** lists connected agents. Click a row for the redacted request/response chain. **Revoke session** kicks that agent off without rotating the key. Heartbeats are not audited.
+The MCP process opens a session and heartbeats every 30 seconds. **Settings → MCP Access** lists connected agents grouped by a fingerprint of provider + device (OS, IDE, hostname). Click a row for the redacted request/response chain. Click the **key name** to jump to that API key. **Ban** blocks that fingerprint from reconnecting even with a new session. Sys-admins can **Delete** an agent (this removes audit logs) and choose to **keep the ban** or **unban**. Heartbeats are not audited.
 
 ## What agents cannot do
 

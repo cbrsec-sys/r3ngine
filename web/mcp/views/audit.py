@@ -74,7 +74,13 @@ class McpSessionEventsView(APIView):
             return Response({'error': 'Not found'}, status=404)
         if session.user_id != request.user.id and not _is_admin(request.user):
             return Response({'error': 'Not found'}, status=404)
-        qs = McpAuditEvent.objects.filter(session=session).order_by('created_at')
+        if session.agent_id:
+            qs = McpAuditEvent.objects.filter(
+                session__agent_id=session.agent_id,
+                session__user_id=session.user_id,
+            ).order_by('created_at')
+        else:
+            qs = McpAuditEvent.objects.filter(session=session).order_by('created_at')
         return Response(page_queryset(qs, request, _serialize_event))
 
 

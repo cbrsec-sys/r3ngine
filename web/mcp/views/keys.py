@@ -11,6 +11,19 @@ from mcp.models import McpApiKey, McpSession
 
 
 def _serialize_key(row, secret=None):
+    agents = [
+        {
+            'agent_id': agent.id,
+            'provider': agent.provider,
+            'ide': agent.ide,
+            'hostname': agent.hostname,
+            'os_name': agent.os_name,
+            'username': agent.username,
+            'banned': bool(agent.banned_at),
+            'last_seen_at': agent.last_seen_at.isoformat() if agent.last_seen_at else None,
+        }
+        for agent in row.agents.all().order_by('-last_seen_at')[:12]
+    ]
     payload = {
         'id': row.id,
         'name': row.name,
@@ -19,6 +32,8 @@ def _serialize_key(row, secret=None):
         'last_used_at': row.last_used_at.isoformat() if row.last_used_at else None,
         'revoked_at': row.revoked_at.isoformat() if row.revoked_at else None,
         'status': 'revoked' if row.revoked_at else 'active',
+        'agents': agents,
+        'agent_count': len(agents),
     }
     if secret is not None:
         payload['secret'] = secret
@@ -26,7 +41,7 @@ def _serialize_key(row, secret=None):
 
 
 def _key_queryset(request):
-    qs = McpApiKey.objects.all().order_by('-created_at')
+    qs = McpApiKey.objects.prefetch_related('agents').all().order_by('-created_at')
     want_all = request.query_params.get('all') == '1'
     is_admin = request.user.is_superuser or has_role(request.user, 'sys_admin')
     if want_all and is_admin:

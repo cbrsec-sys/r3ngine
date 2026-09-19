@@ -33,7 +33,10 @@ import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getDialogPaperSx, getFieldSx } from '../../../theme/semanticColors';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
-export const McpKeysPanel: React.FC = () => {
+export const McpKeysPanel: React.FC<{
+  focusKeyId?: number | null;
+  onFocusAgent?: () => void;
+}> = ({ focusKeyId = null }) => {
   const { tokens, isLight, theme } = useThemeTokens();
   const { data } = useMcpKeys();
   const { data: settings } = useMcpSettings();
@@ -69,6 +72,7 @@ export const McpKeysPanel: React.FC = () => {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Prefix</TableCell>
+              <TableCell>Agents</TableCell>
               <TableCell>Created</TableCell>
               <TableCell>Last used</TableCell>
               <TableCell>Status</TableCell>
@@ -77,9 +81,27 @@ export const McpKeysPanel: React.FC = () => {
           </TableHead>
           <TableBody>
             {(data?.items || []).map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                id={`mcp-key-${row.id}`}
+                selected={focusKeyId === row.id}
+                sx={focusKeyId === row.id ? { outline: `1px solid ${tokens.accent.primary}` } : undefined}
+              >
                 <TableCell>{row.name}</TableCell>
                 <TableCell sx={{ fontFamily: 'monospace' }}>{row.prefix}</TableCell>
+                <TableCell>
+                  {(row.agents || []).length
+                    ? (row.agents || []).map((agent) => (
+                        <Chip
+                          key={agent.agent_id}
+                          size="small"
+                          label={`${agent.provider || 'agent'} @ ${agent.hostname || 'device'}`}
+                          sx={{ mr: 0.5, mb: 0.5 }}
+                          variant="outlined"
+                        />
+                      ))
+                    : '—'}
+                </TableCell>
                 <TableCell>
                   {row.created_at
                     ? formatDistanceToNow(new Date(row.created_at), { addSuffix: true })

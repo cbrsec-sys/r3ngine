@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
+from mcp.identity import BANNED_MESSAGE, agent_is_banned
 from mcp.keys import MCP_KEY_PREFIX, hash_mcp_secret, secrets_match
 from mcp.models import McpApiKey, McpSession
 
@@ -46,6 +47,8 @@ class McpApiKeyAuthentication(BaseAuthentication):
                 raise AuthenticationFailed(
                     'MCP session invalid or revoked. Reconnect or use a new session; the API key may still be valid.'
                 )
+            if agent_is_banned(session.agent_id):
+                raise AuthenticationFailed(BANNED_MESSAGE)
             McpSession.objects.filter(pk=session.pk).update(last_seen_at=timezone.now())
             request.mcp_session = session
         return (key.user, None)

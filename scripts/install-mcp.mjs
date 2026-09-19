@@ -18,12 +18,21 @@ function log(message) {
   process.stderr.write(`${message}\n`);
 }
 
+export function nodeBin(env = process.env) {
+  return env.NODE || 'node';
+}
+
+export function usesCmdShell(command, platform = process.platform) {
+  return platform === 'win32' && /\.(cmd|bat)$/i.test(command);
+}
+
 function run(command, args, cwd = ROOT) {
   const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
-    shell: process.platform === 'win32',
     env: process.env,
+    windowsHide: true,
+    shell: usesCmdShell(command),
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -87,7 +96,7 @@ Wrapper:
   --update       git pull if the checkout already exists
 
 Setup options are forwarded to r3ngine-mcp/scripts/install.mjs
-  (e.g. --url --key --transport --yes --write-cursor --detach)
+  (e.g. --url --key --transport --yes --write-cursor --detach --stop --restart)
 `);
 }
 
@@ -124,7 +133,7 @@ export function main(argv = process.argv.slice(2)) {
   const dir = ensureCheckout(opts);
   const installer = path.join(dir, 'scripts', 'install.mjs');
   log(`Running ${installer}`);
-  run(process.execPath, [installer, ...opts.rest], dir);
+  run(nodeBin(), [installer, ...opts.rest], dir);
   return 0;
 }
 

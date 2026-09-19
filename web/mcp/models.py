@@ -44,6 +44,59 @@ class McpApiKey(models.Model):
         return self.revoked_at is None
 
 
+class McpAgent(models.Model):
+    id = models.CharField(max_length=64, primary_key=True)
+    key = models.ForeignKey(
+        McpApiKey, on_delete=models.CASCADE, related_name='agents'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mcp_agents'
+    )
+    provider = models.CharField(max_length=80, blank=True, default='')
+    ide = models.CharField(max_length=80, blank=True, default='')
+    device_id = models.CharField(max_length=128, blank=True, default='')
+    os_name = models.CharField(max_length=80, blank=True, default='')
+    hostname = models.CharField(max_length=200, blank=True, default='')
+    username = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now_add=True)
+    banned_at = models.DateTimeField(null=True, blank=True)
+    banned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='mcp_agents_banned',
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['key', 'last_seen_at']),
+            models.Index(fields=['user', 'last_seen_at']),
+        ]
+
+
+class McpAgentBan(models.Model):
+    """Fingerprint bans that survive deleting the agent from the UI."""
+    agent_id = models.CharField(max_length=64, unique=True)
+    key = models.ForeignKey(
+        McpApiKey, null=True, blank=True, on_delete=models.SET_NULL, related_name='agent_bans'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='mcp_agent_bans',
+    )
+    provider = models.CharField(max_length=80, blank=True, default='')
+    ide = models.CharField(max_length=80, blank=True, default='')
+    device_id = models.CharField(max_length=128, blank=True, default='')
+    hostname = models.CharField(max_length=200, blank=True, default='')
+    banned_at = models.DateTimeField(auto_now_add=True)
+    banned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='mcp_agent_ban_actions',
+    )
+
+
 class McpSession(models.Model):
     CONNECTED_WINDOW_SECONDS = 120
 
@@ -52,6 +105,15 @@ class McpSession(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mcp_sessions'
     )
+    agent = models.ForeignKey(
+        McpAgent, null=True, blank=True, on_delete=models.SET_NULL, related_name='sessions'
+    )
+    provider = models.CharField(max_length=80, blank=True, default='')
+    ide = models.CharField(max_length=80, blank=True, default='')
+    device_id = models.CharField(max_length=128, blank=True, default='')
+    os_name = models.CharField(max_length=80, blank=True, default='')
+    hostname = models.CharField(max_length=200, blank=True, default='')
+    agent_username = models.CharField(max_length=200, blank=True, default='')
     transport = models.CharField(max_length=8, choices=(('stdio', 'stdio'), ('http', 'http')))
     client_name = models.CharField(max_length=200, blank=True, default='')
     client_version = models.CharField(max_length=100, blank=True, default='')

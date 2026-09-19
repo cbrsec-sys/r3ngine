@@ -51,6 +51,12 @@ class McpAuditApiTests(TestCase):
             'transport': 'stdio',
             'client_name': 'cursor',
             'client_version': '1',
+            'agent_id': 'c' * 64,
+            'provider': 'cursor',
+            'ide': 'cursor',
+            'device_id': 'dev',
+            'hostname': 'host',
+            'username': 'aud',
         }, format='json').json()['session_id']
         self.assertTrue(McpAuditEvent.objects.filter(tool_name='session_open', session_id=sid).exists())
         before = McpAuditEvent.objects.count()
@@ -66,3 +72,34 @@ class McpAuditApiTests(TestCase):
         tools = [item['tool_name'] for item in listed.json()['items']]
         self.assertIn('session_open', tools)
         self.assertNotIn('', [t for t in tools if 'heartbeat' in t])
+
+    def test_session_events_do_not_leak_another_users_agent_fingerprint(self):
+        other = User.objects.create_user(username='aud-other', password='x')
+        assign_role(other, 'penetration_tester')
+        secret = generate_mcp_secret()
+        McpApiKey.objects.create(
+            user=other,
+            name='k',
+            prefix=display_prefix(secret),
+            key_hash=hash_mcp_secret(secret),
+        )
+        other_mcp = APIClient()
+        other_mcp.credentials(HTTP_AUTHORIZATION=f'Bearer {secret}')
+        fingerprint = {
+            'transport': 'stdio',
+            'client_name': 'cursor',
+            'client_version': '1',
+            'agent_id': 'c' * 64,
+            'provider': 'cursor',
+            'ide': 'cursor',
+            'device_id': 'dev',
+            'hostname': 'host',
+            'username': 'shared-os-user',
+        }
+        mine = self.mcp.post('/api/mcp/sessions/', fingerprint, format='json').json()['session_id']
+        theirs = other_mcp.post('/api/mcp/sessions/', fingerprint, format='json').json()['session_id']
+        listed = self.ui.get(f'/api/mcp/sessions/{mine}/events/')
+        self.assertEqual(listed.status_code, 200)
+        session_ids = {item['session_id'] for item in listed.json()['items']}
+        self.assertIn(str(mine), session_ids)
+        self.assertNotIn(str(theirs), session_ids)

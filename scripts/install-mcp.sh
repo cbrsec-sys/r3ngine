@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-exec node "$ROOT/scripts/install-mcp.mjs" "$@"
+exec "${NODE:-node}" "$ROOT/scripts/install-mcp.mjs" "$@"

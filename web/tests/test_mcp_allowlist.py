@@ -25,6 +25,12 @@ def mcp_client_with_session(user):
         'transport': 'stdio',
         'client_name': 'test',
         'client_version': '0',
+        'agent_id': hash_mcp_secret(secret),
+        'provider': 'test',
+        'ide': 'test',
+        'device_id': 'test-device',
+        'hostname': 'test-host',
+        'username': user.username,
     }, format='json').json()['session_id']
     client.credentials(
         HTTP_AUTHORIZATION=f'Bearer {secret}',
@@ -42,6 +48,9 @@ class McpAllowlistTests(TestCase):
             if not view:
                 continue
             methods = set(m.upper() for m in view.http_method_names) - {'OPTIONS', 'HEAD'}
+            if 'DELETE' in methods:
+                self.assertIn('agents', str(pattern.pattern))
+                methods = methods - {'DELETE'}
             self.assertTrue(methods.isdisjoint(FORBIDDEN_METHODS), msg=str(pattern.pattern))
             if 'PATCH' in methods:
                 self.assertIn('settings', str(pattern.pattern))

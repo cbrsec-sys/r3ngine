@@ -38,6 +38,7 @@ export const McpAccessPage: React.FC = () => {
   const [toolName, setToolName] = useState('');
   const [statusCode, setStatusCode] = useState('');
   const [allUsers, setAllUsers] = useState(false);
+  const [focusKeyId, setFocusKeyId] = useState<number | null>(null);
   const { data: audit } = useMcpAudit({
     tool_name: toolName,
     status_code: statusCode,
@@ -80,10 +81,16 @@ export const McpAccessPage: React.FC = () => {
       )}
 
       <Box sx={{ mt: 3 }}>
-        <McpKeysPanel />
+        <McpKeysPanel focusKeyId={focusKeyId} />
       </Box>
       <Box sx={{ mt: 3 }}>
-        <McpConnectedAgentsPanel />
+        <McpConnectedAgentsPanel
+          isAdmin={isAdmin}
+          onFocusKey={(keyId) => {
+            setFocusKeyId(keyId);
+            document.getElementById(`mcp-key-${keyId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }}
+        />
       </Box>
 
       <Box sx={{ mt: 3 }}>

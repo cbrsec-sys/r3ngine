@@ -38,6 +38,7 @@ from mcp.views.read import (
     McpSearchView,
 )
 from mcp.views.sessions import (
+    McpAgentDeleteView,
     McpSessionEndView,
     McpSessionHeartbeatView,
     McpSessionListCreateView,
@@ -55,6 +56,7 @@ urlpatterns = [
     path('sessions/<uuid:pk>/end/', McpSessionEndView.as_view()),
     path('sessions/<uuid:pk>/revoke/', McpSessionRevokeView.as_view()),
     path('sessions/<uuid:pk>/events/', McpSessionEventsView.as_view()),
+    path('agents/<str:agent_id>/', McpAgentDeleteView.as_view()),
     path('audit/', McpAuditListView.as_view()),
     path('projects/', McpListProjectsView.as_view()),
     path('targets/<int:pk>/', McpGetTargetView.as_view()),

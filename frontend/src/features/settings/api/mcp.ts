@@ -8,6 +8,17 @@ export interface McpSettings {
   transport_mode: McpTransportMode;
 }
 
+export interface McpKeyAgent {
+  agent_id: string;
+  provider: string;
+  ide: string;
+  hostname: string;
+  os_name: string;
+  username: string;
+  banned: boolean;
+  last_seen_at: string | null;
+}
+
 export interface McpKey {
   id: number;
   name: string;
@@ -17,11 +28,14 @@ export interface McpKey {
   revoked_at: string | null;
   status: 'active' | 'revoked';
   secret?: string;
+  agents?: McpKeyAgent[];
+  agent_count?: number;
 }
 
 export interface McpSession {
   id: string;
   session_id: string;
+  agent_id: string;
   key_id: number;
   key_name: string;
   key_prefix: string;
@@ -30,14 +44,22 @@ export interface McpSession {
   transport: 'stdio' | 'http';
   client_name: string;
   client_version: string;
+  provider: string;
+  ide: string;
+  device_id: string;
+  os_name: string;
+  hostname: string;
+  agent_username: string;
   user_agent: string;
   source_ip: string | null;
   connected_at: string | null;
   last_seen_at: string | null;
   revoked_at: string | null;
   ended_at: string | null;
+  banned: boolean;
   connected: boolean;
   status: 'connected' | 'idle' | 'revoked' | 'ended';
+  request_count: number | null;
 }
 
 export interface McpAuditEvent {
@@ -215,6 +237,25 @@ export const useRevokeMcpSession = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mcp-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['mcp-keys'] });
+    },
+  });
+};
+
+export const useDeleteMcpAgent = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ agentId, persistBan }: { agentId: string; persistBan: boolean }) => {
+      const { data } = await axios.delete(`/api/mcp/agents/${agentId}/`, {
+        headers: csrfHeaders(),
+        data: { persist_ban: persistBan },
+      });
+      return data as { deleted: boolean; persist_ban: boolean; unbanned: boolean };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mcp-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['mcp-keys'] });
+      queryClient.invalidateQueries({ queryKey: ['mcp-audit'] });
     },
   });
 };

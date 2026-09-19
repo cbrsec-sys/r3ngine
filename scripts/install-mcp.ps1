@@ -1,4 +1,4 @@
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $PSScriptRoot
-& node (Join-Path $PSScriptRoot "install-mcp.mjs") @args
+$Node = if ($env:NODE) { $env:NODE } else { "node" }
+& $Node (Join-Path $PSScriptRoot "install-mcp.mjs") @args
 exit $LASTEXITCODE

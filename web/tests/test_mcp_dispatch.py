@@ -30,6 +30,12 @@ def mcp_client_with_session(user, transport='stdio'):
         'transport': transport,
         'client_name': 'test',
         'client_version': '0',
+        'agent_id': hash_mcp_secret(secret),
+        'provider': 'test',
+        'ide': 'test',
+        'device_id': 'test-device',
+        'hostname': 'test-host',
+        'username': user.username,
     }, format='json').json()['session_id']
     client.credentials(
         HTTP_AUTHORIZATION=f'Bearer {secret}',
