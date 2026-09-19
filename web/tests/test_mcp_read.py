@@ -112,3 +112,27 @@ class McpReadTests(TestCase):
         self.assertEqual(names, ['SQLi'])
         self.assertNotIn('curl_command', str(res.json()))
         self.assertNotIn('password', str(res.json()))
+
+    def test_search_paginates_across_types(self):
+        Vulnerability.objects.create(
+            name='example xss',
+            severity=2,
+            scan_history=self.scan,
+            target_domain=self.domain,
+        )
+        first = self.client.get('/api/mcp/search/?query=example&limit=1&offset=0')
+        self.assertEqual(first.status_code, 200)
+        body = first.json()
+        self.assertEqual(body['total_count'], 3)
+        self.assertEqual(body['count'], 1)
+        self.assertTrue(body['has_more'])
+        self.assertEqual(body['next_offset'], 1)
+        self.assertEqual(body['items'][0]['type'], 'target')
+
+        second = self.client.get('/api/mcp/search/?query=example&limit=1&offset=1')
+        self.assertEqual(second.json()['items'][0]['type'], 'scan')
+        third = self.client.get('/api/mcp/search/?query=example&limit=1&offset=2')
+        self.assertEqual(third.json()['items'][0]['type'], 'vulnerability')
+        done = self.client.get('/api/mcp/search/?query=example&limit=1&offset=3')
+        self.assertEqual(done.json()['items'], [])
+        self.assertFalse(done.json()['has_more'])

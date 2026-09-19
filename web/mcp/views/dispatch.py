@@ -12,10 +12,10 @@ from api.views.scan import (
     InitiateScan,
     InitiateSubTask,
     PauseScan,
-    ResumeScan,
     ScanActivityRetryAPIView,
     StartWorkflowView,
     StopScan,
+    UnpauseScan,
 )
 from mcp.views.base import McpDataView
 from reNgine.definitions import PERM_INITATE_SCANS_SUBSCANS
@@ -67,7 +67,8 @@ class McpPauseScanView(McpScanDispatchView):
 
 class McpResumeScanView(McpScanDispatchView):
     def post(self, request):
-        return _delegate_post(ResumeScan, request)
+        _copy_scan_id_to_scan_ids(request)
+        return _delegate_post(UnpauseScan, request)
 
 
 class McpStopScanView(McpScanDispatchView):

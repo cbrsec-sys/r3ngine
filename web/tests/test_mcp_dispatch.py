@@ -91,3 +91,15 @@ class McpDispatchTests(TestCase):
         res = client.post('/api/mcp/email-discovery/start/', {'scan_id': 1}, format='json')
         self.assertEqual(res.status_code, 202)
         mocked.assert_called()
+
+    @patch(
+        'mcp.views.dispatch.UnpauseScan.post',
+        return_value=Response({'status': True, 'resumed_count': 1}, status=200),
+    )
+    def test_resume_scan_unpauses_and_maps_scan_id(self, mocked):
+        client = mcp_client_with_session(self._user('pt3', 'penetration_tester'))
+        res = client.post('/api/mcp/scans/resume/', {'scan_id': 42}, format='json')
+        self.assertEqual(res.status_code, 200)
+        mocked.assert_called()
+        request = mocked.call_args[0][0]
+        self.assertEqual(list(request.data.get('scan_ids')), [42])

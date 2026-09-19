@@ -2,7 +2,7 @@ from django.db import connection
 from rest_framework.response import Response
 
 from dashboard.models import Project
-from mcp.pagination import page_queryset, parse_limit_offset, page_payload
+from mcp.pagination import page_concatenated, page_queryset
 from mcp.views.base import McpDataView
 from scanEngine.models import EngineType
 from startScan.models import (
@@ -283,21 +283,22 @@ class McpSearchView(McpDataView):
         if not query:
             return Response({'error': 'query is required'}, status=400)
         slug = request.query_params.get('project_slug')
-        domains = Domain.objects.filter(name__icontains=query)
-        scans = ScanHistory.objects.filter(domain__name__icontains=query).select_related('domain')
-        vulns = Vulnerability.objects.filter(name__icontains=query)
+        domains = Domain.objects.filter(name__icontains=query).order_by('id')
+        scans = (
+            ScanHistory.objects.filter(domain__name__icontains=query)
+            .select_related('domain')
+            .order_by('id')
+        )
+        vulns = Vulnerability.objects.filter(name__icontains=query).order_by('id')
         if slug:
             domains = domains.filter(project__slug=slug)
             scans = scans.filter(domain__project__slug=slug)
             vulns = vulns.filter(scan_history__domain__project__slug=slug)
-        limit, offset = parse_limit_offset(request)
-        items = (
-            [{'type': 'target', **serialize_target(row)} for row in domains[offset:offset + limit]]
-            + [{'type': 'scan', **serialize_scan(row)} for row in scans[offset:offset + limit]]
-            + [{'type': 'vulnerability', **serialize_vulnerability(row)} for row in vulns[offset:offset + limit]]
-        )
-        total = domains.count() + scans.count() + vulns.count()
-        return Response(page_payload(items[:limit], total, limit, offset))
+        return Response(page_concatenated(request, [
+            (domains, lambda row: {'type': 'target', **serialize_target(row)}),
+            (scans, lambda row: {'type': 'scan', **serialize_scan(row)}),
+            (vulns, lambda row: {'type': 'vulnerability', **serialize_vulnerability(row)}),
+        ]))
 
 
 class McpDashboardView(McpDataView):

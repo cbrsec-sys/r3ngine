@@ -31,3 +31,23 @@ def page_queryset(qs, request, serializer):
     total = qs.count()
     items = [serializer(obj) for obj in qs[offset:offset + limit]]
     return page_payload(items, total, limit, offset)
+
+
+def page_concatenated(request, parts):
+    """Apply one offset/limit across concatenated querysets (stable order)."""
+    limit, offset = parse_limit_offset(request)
+    totals = [qs.count() for qs, _serializer in parts]
+    total = sum(totals)
+    skip = offset
+    items = []
+    for (qs, serializer), count in zip(parts, totals):
+        if len(items) >= limit:
+            break
+        if skip >= count:
+            skip -= count
+            continue
+        take = limit - len(items)
+        for row in qs[skip:skip + take]:
+            items.append(serializer(row))
+        skip = 0
+    return page_payload(items, total, limit, offset)
