@@ -17,6 +17,15 @@
   - Confirmed addresses (`is_reachable=safe`) are stored on the scan; catch-all MX aborts enumeration. See `documents/email-verification.md`.
   - Scan detail timeline shows **Mailbox Verification** (`check_if_email_exists`) after port scan: pending at start, running while Reacher executes, then success/fail.
 
+- **LLM master switch**:
+  - Settings → AI Hub now has an **Enable LLM Features** toggle that controls impact assessment, GPT vulnerability reports, and other provider calls during scans.
+  - Replaces the `LLM_ENABLED` environment variable as the operator switch. Existing installs that already have an active provider are seeded on.
+
+#### Fixed
+
+- **AI Impact Assessment skip no longer fails the scan**:
+  - When LLM was off, `generate_impact_assessment` skipped with `return False`, which Temporal treated as a hard failure, retried three times, and marked the whole scan failed.
+
 ### [v3.7.4] - 2026-07-24
 
 #### Enhanced

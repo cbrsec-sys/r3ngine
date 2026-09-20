@@ -295,12 +295,14 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 	# Bail out before the per-vulnerability loop rather than inside it. Every
 	# iteration makes up to two provider calls, so with the provider unreachable
 	# this task used to spend its whole retry budget failing 100 times over.
+	# Return None (not False): `_run_task` treats False as a hard Temporal
+	# failure, which retried this skip 3 times and marked the whole scan failed.
 	if not llm_env_enabled():
 		logger.warning(
-			"[TIER7][IMPACT] LLM disabled (LLM_ENABLED unset) — skipping | scan_id=%s",
+			"[TIER7][IMPACT] LLM disabled in Settings — skipping | scan_id=%s",
 			scan_history_id,
 		)
-		return False
+		return
 
 	# Cap the per-run vuln limit so the activity stays well inside start_to_close_timeout.
 	# Single-vuln calls from the dashboard UI bypass this via vulnerability_id.

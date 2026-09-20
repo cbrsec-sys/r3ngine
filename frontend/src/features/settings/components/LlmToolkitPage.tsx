@@ -38,12 +38,14 @@ import {
   Database,
   Wifi,
   XCircle,
+  Power,
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import {
   useLlmToolkit,
   useLlmModels,
   useUpdateLlmSettings,
+  useToggleLlmEnabled,
   useOllamaPullStatus,
   useTestLlmConnection,
   useOllamaServiceStatus,
@@ -60,6 +62,7 @@ export const LlmToolkitPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: toolkit, isLoading: isToolkitLoading } = useLlmToolkit(projectSlug);
   const updateSettings = useUpdateLlmSettings(projectSlug);
+  const toggleLlmEnabled = useToggleLlmEnabled(projectSlug);
   const testConnection = useTestLlmConnection(projectSlug);
   const { data: ollamaStatus } = useOllamaServiceStatus(projectSlug);
   const startOllama = useStartOllamaService(projectSlug);
@@ -72,6 +75,7 @@ export const LlmToolkitPage: React.FC = () => {
     selected_model: '',
     is_active: false
   });
+  const [llmEnabled, setLlmEnabled] = useState(false);
   const [testResult, setTestResult] = useState<TestLlmConnectionResult | null>(null);
   const [pullingModel, setPullingModel] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
@@ -112,6 +116,12 @@ export const LlmToolkitPage: React.FC = () => {
       }
     }
   }, [toolkit, selectedProvider]);
+
+  useEffect(() => {
+    if (typeof toolkit?.llm_enabled === 'boolean') {
+      setLlmEnabled(toolkit.llm_enabled);
+    }
+  }, [toolkit?.llm_enabled]);
 
   // Set default provider on first load
   useEffect(() => {
@@ -154,6 +164,28 @@ export const LlmToolkitPage: React.FC = () => {
   useEffect(() => {
     setTestResult(null);
   }, [selectedProvider, form.api_key, form.selected_model]);
+
+  const handleMasterToggle = (enabled: boolean) => {
+    setLlmEnabled(enabled);
+    toggleLlmEnabled.mutate(enabled, {
+      onSuccess: (data) => {
+        setLlmEnabled(Boolean(data.llm_enabled));
+        setSnackbar({
+          open: true,
+          message: data.message || (enabled ? 'LLM features enabled.' : 'LLM features disabled.'),
+          severity: 'success',
+        });
+      },
+      onError: (error: any) => {
+        setLlmEnabled(!enabled);
+        setSnackbar({
+          open: true,
+          message: `Failed to update LLM switch: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      },
+    });
+  };
 
   const handleProviderChange = (provider: string) => {
     setSelectedProvider(provider);
@@ -271,6 +303,47 @@ export const LlmToolkitPage: React.FC = () => {
           CENTRALIZED LLM ORCHESTRATION & CONFIGURATION
         </Typography>
       </Box>
+
+      <TacticalPanel title="GLOBAL CONTROL" icon={<Power size={18} />} sx={{ mb: 3 }}>
+        <Box sx={{ p: 1 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={llmEnabled}
+                disabled={toggleLlmEnabled.isPending}
+                onChange={(e) => handleMasterToggle(e.target.checked)}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
+                }}
+              />
+            }
+            label={
+              <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
+                ENABLE LLM FEATURES
+              </Typography>
+            }
+          />
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 1 }}>
+            Master switch for AI impact assessment, GPT vulnerability reports, and other LLM calls during scans.
+            Configure a provider below, then turn this on.
+          </Typography>
+        </Box>
+        {!llmEnabled && (
+          <Alert
+            severity="warning"
+            sx={{
+              mt: 1,
+              bgcolor: `${tokens.accent.warning}14`,
+              color: 'text.primary',
+              border: `1px solid ${tokens.accent.warning}4D`,
+              '& .MuiAlert-icon': { color: tokens.accent.warning }
+            }}
+          >
+            LLM is off. Scans will skip AI impact assessment instead of calling a provider.
+          </Alert>
+        )}
+      </TacticalPanel>
 
       <Grid container spacing={3}>
         {/* Provider Sidebar */}

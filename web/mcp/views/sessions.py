@@ -70,6 +70,21 @@ def _serialize_session(row, request_count=None):
     return payload
 
 
+def client_ip(request):
+    """ASGI puts host:port in REMOTE_ADDR; PostgreSQL inet rejects the port."""
+    forwarded = (request.META.get('HTTP_X_FORWARDED_FOR') or '').split(',')[0].strip()
+    raw = forwarded or (request.META.get('REMOTE_ADDR') or '').strip()
+    if not raw:
+        return None
+    if raw.startswith('[') and ']' in raw:
+        return raw[1:raw.index(']')] or None
+    if raw.count(':') == 1:
+        host, port = raw.rsplit(':', 1)
+        if port.isdigit():
+            raw = host
+    return raw or None
+
+
 def _owned_or_admin_session(request, pk):
     session = get_object_or_404(McpSession, pk=pk)
     if session.user_id != request.user.id and not _is_admin(request.user):
@@ -200,7 +215,7 @@ class McpSessionListCreateView(APIView):
             'client_name': request.data.get('client_name') or '',
             'client_version': request.data.get('client_version') or '',
             'user_agent': request.META.get('HTTP_USER_AGENT', '')[:300],
-            'source_ip': request.META.get('REMOTE_ADDR'),
+            'source_ip': client_ip(request),
             'agent': agent,
             'provider': identity['provider'],
             'ide': identity['ide'],

@@ -23,7 +23,7 @@ from reNgine.common_func import *
 from reNgine.tasks import (run_command, send_discord_message, send_slack_message,send_lark_message, send_telegram_message, fetch_proxies_task)
 from django.core.cache import cache
 from reNgine.utils.llm import LLMModelManager
-from dashboard.models import LLMConfig
+from dashboard.models import LLMConfig, LLMSettings
 from scanEngine.forms import *
 from scanEngine.forms import ConfigurationForm
 from scanEngine.models import *
@@ -749,6 +749,8 @@ def llm_toolkit_section(request, slug):
     active_config = configs.filter(is_active=True).first()
     context['active_provider'] = active_config.provider if active_config else 'ollama'
     context['active_config'] = active_config
+    llm_enabled = LLMSettings.get_solo().enabled
+    context['llm_enabled'] = llm_enabled
     
     if request.headers.get('Accept') == 'application/json':
         return http.JsonResponse({
@@ -760,7 +762,8 @@ def llm_toolkit_section(request, slug):
                     'is_active': c.is_active
                 } for c in configs
             ],
-            'active_provider': context['active_provider']
+            'active_provider': context['active_provider'],
+            'llm_enabled': llm_enabled,
         })
 
     return render(request, 'dashboard/v3_index.html', context)
@@ -768,31 +771,47 @@ def llm_toolkit_section(request, slug):
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def update_llm_settings(request, slug):
-    if request.method == "POST":
-        provider = request.POST.get('provider')
-        api_key = request.POST.get('api_key')
-        selected_model = request.POST.get('selected_model')
-        is_active = request.POST.get('is_active') == 'true'
-        action = request.POST.get('action') # 'save' or 'pull'
-        
-        config, created = LLMConfig.objects.get_or_create(provider=provider)
-        config.api_key = api_key
-        config.selected_model = selected_model
-        
-        if is_active:
-            # Deactivate others
-            LLMConfig.objects.exclude(id=config.id).update(is_active=False)
-            config.is_active = True
-        
-        config.save()
-        
-        if action == 'pull' and provider == 'ollama':
-            from reNgine.tasks import pull_ollama_model
-            threading.Thread(target=pull_ollama_model, args=(selected_model,), daemon=True).start()
-            return http.JsonResponse({'status': 'pulling', 'message': f'Started pulling {selected_model}'})
-            
-        return http.JsonResponse({'status': 'success', 'message': 'Settings updated successfully'})
-    return http.JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
+    if request.method != "POST":
+        return http.JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
+
+    action = request.POST.get('action') # 'save', 'pull', or 'toggle_enabled'
+
+    if action == 'toggle_enabled':
+        llm_enabled_raw = request.POST.get('llm_enabled')
+        if llm_enabled_raw is None:
+            return http.JsonResponse({'status': 'error', 'message': 'llm_enabled is required'}, status=400)
+        settings_row = LLMSettings.get_solo()
+        settings_row.enabled = llm_enabled_raw == 'true'
+        settings_row.save(update_fields=['enabled'])
+        enabled = settings_row.enabled
+        return http.JsonResponse({
+            'status': 'success',
+            'message': 'LLM features enabled.' if enabled else 'LLM features disabled.',
+            'llm_enabled': enabled,
+        })
+
+    provider = request.POST.get('provider')
+    api_key = request.POST.get('api_key')
+    selected_model = request.POST.get('selected_model')
+    is_active = request.POST.get('is_active') == 'true'
+
+    config, created = LLMConfig.objects.get_or_create(provider=provider)
+    config.api_key = api_key
+    config.selected_model = selected_model
+
+    if is_active:
+        # Deactivate others
+        LLMConfig.objects.exclude(id=config.id).update(is_active=False)
+        config.is_active = True
+
+    config.save()
+
+    if action == 'pull' and provider == 'ollama':
+        from reNgine.tasks import pull_ollama_model
+        threading.Thread(target=pull_ollama_model, args=(selected_model,), daemon=True).start()
+        return http.JsonResponse({'status': 'pulling', 'message': f'Started pulling {selected_model}'})
+
+    return http.JsonResponse({'status': 'success', 'message': 'Settings updated successfully'})
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def fetch_llm_models(request, slug):

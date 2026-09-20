@@ -6,20 +6,23 @@ import requests
 
 _logger = logging.getLogger(__name__)
 
-# Master switch for every LLM call. Off by default: with no active LLMConfig the
-# generators used to fall back to Ollama, but no `ollama` service exists in
-# docker/docker-compose.yml (only the ollama_data volume), so each call burned
-# its retry budget on "Failed to resolve 'ollama'" and dragged out every scan.
-# Set LLM_ENABLED=1 and configure a provider to turn the features back on.
+# Master switch for every LLM call. Operators toggle this in Settings → AI Hub.
+# Off by default: with no active LLMConfig the generators used to fall back to
+# Ollama, but no `ollama` service exists in docker/docker-compose.yml, so each
+# call burned its retry budget on "Failed to resolve 'ollama'".
 LLM_DISABLED_MESSAGE = (
     "Error: LLM features are disabled "
-    "(set LLM_ENABLED=1 and activate an LLM provider in settings)"
+    "(enable LLM in Settings → AI Hub and activate a provider)"
 )
 
 
-def llm_env_enabled():
-    """True when the LLM_ENABLED environment switch is turned on."""
-    return os.environ.get('LLM_ENABLED', '0').strip().lower() in ('1', 'true', 'yes', 'on')
+def llm_enabled():
+    """True when the operator has enabled LLM features in Settings → AI Hub."""
+    from dashboard.models import LLMSettings
+    return bool(LLMSettings.get_solo().enabled)
+
+
+llm_env_enabled = llm_enabled
 
 _PROMPT_INJECTION_RE = re.compile(
     r'(ignore\s+(previous|all|above|prior)\s+(instructions?|prompts?|context)|'
@@ -77,11 +80,12 @@ class LLMBaseGenerator:
             self.model_name = self.config.selected_model
             self.provider = self.config.provider
             self.api_key = self.config.api_key
-        self.enabled = llm_env_enabled() and self.config is not None
+        settings_on = llm_enabled()
+        self.enabled = settings_on and self.config is not None
         if not self.enabled:
             self.logger.info(
-                "LLM features disabled (LLM_ENABLED=%s, active config=%s)",
-                os.environ.get('LLM_ENABLED', '0'), bool(self.config),
+                "LLM features disabled (settings enabled=%s, active config=%s)",
+                settings_on, bool(self.config),
             )
 
     def _call_llm(self, system_message, user_message, max_tokens=None):

@@ -28,6 +28,12 @@ export interface LLMConfig {
   is_active: boolean;
 }
 
+export interface LlmToolkit {
+  llm_configs: LLMConfig[];
+  active_provider: string;
+  llm_enabled: boolean;
+}
+
 export interface LLMModel {
   name: string;
   expertise?: string;
@@ -558,7 +564,7 @@ export const useUpdateApiVault = (slug: string) => {
 };
 
 export const useLlmToolkit = (slug: string) => {
-  return useQuery<{ llm_configs: LLMConfig[]; active_provider: string }>({
+  return useQuery<LlmToolkit>({
     queryKey: ['llm-toolkit', slug],
     queryFn: async () => {
       const response = await axios.get(`/scanEngine/${slug}/llm_toolkit`, {
@@ -600,6 +606,28 @@ export const useUpdateLlmSettings = (slug: string) => {
         }
       });
       return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['llm-toolkit', slug] });
+    },
+  });
+};
+
+export const useToggleLlmEnabled = (slug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const formData = new FormData();
+      formData.append('action', 'toggle_enabled');
+      formData.append('llm_enabled', enabled ? 'true' : 'false');
+
+      const response = await axios.post(`/scanEngine/${slug}/update_llm_settings`, formData, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data as { status: string; message: string; llm_enabled: boolean };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['llm-toolkit', slug] });
