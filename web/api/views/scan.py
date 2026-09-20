@@ -657,13 +657,14 @@ class ScanActivityRetryAPIView(APIView):
         original_scan_status = scan.scan_status
 
         with transaction.atomic():
-            # Reset the failed activity row so the serializer counts it as pending
-            # and _create_scan_activity can claim it normally.
+            # Reset the failed activity row so _create_scan_activity can claim it.
+            # Keep time_started so the timeline does not hide it as a ghost
+            # INITIATED row (those are filtered when time_started is null).
             ScanActivity.objects.filter(pk=activity_obj.pk).update(
                 status=INITIATED_TASK,
-                time_started=None,
                 time_ended=None,
                 error_message=None,
+                time=timezone.now(),
             )
 
             # Flip scan back to RUNNING so the UI reflects active state.

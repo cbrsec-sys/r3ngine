@@ -107,3 +107,54 @@ class TestLLMSSLAndSecurity(TestCase):
         self.assertNotIn("key=", url, "API key must not appear in URL query string")
         self.assertIn("x-goog-api-key", headers, "API key must be in x-goog-api-key header")
         self.assertEqual(headers["x-goog-api-key"], "test-api-key")
+
+
+class TestLLMSettingsSwitch(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from django.utils import timezone
+        from rolepermissions.roles import assign_role
+        from dashboard.models import Project
+
+        User = get_user_model()
+        self.user = User.objects.create_user(username='llm-admin', password='x')
+        assign_role(self.user, 'sys_admin')
+        self.project = Project.objects.create(
+            name='LLM Project',
+            slug='llm-project',
+            insert_date=timezone.now(),
+        )
+
+    def test_llm_enabled_follows_settings_row(self):
+        from dashboard.models import LLMSettings
+        from reNgine.llm import llm_enabled
+
+        settings_row = LLMSettings.get_solo()
+        self.assertFalse(settings_row.enabled)
+        self.assertFalse(llm_enabled())
+
+        settings_row.enabled = True
+        settings_row.save(update_fields=['enabled'])
+        self.assertTrue(llm_enabled())
+
+    def test_toggle_endpoint_updates_settings(self):
+        from dashboard.models import LLMSettings
+
+        self.client.force_login(self.user)
+        res = self.client.post(
+            f'/scanEngine/{self.project.slug}/update_llm_settings',
+            {'action': 'toggle_enabled', 'llm_enabled': 'true'},
+            HTTP_ACCEPT='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertTrue(payload['llm_enabled'])
+        self.assertTrue(LLMSettings.get_solo().enabled)
+
+        toolkit = self.client.get(
+            f'/scanEngine/{self.project.slug}/llm_toolkit',
+            HTTP_ACCEPT='application/json',
+        )
+        self.assertEqual(toolkit.status_code, 200)
+        self.assertTrue(toolkit.json()['llm_enabled'])
+

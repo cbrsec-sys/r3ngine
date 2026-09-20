@@ -153,6 +153,7 @@ INSTALLED_APPS = [
     'apme.apps.ApmeConfig',
     'engagements.apps.EngagementsConfig',
     'evidence.apps.EvidenceConfig',
+    'mcp.apps.McpConfig',
     'channels',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -609,6 +610,7 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     r'^/mapi/auth/token/',
     r'^/mapi/auth/token/refresh/',
     r'^/mapi/.*$',
+    r'^/api/mcp/.*$',
 ]
 
 from datetime import timedelta

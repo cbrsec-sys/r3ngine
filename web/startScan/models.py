@@ -1158,6 +1158,7 @@ class Email(models.Model):
 	SOURCE_PHONEBOOK = 'phonebook'
 	SOURCE_PATTERN   = 'pattern'
 	SOURCE_CRAWLED   = 'crawled'
+	SOURCE_MAILBOX_VERIFY = 'mailbox_verify'
 	SOURCE_CHOICES = [
 		(SOURCE_MANUAL,    'Manual'),
 		(SOURCE_HUNTER,    'Hunter.io'),
@@ -1165,6 +1166,7 @@ class Email(models.Model):
 		(SOURCE_PHONEBOOK, 'Phonebook.cz'),
 		(SOURCE_PATTERN,   'Pattern Inference'),
 		(SOURCE_CRAWLED,   'Crawled URLs'),
+		(SOURCE_MAILBOX_VERIFY, 'Mailbox Verified'),
 	]
 
 	id       = models.AutoField(primary_key=True)

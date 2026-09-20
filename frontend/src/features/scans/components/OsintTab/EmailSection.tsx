@@ -37,6 +37,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: 'warning' | 'default
   phonebook: { label: 'PHONEBOOK', color: 'default' },
   pattern:   { label: 'PATTERN',   color: 'default' },
   crawled:   { label: 'CRAWLED',   color: 'default' },
+  mailbox_verify: { label: 'VERIFIED', color: 'default' },
 };
 
 export const EmailSection: React.FC<EmailSectionProps> = ({ emails, scanId, refetchEmails }) => {

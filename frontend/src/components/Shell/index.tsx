@@ -187,6 +187,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         { title: 'Report Settings', path: `/${projectSlug}/settings/report-settings` },
         { title: 'reNgine Settings', path: `/${projectSlug}/settings/rengine-settings` },
         { title: 'Remote Workers', path: `/${projectSlug}/settings/workers` },
+        { title: 'MCP Access', path: `/${projectSlug}/settings/mcp` },
         { title: 'Notification Settings', path: `/${projectSlug}/settings/notifications` },
       ]
     },

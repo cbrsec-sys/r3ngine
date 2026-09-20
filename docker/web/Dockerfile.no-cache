@@ -334,6 +334,22 @@ RUN ARCH=$(dpkg --print-architecture) && \
     mv aquatone /usr/local/bin/ && \
     rm -f "aquatone_linux_${ARCH}_1.7.0.zip"
 
+# check_if_email_exists (Reacher) — MX/SMTP mailbox verification. Replaces smtp-user-enum.
+# Unmodified upstream CLI, AGPL-3.0. Pinned GitHub release; installed at image build onto PATH.
+RUN ARCH=$(dpkg --print-architecture) && \
+    CIE_VERSION="v0.11.7" && \
+    if [ "${ARCH}" = "arm64" ]; then CIE_TRIPLE="aarch64-unknown-linux-gnu"; \
+    else CIE_TRIPLE="x86_64-unknown-linux-gnu"; fi && \
+    mkdir -p /tmp/cie && \
+    curl -fsSL "https://github.com/reacherhq/check-if-email-exists/releases/download/${CIE_VERSION}/check_if_email_exists-${CIE_TRIPLE}.tar.gz" \
+      -o /tmp/cie/check_if_email_exists.tar.gz && \
+    tar -xzf /tmp/cie/check_if_email_exists.tar.gz -C /tmp/cie && \
+    BIN=$(find /tmp/cie -type f -name 'check_if_email_exists' | head -n1) && \
+    test -n "$BIN" && test -f "$BIN" && \
+    install -m 0755 "$BIN" /usr/local/bin/check_if_email_exists && \
+    rm -rf /tmp/cie && \
+    command -v check_if_email_exists
+
 # WPScan — WordPress vulnerability scanner
 RUN gem install wpscan --no-document
 
