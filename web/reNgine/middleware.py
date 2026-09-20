@@ -14,7 +14,7 @@ class ContentSecurityPolicyMiddleware:
 	# - api.dicebear.com          : user avatar SVGs
 	# - flagcdn.com               : country flag PNG images
 	# - *.basemaps.cartocdn.com   : Leaflet dark tile layer images (GeoMap)
-	# - raw.githubusercontent.com : GeoMap GeoJSON (ne_110m_admin_0_countries)
+	# - raw.githubusercontent.com : GeoMap GeoJSON; official plugin marketplace icons
 	# - fonts.googleapis.com      : Google Fonts CSS (404 page, report templates)
 	# - fonts.gstatic.com         : Google Fonts woff2 files
 	# - localhost:5173             : Vite HMR dev server (no-op in production)
@@ -26,7 +26,7 @@ class ContentSecurityPolicyMiddleware:
 		"https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
 		"img-src 'self' data: blob: "
 		"https://cdn.jsdelivr.net https://api.dicebear.com https://flagcdn.com "
-		"https://*.basemaps.cartocdn.com; "
+		"https://*.basemaps.cartocdn.com https://raw.githubusercontent.com; "
 		"font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; "
 		"connect-src 'self' ws: wss: "
 		"https://raw.githubusercontent.com https://localhost:5173 wss://localhost:5173; "
