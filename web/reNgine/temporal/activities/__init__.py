@@ -146,12 +146,13 @@ class TemporalTaskProxy:
     def _create_scan_activity(self):
         """Claim an unclaimed ScanActivity row for this task, or create one if none available.
 
-        Uses SELECT FOR UPDATE (skip_locked=True) so that only rows with
-        time_started__isnull=True are claimed. This prevents a Temporal activity
-        retry from overwriting SUCCESS rows left by prior attempts (AUD-003).
+        Uses SELECT FOR UPDATE (skip_locked=True) so that only INITIATED rows
+        are claimed (including retries that keep time_started so the timeline
+        does not hide them as ghosts). This prevents a Temporal activity retry
+        from overwriting SUCCESS rows left by prior attempts (AUD-003).
         """
         from startScan.models import ScanActivity
-        from reNgine.definitions import RUNNING_TASK
+        from reNgine.definitions import INITIATED_TASK, RUNNING_TASK
         from django.db import transaction
 
         try:
@@ -159,12 +160,13 @@ class TemporalTaskProxy:
             now = timezone.now()
             execution_id = "temporal-%s" % temporal_activity_id
             with transaction.atomic():
-                # Claim only a row that has not been started yet (time_started is NULL).
-                # skip_locked=True ensures concurrent retries do not race on the same row.
+                # Claim only an INITIATED row. skip_locked=True ensures concurrent
+                # retries do not race on the same row. Status is the claim key so a
+                # retry can keep time_started set (timeline-visible) and still be claimed.
                 activity_row = ScanActivity.objects.select_for_update(skip_locked=True).filter(
                     scan_of=self.scan,
                     name=self.task_name,
-                    time_started__isnull=True,
+                    status=INITIATED_TASK,
                 ).first()
 
                 if activity_row:
@@ -4145,18 +4147,44 @@ def log_plugin_end_activity(ctx: dict) -> None:
 
 
 @activity.defn(name="GetScanFinalStatusActivity")
-def get_scan_final_status_activity(scan_id: int, task_succeeded: bool, in_flight_names: list | None = None) -> int:
+def get_scan_final_status_activity(
+    scan_id: int,
+    task_succeeded: bool,
+    in_flight_names: list | None = None,
+    failed_task_name: str | None = None,
+) -> int:
     """Return the scan status after a single-task retry.
 
     If other names in this retry batch are still INITIATED/RUNNING, keep the
     scan RUNNING so a parallel sibling retry cannot mark SUCCESS early.
     Otherwise SUCCESS when this task succeeded and no other activities truly
     failed; FAILED otherwise.
+
+    When this retry failed before the activity claimed its row, flip that
+    INITIATED row back to FAILED so the timeline and retry button recover.
     """
+    from django.utils import timezone as _tz
     from startScan.models import ScanActivity
     from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, INITIATED_TASK
 
     pending_names = [n for n in (in_flight_names or []) if n]
+    if failed_task_name:
+        pending_names = [n for n in pending_names if n != failed_task_name]
+
+    if not task_succeeded and failed_task_name:
+        # Only the in-flight retry row (INITIATED, time_started kept) — not
+        # pre-seeded ghost rows with time_started=None.
+        ScanActivity.objects.filter(
+            scan_of_id=scan_id,
+            name=failed_task_name,
+            status=INITIATED_TASK,
+            time_started__isnull=False,
+        ).update(
+            status=FAILED_TASK,
+            error_message="Retry workflow failed before the task completed",
+            time_ended=_tz.now(),
+        )
+
     if pending_names:
         still_running = ScanActivity.objects.filter(
             scan_of_id=scan_id,

@@ -876,36 +876,48 @@ def retry_failed_tasks_temporal(scan, auto=False):
 	set_scan_stop_kill_switch(scan.id, enabled=False)
 
 	yaml_config = _yaml.safe_load(scan.scan_type.yaml_configuration or '') or {}
+	engine_id = scan.scan_type.id
+	domain_id = scan.domain.id
+	results_dir = scan.results_dir
+	scan_id = scan.id
 	started = []
+	to_start = []
+
+	# ORM must stay outside the async starter. recover_stuck_scans runs from a
+	# Temporal activity; Django raises SynchronousOnlyOperation if we query
+	# inside asyncio.run().
+	for task_name in names:
+		scan.scanactivity_set.filter(
+			name=task_name, status=FAILED_TASK
+		).update(
+			status=INITIATED_TASK,
+			time_ended=None,
+			error_message=None,
+		)
+		to_start.append({
+			'scan_history_id': scan_id,
+			'engine_id': engine_id,
+			'domain_id': domain_id,
+			'results_dir': results_dir,
+			'yaml_configuration': yaml_config,
+			'tasks': [task_name],
+			'original_scan_status': FAILED_TASK,
+			'retry_batch_names': names,
+			'task_name': task_name,
+			'workflow_id': (
+				f"retry-{task_name}-{scan_id}-{int(timezone.now().timestamp())}"
+			),
+		})
 
 	async def _start_all():
 		from datetime import timedelta
 		client = await TemporalClientProvider.get_client()
-		for task_name in names:
-			scan.scanactivity_set.filter(
-				name=task_name, status=FAILED_TASK
-			).update(
-				status=INITIATED_TASK,
-				time_started=None,
-				time_ended=None,
-				error_message=None,
-			)
-			ctx = {
-				'scan_history_id': scan.id,
-				'engine_id': scan.scan_type.id,
-				'domain_id': scan.domain.id,
-				'results_dir': scan.results_dir,
-				'yaml_configuration': yaml_config,
-				'tasks': [task_name],
-				'original_scan_status': FAILED_TASK,
-				'retry_batch_names': names,
-			}
-			workflow_id = (
-				f"retry-{task_name}-{scan.id}-{int(timezone.now().timestamp())}"
-			)
+		for item in to_start:
+			task_name = item.pop('task_name')
+			workflow_id = item.pop('workflow_id')
 			await client.start_workflow(
 				'SingleTaskRetryWorkflow',
-				args=[ctx, task_name],
+				args=[item, task_name],
 				id=workflow_id,
 				task_queue='python-orchestrator-queue',
 				execution_timeout=timedelta(days=2),
@@ -913,7 +925,7 @@ def retry_failed_tasks_temporal(scan, auto=False):
 			started.append(task_name)
 			logger.info(
 				"[RECOVERY] Scan %s retrying failed task %s as %s",
-				scan.id, task_name, workflow_id,
+				scan_id, task_name, workflow_id,
 			)
 
 	loop = asyncio.new_event_loop()

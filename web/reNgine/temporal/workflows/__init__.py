@@ -3708,26 +3708,25 @@ class SingleTaskRetryWorkflow:
 
             task_succeeded = True
 
-        except (ActivityError, ChildWorkflowError) as exc:
+        except (ActivityError, ChildWorkflowError, ApplicationError) as exc:
             workflow.logger.error(
                 f"SingleTaskRetryWorkflow: task={task_name} failed — {exc}"
             )
 
         original_scan_status = ctx.get("original_scan_status")
 
+        # Always run final-status so an unclaimed INITIATED retry row is
+        # restored to FAILED. Post-completion retries still force the scan
+        # back to SUCCESS so a failed re-run cannot reopen a completed scan.
+        final_status = await workflow.execute_activity(
+            "GetScanFinalStatusActivity",
+            args=[scan_id, task_succeeded, ctx.get("retry_batch_names") or [], task_name],
+            start_to_close_timeout=timedelta(minutes=2),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
         if original_scan_status == SUCCESS_TASK:
-            # Post-completion retry: restore scan to SUCCESS unconditionally so a
-            # failed re-run never reverts an otherwise complete scan to FAILED.
             final_status = SUCCESS_TASK
-        else:
-            # Standard retry (scan was FAILED/ABORTED): derive status from outcomes.
-            final_status = await workflow.execute_activity(
-                "GetScanFinalStatusActivity",
-                args=[scan_id, task_succeeded, ctx.get("retry_batch_names") or []],
-                start_to_close_timeout=timedelta(minutes=2),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue",
-            )
 
         await workflow.execute_activity(
             "UpdateScanStatusActivity",

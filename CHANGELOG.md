@@ -30,6 +30,11 @@
   - `recover_stuck_scans` treated a completed-but-failed MasterScanWorkflow as dead and spawned a new full `MasterScanWorkflow`. YAML resource keys in `ScanHistory.tasks` (`threads`, `timeout`, `rate_limit`, ...) were treated as remaining tasks, which re-ran YAML-defaulted Vigolium harvest/discovery.
   - Completed failed scans now retry unsuccessful `ScanActivity` rows via `SingleTaskRetryWorkflow`. Crash recovery still resumes remaining pipeline tasks only.
 
+- **AI Impact Assessment retry no longer stalls**:
+  - `SingleTaskRetryWorkflow` did not handle `generate_impact_assessment` on the running worker, raised an uncaught `ApplicationError`, left the scan RUNNING, and the timeline hid the reset INITIATED row (`time_started=None`).
+  - Retry now keeps the activity visible, claims INITIATED rows, and restores FAILED status if the retry workflow fails before the task starts — including post-completion retries that keep the parent scan SUCCESS.
+  - `retry_failed_tasks_temporal` no longer runs Django ORM inside `asyncio.run()`, which made orchestrator startup recovery fail with `SynchronousOnlyOperation`.
+
 ### [v3.7.4] - 2026-07-24
 
 #### Enhanced
