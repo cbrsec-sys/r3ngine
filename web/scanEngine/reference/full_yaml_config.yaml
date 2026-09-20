@@ -75,6 +75,17 @@ dns_security:
   amplification_threshold: 10        # Amplification ratio threshold (UDP ANY query)
 
 # ---------------------------------------------------------------------------
+# POST TIER 2 — Email security / mailbox verification
+# ---------------------------------------------------------------------------
+email_security:
+  mailbox_verification:
+    enabled: true          # default true when omitted
+    http_url: ""           # empty → CLI check_if_email_exists; else self-hosted Reacher origin
+    timeout: 15            # seconds per address
+    max_candidates: 200
+    delay_ms: 250
+
+# ---------------------------------------------------------------------------
 # TIER 1 — OSINT
 # ---------------------------------------------------------------------------
 osint:

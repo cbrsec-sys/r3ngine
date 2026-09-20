@@ -1,5 +1,40 @@
 # Changelog
 
+### [v3.7.6] - 2026-09-19
+
+#### Added
+
+- **MCP Access**:
+  - Dedicated `/api/mcp/` allowlist with hashed per-user API keys, sessions, and an append-only request/response audit chain.
+  - Settings → MCP Access: transport (stdio / HTTP / both), named keys (secret shown once), connected agents, session revoke, audit drawer, inspect-only Replay overlay (stored request, agent, and response; never re-dispatches).
+  - `r3ngine-mcp` TypeScript sidecar (stdio + Streamable HTTP). nginx `/mcp` proxies to the sidecar; the container has no database or scan-result volumes.
+  - HTTP sidecar rate-limits unauthorized clients (10 failures/IP/minute, `429 Retry-After`) before contacting r3ngine; invalid keys are remembered so Django is not re-probed.
+  - `scripts/install-mcp.mjs` clones `r3ngine-mcp` and runs its Node setup (`npm run setup` in that repo).
+  - See `documents/mcp.md`.
+
+- **Mailbox verification (Reacher)**:
+  - Replaced noisy `smtp-user-enum` VRFY spraying in built-in email security with Reacher `check-if-email-exists` mailbox verification (CLI default, optional self-hosted HTTP).
+  - Confirmed addresses (`is_reachable=safe`) are stored on the scan; catch-all MX aborts enumeration. See `documents/email-verification.md`.
+  - Scan detail timeline shows **Mailbox Verification** (`check_if_email_exists`) after port scan: pending at start, running while Reacher executes, then success/fail.
+
+- **LLM master switch**:
+  - Settings → AI Hub now has an **Enable LLM Features** toggle that controls impact assessment, GPT vulnerability reports, and other provider calls during scans.
+  - Replaces the `LLM_ENABLED` environment variable as the operator switch. Existing installs that already have an active provider are seeded on.
+
+#### Fixed
+
+- **AI Impact Assessment skip no longer fails the scan**:
+  - When LLM was off, `generate_impact_assessment` skipped with `return False`, which Temporal treated as a hard failure, retried three times, and marked the whole scan failed.
+
+- **Failed-scan restart recovery retries only failed tasks**:
+  - `recover_stuck_scans` treated a completed-but-failed MasterScanWorkflow as dead and spawned a new full `MasterScanWorkflow`. YAML resource keys in `ScanHistory.tasks` (`threads`, `timeout`, `rate_limit`, ...) were treated as remaining tasks, which re-ran YAML-defaulted Vigolium harvest/discovery.
+  - Completed failed scans now retry unsuccessful `ScanActivity` rows via `SingleTaskRetryWorkflow`. Crash recovery still resumes remaining pipeline tasks only.
+
+- **AI Impact Assessment retry no longer stalls**:
+  - `SingleTaskRetryWorkflow` did not handle `generate_impact_assessment` on the running worker, raised an uncaught `ApplicationError`, left the scan RUNNING, and the timeline hid the reset INITIATED row (`time_started=None`).
+  - Retry now keeps the activity visible, claims INITIATED rows, and restores FAILED status if the retry workflow fails before the task starts — including post-completion retries that keep the parent scan SUCCESS.
+  - `retry_failed_tasks_temporal` no longer runs Django ORM inside `asyncio.run()`, which made orchestrator startup recovery fail with `SynchronousOnlyOperation`.
+
 ### [v3.7.4] - 2026-07-24
 
 #### Enhanced

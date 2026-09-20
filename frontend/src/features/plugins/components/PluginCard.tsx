@@ -50,6 +50,7 @@ import {
   useBurpConfig,
   useUpdateBurpConfig,
   useBurpHealth,
+  resolvePluginIconSrcs,
 } from '../api/pluginsApi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -210,9 +211,92 @@ interface DetailsModalProps {
   open: boolean;
   onClose: () => void;
   plugin: Plugin;
+  iconSrcs?: string[];
 }
 
-const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin }) => {
+const PluginAvatar: React.FC<{
+  name: string;
+  src?: string | readonly string[];
+  size?: number;
+  fallbackColor: string;
+  textColor: string;
+}> = ({ name, src, size = 48, fallbackColor, textColor }) => {
+  const candidates = React.useMemo(
+    () => (Array.isArray(src) ? src : src ? [src] : []).filter(Boolean),
+    [src],
+  );
+  const candidateKey = candidates.join('\0');
+  const [index, setIndex] = React.useState(0);
+  const [blobSrc, setBlobSrc] = React.useState<string>();
+
+  React.useEffect(() => {
+    setIndex(0);
+  }, [candidateKey]);
+
+  const current = candidates[index];
+  const isRemoteSvg = !!current && /^https:\/\//i.test(current) && /\.svg(?:$|\?)/i.test(current);
+
+  React.useEffect(() => {
+    if (!current || !isRemoteSvg) {
+      setBlobSrc(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | undefined;
+
+    fetch(current, { referrerPolicy: 'no-referrer' })
+      .then((res) => {
+        if (!res.ok) throw new Error('svg icon fetch failed');
+        return res.blob();
+      })
+      .then((blob) => {
+        const typed = blob.type.includes('svg')
+          ? blob
+          : new Blob([blob], { type: 'image/svg+xml' });
+        objectUrl = URL.createObjectURL(typed);
+        if (!cancelled) setBlobSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setIndex((i) => i + 1);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [current, isRemoteSvg]);
+
+  const showSrc = isRemoteSvg ? blobSrc : current;
+
+  return (
+    <Avatar
+      variant="rounded"
+      src={showSrc}
+      alt={`${name} icon`}
+      slotProps={{
+        img: {
+          loading: 'lazy',
+          referrerPolicy: 'no-referrer',
+          onError: () => setIndex((i) => i + 1),
+        },
+      }}
+      sx={{
+        width: size,
+        height: size,
+        bgcolor: showSrc ? 'transparent' : fallbackColor,
+        color: textColor,
+        fontSize: size > 40 ? undefined : '1rem',
+        flexShrink: 0,
+        '& .MuiAvatar-img': { objectFit: 'contain' },
+      }}
+    >
+      {name[0]}
+    </Avatar>
+  );
+};
+
+const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin, iconSrcs }) => {
   const { tokens } = useThemeTokens();
   const trustCfg = getTrustLevelConfig(plugin.trust_level, tokens);
   const tools: Record<string, any> = plugin.tools_config ?? {};
@@ -239,9 +323,13 @@ const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin
       <DialogTitle sx={{ pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Avatar variant="rounded" sx={{ bgcolor: tokens.accent.primary, width: 36, height: 36, fontSize: '1rem', color: tokens.mode === 'light' ? '#fff' : '#000' }}>
-              {plugin.name[0]}
-            </Avatar>
+            <PluginAvatar
+              name={plugin.name}
+              src={iconSrcs}
+              size={36}
+              fallbackColor={tokens.accent.primary}
+              textColor={tokens.mode === 'light' ? '#fff' : '#000'}
+            />
             <Box>
               <Typography sx={{ fontFamily: 'var(--r3-heading-font)', fontWeight: 900, fontSize: '0.85rem', color: 'text.primary' }}>
                 {plugin.name}
@@ -781,6 +869,10 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
   const data = plugin || marketplacePlugin;
   const isMarketplace = !!marketplacePlugin && !plugin;
   const isInstalled = !!plugin || (marketplacePlugin?.is_installed);
+  const iconSrcs = React.useMemo(
+    () => resolvePluginIconSrcs(plugin, marketplacePlugin),
+    [plugin, marketplacePlugin],
+  );
 
   if (!data) return null;
 
@@ -826,13 +918,13 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
         <CardContent>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <Avatar
-                variant="rounded"
-                src={plugin?.icon_path ? `/api/plugins/${plugin.slug}/icon/` : undefined}
-                sx={{ bgcolor: isMarketplace && !isInstalled ? tokens.accent.success : tokens.accent.primary, width: 48, height: 48, color: tokens.mode === 'light' ? '#fff' : '#000' }}
-              >
-                {data.name[0]}
-              </Avatar>
+              <PluginAvatar
+                name={data.name}
+                src={iconSrcs}
+                size={48}
+                fallbackColor={isMarketplace && !isInstalled ? tokens.accent.success : tokens.accent.primary}
+                textColor={tokens.mode === 'light' ? '#fff' : '#000'}
+              />
               <Box>
                 <Typography variant="h6" sx={{ fontFamily: 'var(--r3-heading-font)', fontWeight: "bold", color: 'text.primary', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>
                   {data.name}
@@ -997,6 +1089,7 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
           open={isDetailsOpen}
           onClose={() => setIsDetailsOpen(false)}
           plugin={plugin}
+          iconSrcs={iconSrcs}
         />
       )}
 

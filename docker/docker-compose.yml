@@ -122,6 +122,31 @@ services:
         reservations:
           memory: 1G
 
+  r3ngine-mcp:
+    build:
+      context: ../r3ngine-mcp
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - MCP_TRANSPORT=http
+      - MCP_BIND=0.0.0.0
+      - MCP_PORT=3100
+      - R3NGINE_URL=http://web:8000
+      - MCP_UNAUTH_MAX=10
+      - MCP_UNAUTH_WINDOW_MS=60000
+    networks:
+      - r3ngine_network
+    depends_on:
+      - web
+    expose:
+      - "3100"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
   proxy:
     restart: always
     image: nginx:alpine
@@ -132,6 +157,7 @@ services:
       - web
       - db
       - redis
+      - r3ngine-mcp
     secrets:
       - source: proxy.ca
         target: /etc/nginx/certs/rengine_chain.pem

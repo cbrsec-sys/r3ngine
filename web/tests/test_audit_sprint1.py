@@ -172,9 +172,9 @@ class TestAUD003OldBehaviourIsGone(unittest.TestCase):
         with open(ACTIVITIES_FILE, encoding='utf-8-sig') as f:
             source = f.read()
         self.assertIn(
-            'time_started__isnull=True',
+            'status=INITIATED_TASK',
             source,
-            "_create_scan_activity must filter time_started__isnull=True before claiming (AUD-003)"
+            "_create_scan_activity must claim INITIATED rows only (AUD-003)"
         )
 
     def test_exception_is_reraised_not_swallowed(self):
@@ -235,12 +235,12 @@ class TestAUD003ScanActivityRetryBehaviour(DjangoTestCase):
             time=tz_module.now(),
         )
 
-        # The correct behaviour: only claim the unclaimed row
+        # The correct behaviour: only claim the unclaimed INITIATED row
         with transaction.atomic():
             updated = ScanActivity.objects.select_for_update(skip_locked=True).filter(
                 scan_of=self.scan,
                 name='nuclei_scan',
-                time_started__isnull=True,
+                status=INITIATED_TASK,
             ).update(
                 status=RUNNING_TASK,
                 time_started=tz_module.now(),
