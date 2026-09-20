@@ -107,3 +107,16 @@ class TestBuildScanTaskPlan(SimpleTestCase):
         names = [t['name'] for t in plan]
         self.assertNotIn('check_if_email_exists', names)
         self.assertIn('port_scan', names)
+
+
+class TestCanonicalScanTaskName(SimpleTestCase):
+    def test_yaml_resource_keys_are_not_pipeline_tasks(self):
+        from reNgine.task_plan import canonical_scan_task_name
+        for name in ('threads', 'timeout', 'rate_limit', 'retries', 'leaks_and_secrets'):
+            self.assertIsNone(canonical_scan_task_name(name))
+
+    def test_aliases_and_known_tasks(self):
+        from reNgine.task_plan import canonical_scan_task_name
+        self.assertEqual(canonical_scan_task_name('attack_path_modeling'), 'run_apme')
+        self.assertEqual(canonical_scan_task_name('generate_impact_assessment'), 'generate_impact_assessment')
+        self.assertEqual(canonical_scan_task_name('subdomain_discovery'), 'subdomain_discovery')

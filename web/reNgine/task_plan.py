@@ -101,6 +101,24 @@ _TIER7_TASKS = [
     'scan_notification',
 ]
 
+# Engine YAML often stores resource keys (threads, timeout, ...) in ScanHistory.tasks.
+# Recovery must ignore those and only resume real pipeline task names.
+_SCAN_TASK_ALIASES = {
+    'attack_path_modeling': 'run_apme',
+}
+
+KNOWN_SCAN_TASK_NAMES = set(_TASK_TITLES) | set(_TIER7_TASKS)
+
+
+def canonical_scan_task_name(name: str):
+    """Return a known pipeline task name, or None for YAML/resource keys."""
+    if not name:
+        return None
+    mapped = _SCAN_TASK_ALIASES.get(name, name)
+    if mapped in KNOWN_SCAN_TASK_NAMES:
+        return mapped
+    return None
+
 _TIER1_TO_5 = [
     'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
     'dns_security', 'osint', 'spiderfoot_scan', 'baddns',

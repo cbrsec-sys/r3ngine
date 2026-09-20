@@ -353,7 +353,11 @@ class MasterScanWorkflow:
             # enumeration — it seeds the DB with passively gathered endpoints early.
             # Vigolium discovery moves to Tier 2 so it can target all enumerated subdomains.
             vigolium_harvest_config = yaml_config.get('vigolium_harvest', {})
-            if vigolium_harvest_config.get('run_vigolium_harvest', True):
+            if vigolium_harvest_config.get('run_vigolium_harvest', True) and (
+                not ctx.get('resume_from_remaining')
+                or 'vigolium_harvest' in tasks
+                or 'vulnerability_scan' in tasks
+            ):
                 discovery_futures.append(
                     workflow.execute_activity(
                         "RunVigoliumHarvestActivity",
@@ -420,7 +424,11 @@ class MasterScanWorkflow:
             tier2_futures = [_http_crawl_branch()]
 
             vigolium_discovery_config = yaml_config.get('vigolium_discovery', {})
-            if vigolium_discovery_config.get('run_vigolium_discovery', True):
+            if vigolium_discovery_config.get('run_vigolium_discovery', True) and (
+                not ctx.get('resume_from_remaining')
+                or 'vigolium_discovery' in tasks
+                or 'vulnerability_scan' in tasks
+            ):
                 tier2_futures.append(
                     workflow.execute_activity(
                         "RunVigoliumDiscoveryActivity",
@@ -665,7 +673,11 @@ class MasterScanWorkflow:
                 )
 
             vigolium_analysis_config = yaml_config.get('vigolium_analysis', {})
-            if vigolium_analysis_config.get('run_vigolium_analysis', True):
+            if vigolium_analysis_config.get('run_vigolium_analysis', True) and (
+                not ctx.get('resume_from_remaining')
+                or 'vigolium_analysis' in tasks
+                or 'vulnerability_scan' in tasks
+            ):
                 analysis_futures.append(
                     workflow.execute_activity(
                         "RunVigoliumAnalysisActivity",
@@ -3676,6 +3688,16 @@ class SingleTaskRetryWorkflow:
                     heartbeat_timeout=timedelta(minutes=10),
                     task_queue="python-orchestrator-queue",
                 )
+            elif task_name == "generate_impact_assessment":
+                await workflow.execute_activity("GenerateImpactAssessmentActivity", ctx, start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LLM, task_queue="python-orchestrator-queue")
+            elif task_name == "correlate_vulnerabilities":
+                await workflow.execute_activity("CorrelateVulnerabilitiesActivity", ctx, start_to_close_timeout=timedelta(minutes=90), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            elif task_name == "calculate_risk_scores":
+                await workflow.execute_activity("CalculateRiskScoresActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+            elif task_name == "sync_graph":
+                await workflow.execute_activity("SyncGraphActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
+            elif task_name in ("run_apme", "attack_path_modeling"):
+                await workflow.execute_activity("RunGenericTaskActivity", args=[ctx, "run_apme", "Attack Path Modeling"], start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
             elif task_name == "run_acunetix":
                 await workflow.execute_activity("RunAcunetixActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
             else:
@@ -3701,7 +3723,7 @@ class SingleTaskRetryWorkflow:
             # Standard retry (scan was FAILED/ABORTED): derive status from outcomes.
             final_status = await workflow.execute_activity(
                 "GetScanFinalStatusActivity",
-                args=[scan_id, task_succeeded],
+                args=[scan_id, task_succeeded, ctx.get("retry_batch_names") or []],
                 start_to_close_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue",

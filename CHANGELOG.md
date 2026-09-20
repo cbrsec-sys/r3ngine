@@ -26,6 +26,10 @@
 - **AI Impact Assessment skip no longer fails the scan**:
   - When LLM was off, `generate_impact_assessment` skipped with `return False`, which Temporal treated as a hard failure, retried three times, and marked the whole scan failed.
 
+- **Failed-scan restart recovery retries only failed tasks**:
+  - `recover_stuck_scans` treated a completed-but-failed MasterScanWorkflow as dead and spawned a new full `MasterScanWorkflow`. YAML resource keys in `ScanHistory.tasks` (`threads`, `timeout`, `rate_limit`, ...) were treated as remaining tasks, which re-ran YAML-defaulted Vigolium harvest/discovery.
+  - Completed failed scans now retry unsuccessful `ScanActivity` rows via `SingleTaskRetryWorkflow`. Crash recovery still resumes remaining pipeline tasks only.
+
 ### [v3.7.4] - 2026-07-24
 
 #### Enhanced

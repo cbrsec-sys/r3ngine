@@ -4145,12 +4145,26 @@ def log_plugin_end_activity(ctx: dict) -> None:
 
 
 @activity.defn(name="GetScanFinalStatusActivity")
-def get_scan_final_status_activity(scan_id: int, task_succeeded: bool) -> int:
-    """Return SUCCESS_TASK if the task succeeded and no other activities truly failed;
-    otherwise return FAILED_TASK. Used by SingleTaskRetryWorkflow to finalize scan status.
+def get_scan_final_status_activity(scan_id: int, task_succeeded: bool, in_flight_names: list | None = None) -> int:
+    """Return the scan status after a single-task retry.
+
+    If other names in this retry batch are still INITIATED/RUNNING, keep the
+    scan RUNNING so a parallel sibling retry cannot mark SUCCESS early.
+    Otherwise SUCCESS when this task succeeded and no other activities truly
+    failed; FAILED otherwise.
     """
-    from startScan.models import ScanHistory, ScanActivity
-    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+    from startScan.models import ScanActivity
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, INITIATED_TASK
+
+    pending_names = [n for n in (in_flight_names or []) if n]
+    if pending_names:
+        still_running = ScanActivity.objects.filter(
+            scan_of_id=scan_id,
+            name__in=pending_names,
+            status__in=[INITIATED_TASK, RUNNING_TASK],
+        ).exists()
+        if still_running:
+            return RUNNING_TASK
 
     if not task_succeeded:
         return FAILED_TASK

@@ -160,6 +160,7 @@ from reNgine.tasks.scan_init import (
     recover_stuck_scans,
     report,
     resume_scan_temporal,
+    retry_failed_tasks_temporal,
 )
 
 """

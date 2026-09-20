@@ -822,18 +822,123 @@ def report(self, ctx={}, description=None):
 		logger.warning(f"Could not send scan notification: {e}")
 
 
+def _unsuccessful_task_names(scan):
+	"""Pipeline task names that failed and never produced a SUCCESS row."""
+	from startScan.models import ScanActivity
+	from reNgine.task_plan import canonical_scan_task_name
+
+	failed_names = set(
+		ScanActivity.objects.filter(
+			scan_of=scan, status=FAILED_TASK, time_started__isnull=False
+		).exclude(name='scan_notification').values_list('name', flat=True)
+	)
+	success_names = set(
+		ScanActivity.objects.filter(
+			scan_of=scan, status=SUCCESS_TASK
+		).exclude(name='scan_notification').values_list('name', flat=True)
+	)
+	true_failures = failed_names - success_names
+	names = []
+	seen = set()
+	for raw in true_failures:
+		name = canonical_scan_task_name(raw) or raw
+		if name in seen or name == 'scan_notification':
+			continue
+		seen.add(name)
+		names.append(name)
+	return names
+
+
+def retry_failed_tasks_temporal(scan, auto=False):
+	"""Retry only unsuccessful ScanActivity rows via SingleTaskRetryWorkflow.
+
+	Used when a scan's MasterScanWorkflow already completed but some tasks failed
+	(e.g. AI impact assessment). Must not spawn a new MasterScanWorkflow.
+	"""
+	from reNgine.temporal_client import TemporalClientProvider, run_and_close
+	from django.utils import timezone
+	import asyncio
+	import yaml as _yaml
+
+	names = _unsuccessful_task_names(scan)
+	if not names:
+		logger.info("[RECOVERY] Scan %s has no unsuccessful tasks to retry", scan.id)
+		return []
+
+	if auto:
+		scan.recovery_count = (scan.recovery_count or 0) + 1
+	scan.scan_status = RUNNING_TASK
+	scan.error_message = None
+	scan.stop_scan_date = None
+	scan.save(update_fields=['recovery_count', 'scan_status', 'error_message', 'stop_scan_date'])
+
+	from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
+	set_scan_stop_kill_switch(scan.id, enabled=False)
+
+	yaml_config = _yaml.safe_load(scan.scan_type.yaml_configuration or '') or {}
+	started = []
+
+	async def _start_all():
+		from datetime import timedelta
+		client = await TemporalClientProvider.get_client()
+		for task_name in names:
+			scan.scanactivity_set.filter(
+				name=task_name, status=FAILED_TASK
+			).update(
+				status=INITIATED_TASK,
+				time_started=None,
+				time_ended=None,
+				error_message=None,
+			)
+			ctx = {
+				'scan_history_id': scan.id,
+				'engine_id': scan.scan_type.id,
+				'domain_id': scan.domain.id,
+				'results_dir': scan.results_dir,
+				'yaml_configuration': yaml_config,
+				'tasks': [task_name],
+				'original_scan_status': FAILED_TASK,
+				'retry_batch_names': names,
+			}
+			workflow_id = (
+				f"retry-{task_name}-{scan.id}-{int(timezone.now().timestamp())}"
+			)
+			await client.start_workflow(
+				'SingleTaskRetryWorkflow',
+				args=[ctx, task_name],
+				id=workflow_id,
+				task_queue='python-orchestrator-queue',
+				execution_timeout=timedelta(days=2),
+			)
+			started.append(task_name)
+			logger.info(
+				"[RECOVERY] Scan %s retrying failed task %s as %s",
+				scan.id, task_name, workflow_id,
+			)
+
+	loop = asyncio.new_event_loop()
+	run_and_close(loop, _start_all())
+	return started
+
+
 #------------------------- #
 # Tracked reNgine tasks    #
 #--------------------------#
 
 
-def resume_scan_temporal(scan_id):
+def resume_scan_temporal(scan_id, auto=False):
 	"""Resume a scan from the last completed task.
 	
 	1. Identifies completed tasks by checking ScanActivity records.
-	2. Spawns MasterScanWorkflow with only the remaining tasks.
+	2. Spawns MasterScanWorkflow with only the remaining pipeline tasks.
+
+	Args:
+		scan_id (int): ScanHistory primary key.
+		auto (bool): True when called from recover_stuck_scans. Increments
+			recovery_count instead of resetting it, so restarts cannot loop.
 	"""
 	from reNgine.temporal_client import TemporalClientProvider, run_and_close
+	from reNgine.task_plan import canonical_scan_task_name
 	import asyncio
 
 	scan = ScanHistory.objects.get(id=scan_id)
@@ -846,8 +951,18 @@ def resume_scan_temporal(scan_id):
 	completed_activities = scan.scanactivity_set.filter(status=SUCCESS_TASK).values_list('name', flat=True)
 	completed_tasks = set(completed_activities)
 
-	# Filter the scan's original task list (tasks may be NULL for old/broken scans)
-	remaining_tasks = [t for t in (scan.tasks or []) if t not in completed_tasks]
+	# Filter the scan's original task list (tasks may be NULL for old/broken scans).
+	# Drop YAML resource keys (threads, timeout, rate_limit, ...) that are not
+	# pipeline tasks — otherwise a resume re-runs MasterScanWorkflow with junk
+	# names and YAML-defaulted Vigolium/harvest still fires.
+	remaining_tasks = []
+	seen = set()
+	for raw_name in (scan.tasks or []):
+		name = canonical_scan_task_name(raw_name)
+		if not name or name in completed_tasks or name in seen:
+			continue
+		seen.add(name)
+		remaining_tasks.append(name)
 
 	# Reset FAILED rows for tasks that will be retried back to INITIATED so:
 	# (a) _create_scan_activity can claim the existing row rather than creating
@@ -865,20 +980,30 @@ def resume_scan_temporal(scan_id):
 		)
 
 	if not remaining_tasks:
+		failed_names = _unsuccessful_task_names(scan)
+		if failed_names:
+			logger.info(
+				"Scan %s has no remaining pipeline tasks but failed %s — retrying those only",
+				scan_id, failed_names,
+			)
+			retry_failed_tasks_temporal(scan, auto=auto)
+			return
 		logger.info(f"Scan {scan_id} has no remaining tasks to resume.")
 		scan.scan_status = SUCCESS_TASK
 		scan.stop_scan_date = timezone.now()
 		scan.save()
 		return
 		
-	# Update scan status. Clear stop_scan_date and reset recovery_count so that
-	# recover_stuck_scans can find this scan if the container crashes again — a
-	# manually resumed scan is a fresh attempt, not a continuation of prior failures.
+	# Update scan status. Clear stop_scan_date so recover_stuck_scans can find
+	# this scan if the container crashes again.
 	scan.scan_status = RUNNING_TASK
 	scan.error_message = None
 	scan.stop_scan_date = None
-	scan.recovery_count = 0
-	scan.tasks = remaining_tasks
+	if auto:
+		scan.recovery_count = (scan.recovery_count or 0) + 1
+	else:
+		# Manual resume is a fresh attempt.
+		scan.recovery_count = 0
 	scan.save()
 
 	from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
@@ -894,6 +1019,7 @@ def resume_scan_temporal(scan_id):
 		'results_dir': scan.results_dir,
 		'yaml_configuration': yaml_config,
 		'tasks': remaining_tasks,
+		'resume_from_remaining': True,
 	}
 	
 	workflow_id = f"master-scan-{scan.id}-run-{scan.recovery_count}"
@@ -957,11 +1083,13 @@ def resume_scan_temporal(scan_id):
 def recover_stuck_scans():
 	"""Recover scans stuck due to a crash or Temporal state loss.
 
-	Called on orchestrator startup. Identifies RUNNING_TASK scans whose associated
-	Temporal workflow no longer exists (e.g. after a container restart or crash),
-	marks them as FAILED_TASK, and resumes them using the temporal orchestrator.
-	Scans that are already in FAILED_TASK, ABORTED_TASK, or otherwise completed/stopped/paused
-	states are not touched.
+	Called on orchestrator startup.
+
+	- RUNNING scans whose workflow is gone (crash): resume remaining pipeline tasks.
+	- FAILED scans whose MasterScanWorkflow already completed: retry only the
+	  unsuccessful ScanActivity rows. Do not start a new MasterScanWorkflow.
+	- FAILED scans whose workflow is missing/terminated mid-flight: resume remaining
+	  pipeline tasks like a crash.
 
 	Auto-recovery is capped at recovery_count < 3.
 	"""
@@ -972,44 +1100,38 @@ def recover_stuck_scans():
 
 	logger.info("[RECOVERY] recover_stuck_scans triggered")
 
-	async def _is_workflow_active(workflow_id):
+	async def _workflow_state(workflow_id):
 		from temporalio.client import WorkflowExecutionStatus
 		from temporalio.service import RPCError, RPCStatusCode
+		if not workflow_id:
+			return 'dead'
 		try:
 			client = await TemporalClientProvider.get_client()
 			handle = client.get_workflow_handle(workflow_id)
 			desc = await handle.describe()
-			# Also check well-known child workflow IDs that outlive the master
 			if desc.status == WorkflowExecutionStatus.RUNNING:
-				return True
-			# Master finished — check whether its nuclei child is still running
+				return 'running'
 			nuclei_id = f"{workflow_id}-nuclei"
 			try:
 				nuclei_handle = client.get_workflow_handle(nuclei_id)
 				nuclei_desc = await nuclei_handle.describe()
 				if nuclei_desc.status == WorkflowExecutionStatus.RUNNING:
-					return True
+					return 'running'
 			except RPCError as e:
 				if e.status != RPCStatusCode.NOT_FOUND:
-					return True  # server error — assume running
-			return False
+					return 'running'
+			if desc.status == WorkflowExecutionStatus.COMPLETED:
+				return 'completed'
+			return 'dead'
 		except RPCError as e:
 			if e.status == RPCStatusCode.NOT_FOUND:
-				return False  # workflow genuinely absent — safe to recover
-			# Any other RPC error means Temporal itself is unavailable — do NOT recover
+				return 'dead'
 			logger.warning("[RECOVERY] Temporal RPC error checking workflow '%s': %s. Skipping recovery.", workflow_id, e)
-			return True
+			return 'running'
 		except Exception as e:
 			logger.warning("[RECOVERY] Unexpected error checking workflow '%s': %s. Skipping recovery.", workflow_id, e)
-			return True
+			return 'running'
 
-	# --- Pass 2: RUNNING_TASK scans whose Temporal workflow is gone ---
-	# Guard: skip scans whose stop_scan_date was set within the last 2 minutes —
-	# that narrow window covers the abort race-condition where the orchestrator
-	# restarts before abort_scan_history can flip scan_status to ABORTED_TASK.
-	# Scans stopped longer ago (or never stopped) are safe to recover; in particular
-	# a manually-resumed scan now clears stop_scan_date in resume_scan_temporal so
-	# it will always appear here with stop_scan_date=None.
 	from django.utils import timezone as _tz
 	import datetime as _dt
 	_abort_grace = _tz.now() - _dt.timedelta(minutes=2)
@@ -1024,8 +1146,8 @@ def recover_stuck_scans():
 
 	recovered = 0
 	active = 0
+	retried = 0
 	for scan in candidates:
-		# Prefer the TemporalWorkflowExecution record; fall back to workflow_ids array.
 		latest_exec = (
 			TemporalWorkflowExecution.objects
 			.filter(scan_history=scan, status='RUNNING')
@@ -1038,28 +1160,49 @@ def recover_stuck_scans():
 		)
 
 		loop = asyncio.new_event_loop()
-		is_active = run_and_close(loop, _is_workflow_active(workflow_id)) if workflow_id else False
+		state = run_and_close(loop, _workflow_state(workflow_id)) if workflow_id else 'dead'
 
-		if is_active:
+		if state == 'running':
 			logger.info("[RECOVERY] Scan %d (%s) workflow '%s' is ACTIVE — skipping", scan.id, scan.domain, workflow_id)
 			active += 1
 			continue
 
+		# A completed master workflow already ran the pipeline. Retry failed
+		# tasks only — never spawn another MasterScanWorkflow.
+		if state == 'completed':
+			logger.info(
+				"[RECOVERY] Scan %d (%s) workflow '%s' COMPLETED with scan_status=%s — retrying failed tasks only",
+				scan.id, scan.domain, workflow_id, scan.scan_status,
+			)
+			try:
+				started = retry_failed_tasks_temporal(scan, auto=True)
+				if started:
+					retried += 1
+					logger.info("[RECOVERY] Scan %d retrying failed tasks: %s", scan.id, started)
+				else:
+					logger.info("[RECOVERY] Scan %d has no failed tasks to retry", scan.id)
+			except Exception as e:
+				scan.refresh_from_db(fields=['scan_status'])
+				scan.scan_status = FAILED_TASK
+				scan.save(update_fields=['scan_status'])
+				logger.error("[RECOVERY] Failed to retry tasks for scan %d: %s", scan.id, e)
+			continue
+
 		logger.info(
-			"[RECOVERY] Scan %d (%s) workflow '%s' is DEAD — resuming (recovery_count=%d)",
+			"[RECOVERY] Scan %d (%s) workflow '%s' is DEAD — resuming remaining tasks (recovery_count=%d)",
 			scan.id, scan.domain, workflow_id, scan.recovery_count
 		)
 		try:
-			resume_scan_temporal(scan.id)
+			resume_scan_temporal(scan.id, auto=True)
 			recovered += 1
 			logger.info("[RECOVERY] Scan %d resumed successfully", scan.id)
 		except Exception as e:
-			# Recovery failed — only now mark the scan permanently FAILED so the
-			# user can see it and act on it. Doing this before the attempt would
-			# leave the scan stuck in FAILED state whenever resume raises.
 			scan.refresh_from_db(fields=['scan_status'])
 			scan.scan_status = FAILED_TASK
 			scan.save(update_fields=['scan_status'])
 			logger.error("[RECOVERY] Failed to auto-recover stuck running scan %d: %s", scan.id, e)
 
-	logger.info("[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d", active, recovered)
+	logger.info(
+		"[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d retried_failed=%d",
+		active, recovered, retried,
+	)

@@ -76,13 +76,15 @@ A backward-compatibility stub that exists solely to preserve the event history p
 
 ## Scan Recovery via `resume_scan_temporal`
 
-When a scan is recovered manually (e.g., after a crash where Temporal didn't auto-resume), the `resume_scan_temporal` function in `tasks.py`:
+When a scan is recovered after a crash (workflow missing or terminated), `resume_scan_temporal`:
 
-1. Queries `ScanActivity` records to find which tasks have already completed.
-2. Starts a new `MasterScanWorkflow` but passes the completed tasks in `ctx` so the workflow knows to skip them.
-3. This allows resuming from a specific tier without re-running earlier tiers.
+1. Queries `ScanActivity` records to find which **pipeline** tasks have already completed.
+2. Drops YAML resource keys (`threads`, `timeout`, `rate_limit`, ...) that sometimes leak into `ScanHistory.tasks`.
+3. Starts a new `MasterScanWorkflow` with only the remaining pipeline tasks.
 
-> **Note:** This manual recovery path is a fallback. In normal operation, Temporal handles recovery automatically by replaying the workflow's event history.
+If the master workflow **already completed** but the scan is FAILED (a late task such as AI Impact Assessment failed), startup recovery must **not** start another `MasterScanWorkflow`. `recover_stuck_scans` retries only unsuccessful `ScanActivity` rows via `SingleTaskRetryWorkflow`.
+
+> **Note:** In normal operation, Temporal handles in-flight recovery by replaying the workflow's event history. `recover_stuck_scans` is the fallback when that history is gone or the scan finished failed.
 
 ---
 

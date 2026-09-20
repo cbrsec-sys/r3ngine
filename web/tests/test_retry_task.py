@@ -186,6 +186,15 @@ class GetScanFinalStatusTests(TestCase):
         result = get_scan_final_status_activity(scan.id, True)
         self.assertEqual(result, FAILED_TASK)
 
+    def test_keeps_running_when_sibling_retry_still_pending(self):
+        scan = _make_scan()
+        _make_activity(scan, name="generate_impact_assessment", status=SUCCESS_TASK)
+        _make_activity(scan, name="sync_graph", status=INITIATED_TASK)
+        result = get_scan_final_status_activity(
+            scan.id, True, ["generate_impact_assessment", "sync_graph"]
+        )
+        self.assertEqual(result, RUNNING_TASK)
+
 
 class TierStalenessTests(TestCase):
     def test_existing_row_tier_is_updated(self):

@@ -348,8 +348,8 @@ class TestTemporalOrchestration(TestCase):
 
         # Assert both the stuck running scan and the failed scan are resumed (dead workflows)
         self.assertEqual(mock_resume_scan.call_count, 2)
-        mock_resume_scan.assert_any_call(scan_running_stuck.id)
-        mock_resume_scan.assert_any_call(scan_failed.id)
+        mock_resume_scan.assert_any_call(scan_running_stuck.id, auto=True)
+        mock_resume_scan.assert_any_call(scan_failed.id, auto=True)
 
         # Clean up database records
         scan_running_stuck.delete()
@@ -357,6 +357,53 @@ class TestTemporalOrchestration(TestCase):
         scan_failed.delete()
         scan_aborted.delete()
         scan_stopped.delete()
+
+    @patch('reNgine.tasks.scan_init.retry_failed_tasks_temporal')
+    @patch('reNgine.tasks.scan_init.resume_scan_temporal')
+    @patch('reNgine.temporal_client.TemporalClientProvider.get_client', new_callable=AsyncMock)
+    def test_recover_stuck_scans_retries_failed_tasks_when_workflow_completed(
+        self, mock_get_client, mock_resume_scan, mock_retry_failed
+    ):
+        """A FAILED scan whose master workflow completed must not start a new MasterScanWorkflow."""
+        from reNgine.tasks import recover_stuck_scans
+        from reNgine.definitions import FAILED_TASK, RUNNING_TASK
+        from temporalio.client import WorkflowExecutionStatus
+        from django.utils import timezone
+
+        ScanHistory.objects.filter(scan_status__in=[RUNNING_TASK, FAILED_TASK]).delete()
+        scan_failed = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            start_scan_date=timezone.now(),
+            scan_status=FAILED_TASK,
+            recovery_count=0,
+            workflow_ids=["completed-workflow"]
+        )
+        mock_retry_failed.return_value = ['generate_impact_assessment']
+
+        mock_client = MagicMock()
+
+        def mock_get_handle(_workflow_id):
+            h = MagicMock()
+
+            async def mock_describe():
+                mock_desc = MagicMock()
+                mock_desc.status = WorkflowExecutionStatus.COMPLETED
+                return mock_desc
+
+            h.describe = mock_describe
+            return h
+
+        mock_client.get_workflow_handle.side_effect = mock_get_handle
+        mock_get_client.return_value = mock_client
+
+        recover_stuck_scans()
+
+        mock_resume_scan.assert_not_called()
+        mock_retry_failed.assert_called_once()
+        self.assertEqual(mock_retry_failed.call_args.args[0].id, scan_failed.id)
+        self.assertTrue(mock_retry_failed.call_args.kwargs.get('auto'))
+        scan_failed.delete()
 
 
 class TestWorkflowStructuralInvariants(TestCase):
