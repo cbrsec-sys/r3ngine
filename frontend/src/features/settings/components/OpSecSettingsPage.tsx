@@ -257,15 +257,15 @@ export const OpSecSettingsPage: React.FC = () => {
               <Stack spacing={2} sx={{ p: 1 }}>
                 <FormControlLabel
                   control={<Switch checked={formData.enable_random_ua} onChange={() => handleToggle('enable_random_ua')} size="small" />}
-                  label={<Typography variant="body2" sx={{ color: '#fff' }}>Random User-Agents</Typography>}
+                  label={<Typography variant="body2" sx={{ color: 'text.primary' }}>Random User-Agents</Typography>}
                 />
                 <FormControlLabel
                   control={<Switch checked={formData.enable_waf_bypass} onChange={() => handleToggle('enable_waf_bypass')} size="small" />}
-                  label={<Typography variant="body2" sx={{ color: '#fff' }}>Inject WAF Bypass Headers</Typography>}
+                  label={<Typography variant="body2" sx={{ color: 'text.primary' }}>Inject WAF Bypass Headers</Typography>}
                 />
                 <FormControlLabel
                   control={<Switch checked={formData.enable_ja3_randomization} onChange={() => handleToggle('enable_ja3_randomization')} size="small" />}
-                  label={<Typography variant="body2" sx={{ color: '#fff' }}>JA3 Fingerprint Randomization</Typography>}
+                  label={<Typography variant="body2" sx={{ color: 'text.primary' }}>JA3 Fingerprint Randomization</Typography>}
                 />
               </Stack>
             </TacticalPanel>
