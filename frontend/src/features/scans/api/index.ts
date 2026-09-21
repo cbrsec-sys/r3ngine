@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { operations, components } from '@/types/api';
-import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, SecretLeak, DirectoryFile } from '../types';
+import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, ScanTierRetryResponse, SecretLeak, DirectoryFile } from '../types';
 import type { Domain } from '../../targets/types';
 
 export const useDirectories = (params: { scan_id?: string | number, subdomain_id?: string | number, page?: number }) => {
@@ -888,6 +888,41 @@ export const useRetryScanTask = (projectSlug: string, scanId: number) => {
     onError: (e: Error) => {
       // Toast is handled by the caller if needed; log for now
       console.error('Retry task failed:', e.message);
+    },
+  });
+};
+
+/**
+ * Re-run every failed task of one tier of a scan.
+ * `POST /api/action/retry/tier/<scan_id>/<tier>/` (api/urls.py -> ScanTierRetryAPIView).
+ */
+export const useRetryScanTier = (projectSlug: string, scanId: number) => {
+  const queryClient = useQueryClient();
+  return useMutation<ScanTierRetryResponse, Error, number>({
+    mutationFn: async (tier: number) => {
+      const response = await fetch(`/api/action/retry/tier/${scanId}/${tier}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        let message = 'Failed to retry tier';
+        try {
+          const errorData = await response.json();
+          message = errorData.message || errorData.error || message;
+        } catch {
+          // Response carried no JSON body; keep the generic message.
+        }
+        throw new Error(message);
+      }
+      return response.json();
+    },
+    onSettled: () => {
+      // Refresh the timeline either way: a partial success still moved rows.
+      queryClient.invalidateQueries({ queryKey: scanSummaryQueryKey(projectSlug, scanId) });
     },
   });
 };

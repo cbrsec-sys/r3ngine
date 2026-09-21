@@ -42,6 +42,39 @@ export interface ScanActivity {
   target_host?: string;
   traceback?: string | null;
   execution_id?: string | null;
+  /** Slug from `classify_failure()`; only set for FAILED/ABORTED rows. */
+  failure_category?: string | null;
+  /** Fixed, role-safe sentence that goes with `failure_category`. */
+  failure_hint?: string | null;
+}
+
+/** One row the tier-retry endpoint could not queue, and why. */
+export interface ScanTierRetrySkip {
+  activity_id: number;
+  name: string;
+  title: string;
+  reason: string;
+  message: string;
+}
+
+export interface ScanTierRetryQueued {
+  activity_id: number;
+  name: string;
+  title: string;
+  workflow_id: string;
+}
+
+/** Response of `POST /api/action/retry/tier/<scan_id>/<tier>/`. */
+export interface ScanTierRetryResponse {
+  status: boolean;
+  no_op: boolean;
+  scan_id: number;
+  tier: number;
+  queued_count: number;
+  skipped_count: number;
+  queued: ScanTierRetryQueued[];
+  skipped: ScanTierRetrySkip[];
+  message: string;
 }
 
 export interface ScanSummaryResponse {

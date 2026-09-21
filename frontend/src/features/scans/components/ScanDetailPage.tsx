@@ -39,7 +39,8 @@ import {
   Backdrop,
   DialogActions,
   Link,
-  Alert
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   Activity,
@@ -83,7 +84,9 @@ import {
   GitBranch,
   Brain
 } from 'lucide-react';
-import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useRetryScanTask } from '../api';
+import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useRetryScanTask, useRetryScanTier } from '../api';
+import { getFailureCategoryLabel, summariseTier } from '../utils/failureCategories';
+import { TimelineTierHeader } from './TimelineTierHeader';
 import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote } from '../types';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
@@ -548,6 +551,7 @@ const ActivityDetailsPanel: React.FC<{ activity: ScanActivity }> = ({ activity }
   const durationSeconds = getActivityDurationSeconds(activity);
   const traceback = activity.traceback || '';
   const isFailed = activity.status === 'FAILED' || activity.status === 'ABORTED';
+  const failureCategoryLabel = getFailureCategoryLabel(activity.failure_category);
 
   return (
     <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
@@ -581,6 +585,26 @@ const ActivityDetailsPanel: React.FC<{ activity: ScanActivity }> = ({ activity }
           <ActivityDetailField label="Execution ID" value={activity.execution_id} monospace />
         )}
       </Box>
+
+      {isFailed && failureCategoryLabel && (
+        <Box sx={{
+          mt: 1.5,
+          p: 1,
+          bgcolor: `${tokens.accent.error}0D`,
+          border: `1px solid ${tokens.accent.error}33`,
+          borderLeft: `3px solid ${tokens.accent.error}`,
+          borderRadius: 0.5
+        }}>
+          <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, color: tokens.accent.error, letterSpacing: 0.5 }}>
+            {failureCategoryLabel.toUpperCase()}
+          </Typography>
+          {activity.failure_hint && (
+            <Typography sx={{ mt: 0.3, fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', wordBreak: 'break-word' }}>
+              {activity.failure_hint}
+            </Typography>
+          )}
+        </Box>
+      )}
 
       {isFailed && activity.error_message && (
         <Typography sx={{
@@ -923,6 +947,7 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
   const { theme, isLight, tokens } = useThemeTokens();
   const config = getActivityStatusConfig(activity.status, tokens, theme.palette.text.primary);
   const durationSeconds = getActivityDurationSeconds(activity);
+  const failureCategoryLabel = getFailureCategoryLabel(activity.failure_category);
 
   return (
     <Box
@@ -1041,6 +1066,24 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
             </Typography>
           )}
         </Stack>
+        {failureCategoryLabel && (
+          <Box sx={{
+            alignSelf: 'flex-start',
+            mt: 0.5,
+            px: 0.8,
+            py: 0.1,
+            borderRadius: 0.5,
+            bgcolor: `${tokens.accent.error}20`,
+            border: `1px solid ${tokens.accent.error}40`,
+            color: tokens.accent.error,
+            fontSize: '0.55rem',
+            fontWeight: 900,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase'
+          }}>
+            {failureCategoryLabel}
+          </Box>
+        )}
         {activity.error_message && (
           <Typography sx={{ fontSize: '0.65rem', color: isLight ? tokens.accent.error : '#ff003c', bgcolor: isLight ? `${tokens.accent.error}15` : 'rgba(255,0,60,0.1)', p: 1, borderRadius: 0.5, border: `1px solid ${isLight ? `${tokens.accent.error}33` : 'rgba(255,0,60,0.2)'}`, mt: 1 }}>
             ERROR: {activity.error_message}
@@ -1556,6 +1599,7 @@ export const ScanDetailPage = () => {
   const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
   const stopScanMutation = useStopScan(projectSlug);
   const retryScanTaskMutation = useRetryScanTask(projectSlug, parseInt(scanId));
+  const retryScanTierMutation = useRetryScanTier(projectSlug, parseInt(scanId));
   const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
@@ -1566,6 +1610,12 @@ export const ScanDetailPage = () => {
   const [selectedActivity, setSelectedActivity] = useState<ScanActivity | null>(null);
   const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
   const [pendingRetryActivity, setPendingRetryActivity] = useState<ScanActivity | null>(null);
+  const [pendingTierRetry, setPendingTierRetry] = useState<{ tier: number; label: string } | null>(null);
+  const [tierRetryNotice, setTierRetryNotice] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({ open: false, message: '', severity: 'success' });
 
   const [selectedVulnForInfo, setSelectedVulnForInfo] = useState<any | null>(null);
   const [vulnInfoModalOpen, setVulnInfoModalOpen] = useState(false);
@@ -1613,6 +1663,28 @@ export const ScanDetailPage = () => {
     setRetryConfirmOpen(true);
   };
 
+  const handleRetryTier = (tier: number, label: string) => setPendingTierRetry({ tier, label });
+
+  const confirmRetryTier = () => {
+    if (!pendingTierRetry) return;
+    const { tier } = pendingTierRetry;
+    setPendingTierRetry(null);
+    retryScanTierMutation.mutate(tier, {
+      onSuccess: (result) => setTierRetryNotice({
+        open: true,
+        message: result.message,
+        severity: result.queued_count > 0
+          ? (result.skipped_count > 0 ? 'warning' : 'success')
+          : 'info',
+      }),
+      onError: (error: Error) => setTierRetryNotice({
+        open: true,
+        message: error.message,
+        severity: 'error',
+      }),
+    });
+  };
+
   const groupedTimeline = useMemo(() => {
     const timeline: ScanActivity[] = data?.timeline ?? [];
     
@@ -1647,8 +1719,10 @@ export const ScanDetailPage = () => {
     const sortedTiers = Array.from(tierGroups.entries()).map(([tier, activities]) => ({
       id: `tier-${tier}`,
       sortOrder: tier,
+      tier,
       label: `Tier ${tier} — ${TIER_LABELS[tier] ?? 'Unknown'}`,
       activities,
+      summary: summariseTier(activities),
       type: 'tier' as const,
     }));
 
@@ -1664,8 +1738,10 @@ export const ScanDetailPage = () => {
       return {
         id: `plugin-${plugin.slug}`,
         sortOrder,
+        tier: null,
         label: `Plugin — ${plugin.name}`,
         activities,
+        summary: summariseTier(activities),
         type: 'plugin' as const,
       };
     });
@@ -1682,6 +1758,12 @@ export const ScanDetailPage = () => {
   }
 
   const scanStatus = data.scan_info.scan_status;
+  // Mirrors ScanTierRetryAPIView: a live scan owns its own activity rows.
+  const tierRetryBlockedReason = scanStatus === 1
+    ? 'Cannot retry a tier while the scan is running'
+    : scanStatus === 5
+      ? 'Cannot retry a tier while the scan is paused'
+      : null;
   const isTerminal = [0, 2, 3, 4].includes(scanStatus);
   const progressColor = scanStatus === 2 ? tokens.accent.success : (scanStatus === 3 || scanStatus === 0) ? tokens.accent.error : scanStatus === 4 ? tokens.accent.warning : tokens.accent.primary;
   const progressValue = isTerminal ? 100 : data.scan_info.progress;
@@ -1820,19 +1902,22 @@ export const ScanDetailPage = () => {
             <Stack>
               {groupedTimeline.map((group) => (
                 <Box key={group.id}>
-                  <Typography sx={{
-                    display: 'block',
-                    fontSize: '0.55rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: group.type === 'plugin' ? tokens.accent.primary : 'text.secondary',
-                    mt: 1.5,
-                    mb: 0.5,
-                    px: 1,
-                  }}>
-                    {group.label}
-                  </Typography>
+                  <TimelineTierHeader
+                    label={group.label}
+                    summary={group.summary}
+                    isPlugin={group.type === 'plugin'}
+                    onRetryTier={
+                      group.tier !== null && tierRetryBlockedReason === null
+                        ? () => handleRetryTier(group.tier as number, group.label)
+                        : undefined
+                    }
+                    retryBlockedReason={
+                      group.tier === null
+                        ? 'Only tier groups can be re-run as a whole'
+                        : tierRetryBlockedReason ?? undefined
+                    }
+                    isRetrying={retryScanTierMutation.isPending && retryScanTierMutation.variables === group.tier}
+                  />
                   <Box sx={{ position: 'relative' }}>
                     {group.activities.map((activity) => (
                       <TimelineItem
@@ -2653,6 +2738,36 @@ export const ScanDetailPage = () => {
         isLoading={retryScanTaskMutation.isPending}
         type="info"
       />
+
+      <ConfirmDialog
+        open={!!pendingTierRetry}
+        onClose={() => setPendingTierRetry(null)}
+        onConfirm={confirmRetryTier}
+        title="Retry Tier"
+        message={pendingTierRetry
+          ? `Re-run every failed task of ${pendingTierRetry.label}? Tasks that cannot be retried on their own are skipped and reported.`
+          : ''}
+        confirmText="RETRY TIER"
+        cancelText="CANCEL"
+        isDestructive={false}
+        isLoading={retryScanTierMutation.isPending}
+        type="info"
+      />
+
+      <Snackbar
+        open={tierRetryNotice.open}
+        autoHideDuration={6000}
+        onClose={() => setTierRetryNotice((n) => ({ ...n, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setTierRetryNotice((n) => ({ ...n, open: false }))}
+          severity={tierRetryNotice.severity}
+          variant="filled"
+        >
+          {tierRetryNotice.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
