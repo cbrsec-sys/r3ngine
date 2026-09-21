@@ -51,6 +51,7 @@ const NotificationSettingsPage = lazyRouteComponent(() => import("./features/set
 const ProfileSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ProfileSettingsPage })));
 const AdminSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.AdminSettingsPage })));
 const RemoteWorkersPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.RemoteWorkersPage })));
+const McpAccessPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.McpAccessPage })));
 const StressTestingPage = lazyRouteComponent(() => import("./pages/StressTestingPage").then(m => ({ default: m.StressTestingPage })));
 
 interface RouterContext {
@@ -408,6 +409,12 @@ const remoteWorkersRoute = createRoute({
   component: RemoteWorkersPage,
 });
 
+const mcpAccessRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/mcp",
+  component: McpAccessPage,
+});
+
 
 
 
@@ -622,6 +629,7 @@ const routeTree = rootRoute.addChildren([
     notificationSettingsRoute,
     adminSettingsRoute,
     remoteWorkersRoute,
+    mcpAccessRoute,
     bountyHubRoute,
     searchRoute,
     pluginsRoute,

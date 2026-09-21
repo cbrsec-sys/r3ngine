@@ -37,6 +37,15 @@ port_scan: {
   # 'nmap_script': '',
   # 'nmap_script_args': ''
 }
+email_security: {
+  mailbox_verification: {
+    enabled: true,
+    http_url: "",
+    timeout: 15,
+    max_candidates: 200,
+    delay_ms: 250
+  }
+}
 osint: {
   'discover': [
       'emails',

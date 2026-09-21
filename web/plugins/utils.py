@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import threading
 import time
@@ -27,9 +28,16 @@ from .models import Plugin
 logger = logging.getLogger(__name__)
 
 class MarketplaceManager:
-    MARKETPLACE_YAML_URL = "https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/master/plugins.yaml"
-    CACHE_KEY = "marketplace_plugins"
+    MARKETPLACE_REPO_RAW_BASE = "https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/master"
+    MARKETPLACE_ICON_RAW_BASE = "https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/refs/heads/master"
+    MARKETPLACE_YAML_URL = f"{MARKETPLACE_REPO_RAW_BASE}/plugins.yaml"
+    CACHE_KEY = "marketplace_plugins_v3"
     CACHE_TIMEOUT = 3600  # 1 hour
+    _SLUG_RE = re.compile(r'^[a-z0-9_]{1,64}$')
+    _ICON_FILENAME_RE = re.compile(
+        r'^[A-Za-z0-9._-]{1,64}\.(?:png|svg|jpe?g|webp|gif)$',
+        re.IGNORECASE,
+    )
 
     @classmethod
     def get_available_plugins(cls, force_refresh=False):
@@ -66,6 +74,7 @@ class MarketplaceManager:
                         plugin['is_installed'] = False
                         plugin['installed_version'] = None
                         plugin['update_available'] = False
+                    plugin['icon_url'] = cls._marketplace_icon_url(slug, plugin.get('icon'))
                 
                 cache.set(cls.CACHE_KEY, plugins, cls.CACHE_TIMEOUT)
                 return plugins
@@ -77,7 +86,7 @@ class MarketplaceManager:
 
     @classmethod
     def download_plugin(cls, slug):
-        download_url = f"https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/master/{slug}/{slug}.r3n"
+        download_url = f"{cls.MARKETPLACE_REPO_RAW_BASE}/{slug}/{slug}.r3n"
         temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f"download_{slug}.r3n")
         PluginManager.ensure_dirs()
         
@@ -94,6 +103,29 @@ class MarketplaceManager:
                 raise e
         else:
             raise Exception(f"Failed to download plugin {slug}: {response.status_code}")
+
+    @classmethod
+    def _marketplace_icon_url(cls, slug: str | None, icon_field: object = None) -> str | None:
+        """Public raw.githubusercontent.com URL for a marketplace plugin icon.
+
+        Uses `{slug}/icon.png` by default. An optional YAML `icon` value is
+        accepted only as a basename with an image extension — never a URL
+        or path — so the host always stays the official plugins repo.
+        """
+        if not slug or not cls._SLUG_RE.match(slug):
+            return None
+        filename = 'icon.png'
+        if icon_field:
+            raw = str(icon_field).strip()
+            if (
+                '://' not in raw
+                and '/' not in raw
+                and '\\' not in raw
+                and '..' not in raw
+                and cls._ICON_FILENAME_RE.match(raw)
+            ):
+                filename = raw
+        return f"{cls.MARKETPLACE_ICON_RAW_BASE}/{slug}/{filename}"
 
 class PluginManager:
     """Handles file operations for plugins: extraction, validation, and deletion."""

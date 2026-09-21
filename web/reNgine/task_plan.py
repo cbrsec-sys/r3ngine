@@ -21,6 +21,7 @@ _TASK_TITLES = {
     'port_scan':                  'Port Scan',
     'vigolium_discovery':         'Vigolium Discovery',
     'acunetix_submit':            'Acunetix Target Submission',
+    'check_if_email_exists':      'Mailbox Verification',
     # Tier 3
     'fetch_url':                  'URL Fetching',
     'http_crawl_bridge':          'HTTP Crawl Bridge',
@@ -72,6 +73,7 @@ _TASK_TIER = {
     # subdomain. The timeline groups rows by this map, and the tier retry
     # endpoint selects rows by it, so it has to name the tier that really runs it.
     'vigolium_discovery':    2,
+    'check_if_email_exists': 2,
     'fetch_url':             3,
     'http_crawl_bridge':     3,
     'screenshot':            3,
@@ -113,6 +115,24 @@ _TIER7_TASKS = [
     'scan_notification',
 ]
 
+# Engine YAML often stores resource keys (threads, timeout, ...) in ScanHistory.tasks.
+# Recovery must ignore those and only resume real pipeline task names.
+_SCAN_TASK_ALIASES = {
+    'attack_path_modeling': 'run_apme',
+}
+
+KNOWN_SCAN_TASK_NAMES = set(_TASK_TITLES) | set(_TIER7_TASKS)
+
+
+def canonical_scan_task_name(name: str):
+    """Return a known pipeline task name, or None for YAML/resource keys."""
+    if not name:
+        return None
+    mapped = _SCAN_TASK_ALIASES.get(name, name)
+    if mapped in KNOWN_SCAN_TASK_NAMES:
+        return mapped
+    return None
+
 _TIER1_TO_5 = [
     'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
     'dns_security', 'osint', 'spiderfoot_scan', 'baddns',
@@ -131,6 +151,23 @@ def get_task_tier(name: str) -> int:
     return _TASK_TIER.get(name, 7)
 
 
+def _mailbox_verification_planned(tasks: list, yaml_configuration: dict, is_subscan: bool = False) -> bool:
+    """True when MasterScanWorkflow will run mailbox verification."""
+    if is_subscan:
+        return False
+    if 'port_scan' not in tasks:
+        return False
+    section = yaml_configuration.get('email_security') if isinstance(yaml_configuration, dict) else None
+    if not isinstance(section, dict):
+        section = {}
+    raw = section.get('mailbox_verification')
+    if raw is None:
+        return True
+    if not isinstance(raw, dict):
+        return True
+    return bool(raw.get('enabled', True))
+
+
 def _entry(name: str) -> dict:
     return {
         'name': name,
@@ -140,13 +177,14 @@ def _entry(name: str) -> dict:
     }
 
 
-def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
+def build_scan_task_plan(tasks: list, yaml_configuration: dict, is_subscan: bool = False) -> list:
     """
     Return ordered list of planned-task dicts given an engine task list
     and the full parsed YAML configuration dict.
 
     Each dict: {name, title, tier, status=INITIATED_TASK}.
     Sorted by tier ascending. No I/O — pure function.
+    is_subscan: SubScanWorkflow never runs RunEmailSecurityActivity.
     """
     plan = []
     seen = set()
@@ -171,6 +209,10 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
     acunetix_cfg = (yaml_configuration.get('vulnerability_scan') or {}).get('acunetix') or {}
     if 'http_crawl' in tasks and acunetix_cfg.get('submit_live_subdomains', False):
         add('acunetix_submit')
+
+    # Post-tier-2 mailbox verification (same gate as RunEmailSecurityActivity).
+    if _mailbox_verification_planned(tasks, yaml_configuration, is_subscan=is_subscan):
+        add('check_if_email_exists')
 
     # Vigolium tasks: harvest + discovery auto-added when vulnerability_scan is selected
     # (unless explicitly disabled in yaml_configuration).

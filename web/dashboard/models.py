@@ -135,6 +135,24 @@ class LLMConfig(models.Model):
 		return f"{self.provider} - {self.selected_model}"
 
 
+class LLMSettings(models.Model):
+	"""Singleton operator switch for all LLM features (impact assessment, reports, ...)."""
+	enabled = models.BooleanField(default=False)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name = 'LLM settings'
+		verbose_name_plural = 'LLM settings'
+
+	def __str__(self):
+		return 'enabled' if self.enabled else 'disabled'
+
+	@classmethod
+	def get_solo(cls):
+		obj, _ = cls.objects.get_or_create(pk=1, defaults={'enabled': False})
+		return obj
+
+
 class SpiderfootAPIKey(models.Model):
 	id = models.AutoField(primary_key=True)
 	module_name = models.CharField(max_length=200)
