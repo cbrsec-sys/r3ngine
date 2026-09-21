@@ -23,9 +23,7 @@ RUN npm run build
 # ===========================================================================
 FROM golang:1.26-bookworm AS go-tools-builder
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends libpcap-dev make curl && \
     rm -rf /var/lib/apt/lists/*
 
@@ -84,7 +82,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # betterleaks has no published go install path — clone and build directly.
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterleaks && \
+    git config --global http.version HTTP/1.1 && \
+    git config --global http.postBuffer 524288000 && \
+    n=0 && \
+    until git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterleaks; do \
+      n=$((n+1)); \
+      [ "$n" -ge 6 ] && exit 1; \
+      rm -rf /tmp/betterleaks; \
+      echo "betterleaks clone failed, retry $n/6"; \
+      sleep $((n*5)); \
+    done && \
     cd /tmp/betterleaks && make build && \
     cp betterleaks /go/bin/betterleaks && \
     rm -rf /tmp/betterleaks
@@ -117,14 +124,30 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ===========================================================================
 FROM golang:1.26-bookworm AS vigolium-builder
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends curl git make unzip && \
     rm -rf /var/lib/apt/lists/*
 
-# Install bun (needed for vigolium-audit and jsscan embedded binary builds)
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.34"
+# Install bun (needed for vigolium-audit and jsscan embedded binary builds).
+# vigolium-audit engines.bun is >=1.3.0; 1.1.34 cannot cross-compile its
+# current TypeScript tree.
+# bun.sh's installer curls the GitHub zip with no retries; Docker Desktop TLS
+# commonly dies mid-download: OpenSSL SSL_read ... bad record mac.
+RUN n=0 && \
+    until curl --http1.1 --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30 \
+          -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v1.3.1/bun-linux-x64.zip" \
+          -o /tmp/bun.zip && \
+          unzip -qo /tmp/bun.zip -d /tmp/bun-extract && \
+          mkdir -p /root/.bun/bin && \
+          mv /tmp/bun-extract/bun-linux-x64/bun /root/.bun/bin/bun && \
+          chmod +x /root/.bun/bin/bun; do \
+      n=$((n+1)); \
+      [ "$n" -ge 6 ] && exit 1; \
+      rm -rf /tmp/bun.zip /tmp/bun-extract; \
+      echo "bun download failed, retry $n/6"; \
+      sleep $((n*5)); \
+    done && \
+    rm -rf /tmp/bun.zip /tmp/bun-extract
 ENV PATH="/root/.bun/bin:${PATH}"
 ENV GO111MODULE=on
 # The official golang images set GOTOOLCHAIN=local, which makes `go build` fail
@@ -139,14 +162,32 @@ ENV GO111MODULE=on
 # buildable as vigolium moves.
 ENV GOTOOLCHAIN=auto
 
-# Clone vigolium at the pinned release tag
-RUN git clone --depth 1 https://github.com/vigolium/vigolium /build/vigolium
+# Clone with HTTP/1.1 + retries. Git's pack protocol over Docker Desktop TLS
+# often dies with: GnuTLS recv error (-24): Decryption has failed.
+RUN git config --global http.version HTTP/1.1 && \
+    git config --global http.postBuffer 524288000 && \
+    n=0 && \
+    until git clone --depth 1 https://github.com/vigolium/vigolium /build/vigolium; do \
+      n=$((n+1)); \
+      [ "$n" -ge 6 ] && exit 1; \
+      rm -rf /build/vigolium; \
+      echo "vigolium clone failed, retry $n/6"; \
+      sleep $((n*5)); \
+    done
 
 WORKDIR /build/vigolium
 
-# Build embedded binaries (vigolium-audit via bun, jstangle via bun)
+# Host-only audit binary. `make ensure-audit` runs `bun run build:all`, which
+# cross-compiles darwin/windows from Linux and dies downloading extra bun
+# toolchains (ConnectionClosed / tls: bad record MAC on Docker Desktop).
+# go:embed only needs the Linux host blob at pkg/audit/bin/_bin/vigolium-audit.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    make ensure-audit && make ensure-jstangle
+    cd platform/vigolium-audit && bun install && \
+    VIGOLIUM_AUDIT_BUILD_NO_INSTALL=1 bun run build && \
+    mkdir -p /build/vigolium/pkg/audit/bin/_bin && \
+    cp build/dist/vigolium-audit-linux-x64 /build/vigolium/pkg/audit/bin/_bin/vigolium-audit && \
+    chmod +x /build/vigolium/pkg/audit/bin/_bin/vigolium-audit && \
+    cd /build/vigolium && make ensure-jstangle
 
 # Compile vigolium binary
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -164,9 +205,10 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ===========================================================================
 FROM rust:bookworm AS dalfox-builder
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+# Apt lists/debs and cargo target/ are omitted as cache mounts: they are
+# multi-hundred-MB snapshots that Docker Desktop copies over TLS and fails
+# with "tls: bad record MAC". pip/npm/go/cargo-registry mounts stay.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     musl-tools \
     pkg-config \
     git \
@@ -174,13 +216,21 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 RUN rustup target add x86_64-unknown-linux-musl
 
-RUN git clone --depth 1 https://github.com/hahwul/dalfox /tmp/dalfox
+RUN git config --global http.version HTTP/1.1 && \
+    git config --global http.postBuffer 524288000 && \
+    n=0 && \
+    until git clone --depth 1 https://github.com/hahwul/dalfox /tmp/dalfox; do \
+      n=$((n+1)); \
+      [ "$n" -ge 6 ] && exit 1; \
+      rm -rf /tmp/dalfox; \
+      echo "dalfox clone failed, retry $n/6"; \
+      sleep $((n*5)); \
+    done
 
 WORKDIR /tmp/dalfox
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/tmp/dalfox/target \
     cargo build --release && \
     cp target/release/dalfox /usr/local/bin/dalfox
 
@@ -218,15 +268,34 @@ LABEL \
     Original By: Yogesh Ojha <yogesh.ojha11@gmail.com>" \
     description="reNgine is an automated recon pipeline for web application penetration testing."
 
+# Docker Desktop on Windows corrupts large apt index downloads (same byte
+# length, wrong SHA256 → "Hash Sum mismatch", cousin of tls: bad record MAC).
+# Disable pipelining/by-hash xz and fetch indexes as gzip over HTTPS instead.
+RUN printf '%s\n' \
+      'Acquire::http::Pipeline-Depth "0";' \
+      'Acquire::https::Pipeline-Depth "0";' \
+      'Acquire::http::No-Cache "true";' \
+      'Acquire::BrokenProxy "true";' \
+      'Acquire::By-Hash "0";' \
+      'Acquire::Retries "5";' \
+      'Acquire::CompressionTypes::Order:: "gz";' \
+      'Acquire::Languages "none";' \
+    > /etc/apt/apt.conf.d/99docker-desktop
+
 # ---------------------------------------------------------------------------
 # Add the PostgreSQL 16 APT repository.
 # Ubuntu 22.04 ships postgresql-client 14 by default; pg_dump requires the
 # client version to be >= the server version (now 16), so we pin to 16.
 # ---------------------------------------------------------------------------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update -y && \
+RUN rm -rf /var/lib/apt/lists/* && apt-get clean && \
+    (apt-get update -y \
+      || (sleep 3 && rm -rf /var/lib/apt/lists/* && apt-get update -y) \
+      || (sleep 5 && rm -rf /var/lib/apt/lists/* && apt-get update -y)) && \
     apt-get install -y --no-install-recommends ca-certificates gnupg curl lsb-release && \
+    sed -i \
+      -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+      -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \
+      /etc/apt/sources.list && \
     rm -rf /var/lib/apt/lists/* && \
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
         | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg && \
@@ -243,9 +312,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # build-essential is kept because pip installs some packages that compile
 # C extensions (cryptography, pycairo, etc.) and gems (wpscan) need gcc.
 # ---------------------------------------------------------------------------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update -y && \
+RUN rm -rf /var/lib/apt/lists/* && apt-get clean && \
+    (apt-get update -y \
+      || (sleep 3 && rm -rf /var/lib/apt/lists/* && apt-get update -y) \
+      || (sleep 5 && rm -rf /var/lib/apt/lists/* && apt-get update -y)) && \
     apt-get install -y --no-install-recommends \
     # Python 3.12 runtime
     python3.12 \
@@ -340,9 +410,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 # Node.js 20 + Retire.js (JS dependency vulnerability scanner)
 # Node runtime is needed at runtime for `retire` — not just build time.
 # ---------------------------------------------------------------------------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,target=/root/.npm \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g retire && \
@@ -403,6 +471,22 @@ RUN FEROX_VERSION="2.11.0" && \
     unzip /tmp/feroxbuster.zip feroxbuster -d /usr/local/bin && \
     chmod +x /usr/local/bin/feroxbuster && \
     rm /tmp/feroxbuster.zip
+
+# check_if_email_exists (Reacher) — MX/SMTP mailbox verification. Replaces smtp-user-enum.
+# Unmodified upstream CLI, AGPL-3.0. Pinned GitHub release; installed at image build onto PATH.
+RUN ARCH=$(dpkg --print-architecture) && \
+    CIE_VERSION="v0.11.7" && \
+    if [ "${ARCH}" = "arm64" ]; then CIE_TRIPLE="aarch64-unknown-linux-gnu"; \
+    else CIE_TRIPLE="x86_64-unknown-linux-gnu"; fi && \
+    mkdir -p /tmp/cie && \
+    curl -fsSL "https://github.com/reacherhq/check-if-email-exists/releases/download/${CIE_VERSION}/check_if_email_exists-${CIE_TRIPLE}.tar.gz" \
+      -o /tmp/cie/check_if_email_exists.tar.gz && \
+    tar -xzf /tmp/cie/check_if_email_exists.tar.gz -C /tmp/cie && \
+    BIN=$(find /tmp/cie -type f -name 'check_if_email_exists' | head -n1) && \
+    test -n "$BIN" && test -f "$BIN" && \
+    install -m 0755 "$BIN" /usr/local/bin/check_if_email_exists && \
+    rm -rf /tmp/cie && \
+    command -v check_if_email_exists
 
 # Searchsploit — offline Exploit-DB CLI search
 RUN git clone --depth 1 https://gitlab.com/exploit-database/exploitdb /usr/src/exploitdb && \
@@ -517,7 +601,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ---------------------------------------------------------------------------
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail && \
-    pip3 install --upgrade fierce dirsearch meson ninja arjun inql netlas holehe smtp-user-enum
+    pip3 install --upgrade fierce dirsearch meson ninja arjun inql netlas holehe
 
 # emailfinder — email discovery from public sources (confirmed installable 2026-07-01)
 # LeakSearch is not on PyPI; no Dockerfile line added (binary unavailable, module degrades gracefully)

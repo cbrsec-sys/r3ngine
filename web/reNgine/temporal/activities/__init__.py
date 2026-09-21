@@ -36,45 +36,6 @@ from startScan.models import Subdomain
 
 logger = get_module_logger(__name__)
 
-# Fallback budget for the SMTP probing loop when the attempt's real deadline is
-# unknown (outside an activity context, e.g. in tests).
-EMAIL_SECURITY_BUDGET_SECONDS: int = 5400
-# Fraction of the attempt's own start_to_close_timeout the probing loop may use.
-# The rest is headroom for saving findings before Temporal kills the attempt.
-_EMAIL_SECURITY_BUDGET_RATIO: float = 0.7
-
-
-def email_security_budget_seconds() -> int:
-    """Wall-clock budget for SMTP probing, derived from the attempt's own deadline.
-
-    Deriving it rather than hardcoding matters for workflows scheduled before a
-    timeout change: Temporal fixes an activity's start_to_close_timeout when it is
-    scheduled, so a running scan keeps the old, shorter deadline no matter what the
-    workflow file now says. A fixed budget larger than that deadline would let the
-    activity be killed and retried forever.
-
-    Returns:
-        int: Seconds of probing allowed before the loop returns partial results.
-    """
-    override = os.environ.get('EMAIL_SECURITY_BUDGET_SECONDS')
-    if override:
-        try:
-            return max(60, int(override))
-        except ValueError:
-            logger.warning(
-                'Ignoring non-numeric EMAIL_SECURITY_BUDGET_SECONDS=%s', override
-            )
-
-    try:
-        timeout = activity.info().start_to_close_timeout
-    except Exception:
-        timeout = None
-
-    if timeout:
-        return max(60, int(timeout.total_seconds() * _EMAIL_SECURITY_BUDGET_RATIO))
-    return EMAIL_SECURITY_BUDGET_SECONDS
-
-
 def resolve_target_host(ctx: dict, subdomain=None, domain=None) -> str:
     """Resolve the host a task runs against, for display on its timeline entry.
 
@@ -227,12 +188,13 @@ class TemporalTaskProxy:
     def _create_scan_activity(self):
         """Claim an unclaimed ScanActivity row for this task, or create one if none available.
 
-        Uses SELECT FOR UPDATE (skip_locked=True) so that only rows with
-        time_started__isnull=True are claimed. This prevents a Temporal activity
-        retry from overwriting SUCCESS rows left by prior attempts (AUD-003).
+        Uses SELECT FOR UPDATE (skip_locked=True) so that only INITIATED rows
+        are claimed (including retries that keep time_started so the timeline
+        does not hide them as ghosts). This prevents a Temporal activity retry
+        from overwriting SUCCESS rows left by prior attempts (AUD-003).
         """
         from startScan.models import ScanActivity
-        from reNgine.definitions import RUNNING_TASK
+        from reNgine.definitions import INITIATED_TASK, RUNNING_TASK
         from reNgine.task_plan import get_task_tier
         from django.db import transaction
 
@@ -241,12 +203,13 @@ class TemporalTaskProxy:
             now = timezone.now()
             execution_id = "temporal-%s" % temporal_activity_id
             with transaction.atomic():
-                # Claim only a row that has not been started yet (time_started is NULL).
-                # skip_locked=True ensures concurrent retries do not race on the same row.
+                # Claim only an INITIATED row. skip_locked=True ensures concurrent
+                # retries do not race on the same row. Status is the claim key so a
+                # retry can keep time_started set (timeline-visible) and still be claimed.
                 activity_row = ScanActivity.objects.select_for_update(skip_locked=True).filter(
                     scan_of=self.scan,
                     name=self.task_name,
-                    time_started__isnull=True,
+                    status=INITIATED_TASK,
                 ).first()
 
                 if activity_row:
@@ -341,6 +304,16 @@ class TemporalTaskProxy:
             add_meta_info (bool): Whether to include scan metadata.
         """
         logger.info(f"[notify] Task '{name or self.task_name}' fields={fields}")
+
+
+def _start_scan_task_proxy(ctx: dict, task_name: str, description: str):
+    """Claim a pre-populated ScanActivity row. No-op outside a Temporal activity."""
+    try:
+        if not activity.in_activity():
+            return None
+    except Exception:
+        return None
+    return TemporalTaskProxy(ctx, task_name, description)
 
 
 # ---------------------------------------------------------------------------
@@ -589,7 +562,7 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
         except SubScan.DoesNotExist:
             pass
 
-    plan = build_scan_task_plan(tasks, yaml_configuration)
+    plan = build_scan_task_plan(tasks, yaml_configuration, is_subscan=bool(subscan_id))
     created_count = 0
     existing_count = 0
     now = tz.now()
@@ -4269,12 +4242,52 @@ def log_plugin_end_activity(ctx: dict) -> None:
 
 
 @activity.defn(name="GetScanFinalStatusActivity")
-def get_scan_final_status_activity(scan_id: int, task_succeeded: bool) -> int:
-    """Return SUCCESS_TASK if the task succeeded and no other activities truly failed;
-    otherwise return FAILED_TASK. Used by SingleTaskRetryWorkflow to finalize scan status.
+def get_scan_final_status_activity(
+    scan_id: int,
+    task_succeeded: bool,
+    in_flight_names: list | None = None,
+    failed_task_name: str | None = None,
+) -> int:
+    """Return the scan status after a single-task retry.
+
+    If other names in this retry batch are still INITIATED/RUNNING, keep the
+    scan RUNNING so a parallel sibling retry cannot mark SUCCESS early.
+    Otherwise SUCCESS when this task succeeded and no other activities truly
+    failed; FAILED otherwise.
+
+    When this retry failed before the activity claimed its row, flip that
+    INITIATED row back to FAILED so the timeline and retry button recover.
     """
-    from startScan.models import ScanHistory, ScanActivity
-    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+    from django.utils import timezone as _tz
+    from startScan.models import ScanActivity
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, INITIATED_TASK
+
+    pending_names = [n for n in (in_flight_names or []) if n]
+    if failed_task_name:
+        pending_names = [n for n in pending_names if n != failed_task_name]
+
+    if not task_succeeded and failed_task_name:
+        # Only the in-flight retry row (INITIATED, time_started kept) — not
+        # pre-seeded ghost rows with time_started=None.
+        ScanActivity.objects.filter(
+            scan_of_id=scan_id,
+            name=failed_task_name,
+            status=INITIATED_TASK,
+            time_started__isnull=False,
+        ).update(
+            status=FAILED_TASK,
+            error_message="Retry workflow failed before the task completed",
+            time_ended=_tz.now(),
+        )
+
+    if pending_names:
+        still_running = ScanActivity.objects.filter(
+            scan_of_id=scan_id,
+            name__in=pending_names,
+            status__in=[INITIATED_TASK, RUNNING_TASK],
+        ).exists()
+        if still_running:
+            return RUNNING_TASK
 
     if not task_succeeded:
         return FAILED_TASK
@@ -4302,12 +4315,12 @@ def get_scan_final_status_activity(scan_id: int, task_succeeded: bool) -> int:
 
 @activity.defn(name="RunEmailSecurityActivity")
 def run_email_security_activity(ctx: dict) -> dict:
-    """Perform email/SMTP security checks (SPF, DMARC, DKIM, relay, STARTTLS, user enum).
+    """Perform email/SMTP security checks (SPF, DMARC, DKIM, relay, STARTTLS, mailbox verify).
 
     Runs as a sync activity so Temporal places it in a thread.  A background
     heartbeat thread (copy_context pattern, same as _run_task) sends heartbeats
-    every 30 s so the heartbeat_timeout is never tripped by slow swaks / smtp-user-enum
-    subprocesses.
+    every 30 s so the heartbeat_timeout is never tripped by slow swaks /
+    check_if_email_exists subprocesses.
     """
     import contextvars
     import time
@@ -4371,34 +4384,42 @@ def run_email_security_activity(ctx: dict) -> dict:
 
 
 def _run_email_security_sync(ctx: dict) -> dict:
-    """Synchronous implementation of email security checks.
-
-    Probing is bounded by `email_security_budget_seconds()`. Without it a target
-    with many mail hosts outlives the activity's start_to_close_timeout
-    — Temporal then discards the result and retries from scratch, while the killed
-    attempt's thread keeps holding one of the worker's activity slots.
-    """
-    import time as _time
-
+    """Synchronous implementation of email security checks."""
     from reNgine.common_func import save_vulnerability
     from startScan.models import ScanHistory, Subdomain
     from reNgine.tasks.email_security import (
         check_spf, check_dmarc, check_dkim, assess_spoofability,
-        swaks_relay_test, swaks_starttls_check, smtp_user_enum,
+        swaks_relay_test, swaks_starttls_check,
         check_ssl_cert, SMTP_PORTS,
     )
+    from reNgine.tasks.email_verification import (
+        verify_domain_mailboxes,
+        parse_mailbox_config,
+        ACTIVITY_START_TO_CLOSE_SECONDS,
+    )
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, ABORTED_TASK
     from django.db.models import Q
+    import time
+
+    started = time.monotonic()
 
     scan_id: int = ctx.get('scan_history_id')
     domain_name: str = ctx.get('domain_name') or ctx.get('domain', '')
     logger.info('[EMAIL_SECURITY] START scan_id=%s domain=%s', scan_id, domain_name)
 
-    budget_seconds = email_security_budget_seconds()
-    deadline = _time.monotonic() + budget_seconds
-
     scan = ScanHistory.objects.select_related('domain').get(pk=scan_id)
     if not domain_name:
         domain_name = scan.domain.name
+
+    yaml_cfg = ctx.get('yaml_configuration') or {}
+    mailbox_proxy = None
+    if parse_mailbox_config(yaml_cfg).get('enabled', True):
+        mailbox_proxy = _start_scan_task_proxy(
+            ctx, 'check_if_email_exists', 'Mailbox Verification',
+        )
+
+    mailbox_status = SUCCESS_TASK
+    mailbox_error = None
 
     findings_count: int = 0
 
@@ -4420,138 +4441,156 @@ def _run_email_security_sync(ctx: dict) -> dict:
         except Exception as exc:
             logger.error('[EMAIL_SECURITY] save_vulnerability failed for %s: %s', name, exc)
 
-    # DNS checks (always run against the root domain)
-    spf = check_spf(domain_name)
-    dmarc = check_dmarc(domain_name)
-    dkim = check_dkim(domain_name)
-
-    if not spf['found']:
-        _vuln('SPF Record Missing', 3,
-              'No SPF TXT record found for %s.' % domain_name)
-    elif spf['weak']:
-        _vuln('SPF Weak Policy', 2,
-              'SPF record for %s uses +all or ~all: %s' % (domain_name, spf['record']))
-
-    if not dmarc['found']:
-        _vuln('DMARC Record Missing', 3,
-              'No DMARC record found at _dmarc.%s.' % domain_name)
-    elif dmarc['policy'] == 'none':
-        _vuln('DMARC Policy Not Enforced (p=none)', 2,
-              'DMARC for %s uses p=none — monitoring only.' % domain_name)
-
-    if not dkim['found']:
-        _vuln('DKIM Record Missing', 2,
-              'No DKIM record found for %s across common selectors.' % domain_name)
-
-    for spoof in assess_spoofability(spf, dmarc):
-        _vuln(spoof['name'], spoof['severity'], spoof['description'])
-
-    # SMTP tool checks — only run if SMTP ports were found during port scan
     try:
-        smtp_hosts = list(
-            Subdomain.objects.filter(scan_history_id=scan_id).filter(
-                Q(ip_addresses__ports__number__in=SMTP_PORTS) |
-                Q(ip_addresses__ports__service_name__icontains='smtp')
-            ).values_list('name', 'ip_addresses__address', 'ip_addresses__ports__number')
-            .distinct()
-        )
+            # DNS checks (always run against the root domain)
+            spf = check_spf(domain_name)
+            dmarc = check_dmarc(domain_name)
+            dkim = check_dkim(domain_name)
+
+            if not spf['found']:
+                _vuln('SPF Record Missing', 3,
+                      'No SPF TXT record found for %s.' % domain_name)
+            elif spf['weak']:
+                _vuln('SPF Weak Policy', 2,
+                      'SPF record for %s uses +all or ~all: %s' % (domain_name, spf['record']))
+
+            if not dmarc['found']:
+                _vuln('DMARC Record Missing', 3,
+                      'No DMARC record found at _dmarc.%s.' % domain_name)
+            elif dmarc['policy'] == 'none':
+                _vuln('DMARC Policy Not Enforced (p=none)', 2,
+                      'DMARC for %s uses p=none — monitoring only.' % domain_name)
+
+            if not dkim['found']:
+                _vuln('DKIM Record Missing', 2,
+                      'No DKIM record found for %s across common selectors.' % domain_name)
+
+            for spoof in assess_spoofability(spf, dmarc):
+                _vuln(spoof['name'], spoof['severity'], spoof['description'])
+
+            # SMTP tool checks — only run if SMTP ports were found during port scan
+            try:
+                smtp_hosts = list(
+                    Subdomain.objects.filter(scan_history_id=scan_id).filter(
+                        Q(ip_addresses__ports__number__in=SMTP_PORTS) |
+                        Q(ip_addresses__ports__service_name__icontains='smtp')
+                    ).values_list('name', 'ip_addresses__address', 'ip_addresses__ports__number')
+                    .distinct()
+                )
+            except Exception as exc:
+                logger.error('[EMAIL_SECURITY] DB query failed scan_id=%s: %s', scan_id, exc)
+                mailbox_status = FAILED_TASK
+                mailbox_error = format_exception_for_log(exc)
+                if mailbox_proxy:
+                    mailbox_proxy.update_scan_activity(FAILED_TASK, error_message=mailbox_error)
+                raise
+
+            checked_pairs: set = set()
+            for (subdomain_name, ip_address, port) in smtp_hosts:
+                host = subdomain_name or ip_address
+                if not host:
+                    continue
+                pair = (host, port)
+                if pair in checked_pairs:
+                    continue
+                checked_pairs.add(pair)
+                host_url = 'smtp://%s:%s' % (host, port)
+
+                relay = swaks_relay_test(host, port, domain_name)
+                if relay.get('banner'):
+                    _vuln('SMTP Service Banner Disclosure', 0,
+                          'SMTP banner on %s:%s: %s' % (host, port, relay['banner']), host_url)
+                if relay['open_relay']:
+                    _vuln('SMTP Open Relay', 4,
+                          'SMTP server at %s:%s accepted a relay attempt.' % (host, port), host_url)
+
+                # Ports 25/587 use opportunistic TLS (STARTTLS) — flag if missing
+                if port in (25, 587):
+                    tls = swaks_starttls_check(host, port)
+                    if not tls['starttls_supported']:
+                        _vuln('STARTTLS Not Supported', 3,
+                              'SMTP at %s:%s did not advertise STARTTLS.' % (host, port), host_url)
+
+                # Ports 465/993 use implicit TLS (SMTPS/IMAPS) — verify certificate validity
+                if port in (465, 993):
+                    cert = check_ssl_cert(host, port)
+                    if not cert['connected']:
+                        _vuln(
+                            'Port %d Not Responding to TLS Handshake' % port, 2,
+                            'Port %s on %s is expected to use implicit TLS (SMTPS/IMAPS) '
+                            'but did not complete the SSL handshake.' % (port, host),
+                            host_url,
+                        )
+                    else:
+                        if cert['expired']:
+                            _vuln(
+                                'Expired SSL/TLS Certificate on SMTP', 3,
+                                'The SSL/TLS certificate on %s:%s has expired.' % (host, port),
+                                host_url,
+                            )
+                        if cert['self_signed']:
+                            _vuln(
+                                'Self-Signed SSL/TLS Certificate on SMTP', 2,
+                                'The certificate on %s:%s is self-signed and will not be '
+                                'trusted by mail clients.' % (host, port),
+                                host_url,
+                            )
+                        if cert['hostname_mismatch']:
+                            _vuln(
+                                'SSL/TLS Certificate Hostname Mismatch on SMTP', 3,
+                                'The certificate on %s:%s does not match the hostname. '
+                                'Clients may refuse the connection.' % (host, port),
+                                host_url,
+                            )
+                        days = cert.get('days_until_expiry')
+                        if days is not None and 0 <= days < 30 and not cert['expired']:
+                            _vuln(
+                                'SSL/TLS Certificate Expiring Soon on SMTP', 1,
+                                'The certificate on %s:%s expires in %d day(s). '
+                                'Renew before it causes delivery failures.' % (host, port, days),
+                                host_url,
+                            )
+
     except Exception as exc:
-        logger.error('[EMAIL_SECURITY] DB query failed scan_id=%s: %s', scan_id, exc)
+        logger.error('[EMAIL_SECURITY] pre-mailbox failed scan_id=%s: %s', scan_id, exc)
+        mailbox_status = FAILED_TASK
+        mailbox_error = format_exception_for_log(exc)
+        if mailbox_proxy:
+            mailbox_proxy.update_scan_activity(FAILED_TASK, error_message=mailbox_error)
         raise
 
-    checked_pairs: set = set()
-    budget_exhausted = False
-    for (subdomain_name, ip_address, port) in smtp_hosts:
-        if _time.monotonic() >= deadline:
-            budget_exhausted = True
-            logger.warning(
-                '[EMAIL_SECURITY] Time budget of %ss spent after %d of %d SMTP hosts '
-                '— returning partial results | scan_id=%s',
-                budget_seconds, len(checked_pairs), len(smtp_hosts), scan_id,
-            )
-            break
-        host = subdomain_name or ip_address
-        if not host:
-            continue
-        pair = (host, port)
-        if pair in checked_pairs:
-            continue
-        checked_pairs.add(pair)
-        host_url = 'smtp://%s:%s' % (host, port)
+    proxy_url = None
+    try:
+        from reNgine.common_func import get_random_proxy
+        proxy_url = get_random_proxy()
+    except Exception:
+        proxy_url = None
+    mailbox = {'confirmed': [], 'checked': 0}
+    try:
+        remaining = ACTIVITY_START_TO_CLOSE_SECONDS - (time.monotonic() - started)
+        mailbox = verify_domain_mailboxes(
+            domain_name, scan, yaml_cfg, proxy_url=proxy_url,
+            remaining_seconds=remaining,
+            activity_id=getattr(mailbox_proxy, 'activity_id', None),
+        )
+        for finding in mailbox.get('findings') or []:
+            _vuln(finding['name'], finding['severity'], finding['description'])
+        skipped = mailbox.get('skipped_reason')
+        if skipped:
+            mailbox_status = ABORTED_TASK
+            mailbox_error = skipped
+    except Exception as exc:
+        logger.error('[EMAIL_SECURITY] mailbox verification failed scan_id=%s: %s', scan_id, exc)
+        mailbox_status = FAILED_TASK
+        mailbox_error = format_exception_for_log(exc)
 
-        relay = swaks_relay_test(host, port, domain_name)
-        if relay.get('banner'):
-            _vuln('SMTP Service Banner Disclosure', 0,
-                  'SMTP banner on %s:%s: %s' % (host, port, relay['banner']), host_url)
-        if relay['open_relay']:
-            _vuln('SMTP Open Relay', 4,
-                  'SMTP server at %s:%s accepted a relay attempt.' % (host, port), host_url)
+    if mailbox_proxy:
+        mailbox_proxy.update_scan_activity(mailbox_status, error_message=mailbox_error)
 
-        # Ports 25/587 use opportunistic TLS (STARTTLS) — flag if missing
-        if port in (25, 587):
-            tls = swaks_starttls_check(host, port)
-            if not tls['starttls_supported']:
-                _vuln('STARTTLS Not Supported', 3,
-                      'SMTP at %s:%s did not advertise STARTTLS.' % (host, port), host_url)
-
-        # Ports 465/993 use implicit TLS (SMTPS/IMAPS) — verify certificate validity
-        if port in (465, 993):
-            cert = check_ssl_cert(host, port)
-            if not cert['connected']:
-                _vuln(
-                    'Port %d Not Responding to TLS Handshake' % port, 2,
-                    'Port %s on %s is expected to use implicit TLS (SMTPS/IMAPS) '
-                    'but did not complete the SSL handshake.' % (port, host),
-                    host_url,
-                )
-            else:
-                if cert['expired']:
-                    _vuln(
-                        'Expired SSL/TLS Certificate on SMTP', 3,
-                        'The SSL/TLS certificate on %s:%s has expired.' % (host, port),
-                        host_url,
-                    )
-                if cert['self_signed']:
-                    _vuln(
-                        'Self-Signed SSL/TLS Certificate on SMTP', 2,
-                        'The certificate on %s:%s is self-signed and will not be '
-                        'trusted by mail clients.' % (host, port),
-                        host_url,
-                    )
-                if cert['hostname_mismatch']:
-                    _vuln(
-                        'SSL/TLS Certificate Hostname Mismatch on SMTP', 3,
-                        'The certificate on %s:%s does not match the hostname. '
-                        'Clients may refuse the connection.' % (host, port),
-                        host_url,
-                    )
-                days = cert.get('days_until_expiry')
-                if days is not None and 0 <= days < 30 and not cert['expired']:
-                    _vuln(
-                        'SSL/TLS Certificate Expiring Soon on SMTP', 1,
-                        'The certificate on %s:%s expires in %d day(s). '
-                        'Renew before it causes delivery failures.' % (host, port, days),
-                        host_url,
-                    )
-
-    # VRFY enumeration costs up to ~2 minutes per target, so it only runs with
-    # budget left — the relay/TLS findings above are worth keeping either way.
-    enum_targets = list(checked_pairs) if not budget_exhausted and _time.monotonic() < deadline else []
-    if enum_targets:
-        enum = smtp_user_enum(enum_targets, domain=domain_name)
-        for host_port_key, users in enum['users_found'].items():
-            if users:
-                _vuln('SMTP User Enumeration (VRFY/EXPN)', 2,
-                      '%d valid usernames at %s: %s' % (
-                          len(users), host_port_key, ', '.join(users[:20])),
-                      'smtp://%s' % host_port_key)
-
-    logger.info(
-        '[EMAIL_SECURITY] COMPLETE scan_id=%s findings=%d hosts=%d partial=%s',
-        scan_id, findings_count, len(checked_pairs), budget_exhausted,
-    )
+    logger.info('[EMAIL_SECURITY] COMPLETE scan_id=%s findings=%d', scan_id, findings_count)
     return {
         'findings_count': findings_count,
         'smtp_hosts_checked': len(checked_pairs),
-        'partial': budget_exhausted,
+        'mailboxes_confirmed': len(mailbox.get('confirmed') or []),
+        'mailboxes_checked': mailbox.get('checked') or 0,
     }

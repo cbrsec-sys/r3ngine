@@ -77,7 +77,7 @@ class TestResumeScanRecoveryBudget(TestCase):
 
         mock_get_client.return_value = self._dead_workflow_client()
 
-        resume_scan_temporal(self.scan.id, automatic=True)
+        resume_scan_temporal(self.scan.id, auto=True)
 
         self.scan.refresh_from_db()
         self.assertEqual(self.scan.recovery_count, 1)
@@ -122,8 +122,8 @@ class TestResumeScanRecoveryBudget(TestCase):
         client = self._dead_workflow_client()
         mock_get_client.return_value = client
 
-        resume_scan_temporal(self.scan.id, automatic=True)
-        resume_scan_temporal(self.scan.id, automatic=True)
+        resume_scan_temporal(self.scan.id, auto=True)
+        resume_scan_temporal(self.scan.id, auto=True)
 
         started_ids = self._started_workflow_ids(client)
         self.assertEqual(

@@ -40,6 +40,7 @@ class TestBuildScanTaskPlan(SimpleTestCase):
         names = [t['name'] for t in plan]
         self.assertIn('subdomain_discovery', names)
         self.assertIn('port_scan', names)
+        self.assertIn('check_if_email_exists', names)
         # Tier-7 tasks always present
         self.assertIn('correlate_vulnerabilities', names)
         self.assertIn('calculate_risk_scores', names)
@@ -116,3 +117,38 @@ class TestBuildScanTaskPlan(SimpleTestCase):
             'generate_impact_assessment', 'sync_graph', 'run_apme',
         ]:
             self.assertIn(expected, names)
+        self.assertNotIn('check_if_email_exists', names)
+
+    def test_mailbox_verification_omitted_when_disabled(self):
+        yaml_cfg = {
+            'port_scan': {},
+            'email_security': {'mailbox_verification': {'enabled': False}},
+        }
+        plan = build_scan_task_plan(['port_scan'], yaml_cfg)
+        names = [t['name'] for t in plan]
+        self.assertNotIn('check_if_email_exists', names)
+
+    def test_mailbox_verification_title_and_tier(self):
+        plan = build_scan_task_plan(MINIMAL_TASKS, MINIMAL_YAML)
+        entry = next(t for t in plan if t['name'] == 'check_if_email_exists')
+        self.assertEqual(entry['title'], 'Mailbox Verification')
+        self.assertEqual(entry['tier'], 2)
+
+    def test_mailbox_verification_omitted_for_subscan(self):
+        plan = build_scan_task_plan(MINIMAL_TASKS, MINIMAL_YAML, is_subscan=True)
+        names = [t['name'] for t in plan]
+        self.assertNotIn('check_if_email_exists', names)
+        self.assertIn('port_scan', names)
+
+
+class TestCanonicalScanTaskName(SimpleTestCase):
+    def test_yaml_resource_keys_are_not_pipeline_tasks(self):
+        from reNgine.task_plan import canonical_scan_task_name
+        for name in ('threads', 'timeout', 'rate_limit', 'retries', 'leaks_and_secrets'):
+            self.assertIsNone(canonical_scan_task_name(name))
+
+    def test_aliases_and_known_tasks(self):
+        from reNgine.task_plan import canonical_scan_task_name
+        self.assertEqual(canonical_scan_task_name('attack_path_modeling'), 'run_apme')
+        self.assertEqual(canonical_scan_task_name('generate_impact_assessment'), 'generate_impact_assessment')
+        self.assertEqual(canonical_scan_task_name('subdomain_discovery'), 'subdomain_discovery')

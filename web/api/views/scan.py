@@ -657,14 +657,15 @@ class ScanActivityRetryAPIView(APIView):
         original_scan_status = scan.scan_status
 
         with transaction.atomic():
-            # Reset the failed activity row so the serializer counts it as pending
-            # and _create_scan_activity can claim it normally.
+            # Reset the failed activity row so _create_scan_activity can claim it.
+            # Keep time_started so the timeline does not hide it as a ghost
+            # INITIATED row (those are filtered when time_started is null).
             ScanActivity.objects.filter(pk=activity_obj.pk).update(
                 status=INITIATED_TASK,
-                time_started=None,
                 time_ended=None,
                 error_message=None,
                 traceback=None,
+                time=timezone.now(),
             )
 
             # Flip scan back to RUNNING so the UI reflects active state.
@@ -734,6 +735,17 @@ RETRYABLE_TASK_NAMES = frozenset({
     'post_crawl_osint',
     'http_crawl_bridge',
     'run_acunetix',
+    # Tier 7 post-processing — dispatchable on its own since the upstream merge.
+    'correlate_vulnerabilities',
+    'calculate_risk_scores',
+    'generate_impact_assessment',
+    'sync_graph',
+    'run_apme',
+    'attack_path_modeling',
+    # Mailbox verification, under each of the names the workflow accepts.
+    'check_if_email_exists',
+    'email_security',
+    'mailbox_verification',
 })
 
 #: Highest tier the timeline uses (Tier 7 holds finalisation/post-processing).
@@ -866,6 +878,12 @@ class ScanTierRetryAPIView(APIView):
 
         yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "") or {}
 
+        # Every retry in this batch reaches GetScanFinalStatusActivity, which
+        # reports RUNNING while any name in the batch is still unfinished.
+        # Without it the retries race to write the scan's final status and the
+        # last one to finish decides it, even if its siblings are still going.
+        batch_names = sorted({a.name for a in retryable})
+
         async def _start_all():
             client = await TemporalClientProvider.get_client()
             outcomes = []
@@ -878,6 +896,7 @@ class ScanTierRetryAPIView(APIView):
                     "yaml_configuration": yaml_config,
                     "tasks": [activity.name],
                     "original_scan_status": original_scan_status,
+                    "retry_batch_names": batch_names,
                 }
                 workflow_id = tier_retry_workflow_id(scan.id, tier, activity.id)
                 try:

@@ -32,6 +32,63 @@ export interface MarketplacePlugin {
   is_installed: boolean;
   update_available?: boolean;
   installed_version?: string;
+  icon_url?: string | null;
+}
+
+const MARKETPLACE_ICON_HOST = 'raw.githubusercontent.com';
+const MARKETPLACE_ICON_PATH_PREFIX = '/whiterabb17/r3ngine-plugins/refs/heads/master/';
+const MARKETPLACE_ICON_EXT_RE = /\.(png|svg|jpe?g|webp|gif)$/i;
+
+function isSafeMarketplaceIconUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === 'https:' &&
+      parsed.hostname === MARKETPLACE_ICON_HOST &&
+      parsed.pathname.startsWith(MARKETPLACE_ICON_PATH_PREFIX)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function withIconExtension(url: string, ext: '.png' | '.svg'): string | undefined {
+  try {
+    const parsed = new URL(url);
+    if (!MARKETPLACE_ICON_EXT_RE.test(parsed.pathname)) return undefined;
+    parsed.pathname = parsed.pathname.replace(MARKETPLACE_ICON_EXT_RE, ext);
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/** Local installed icon first; otherwise same-repo GitHub raw PNG and SVG URLs. */
+export function resolvePluginIconSrcs(
+  plugin?: Plugin,
+  marketplacePlugin?: MarketplacePlugin,
+): string[] {
+  if (plugin?.icon_path && plugin.slug) {
+    return [`/api/plugins/${encodeURIComponent(plugin.slug)}/icon/`];
+  }
+  const primary = marketplacePlugin?.icon_url;
+  if (!primary || !isSafeMarketplaceIconUrl(primary)) return [];
+
+  const urls = [primary];
+  for (const ext of ['.svg', '.png'] as const) {
+    const alternate = withIconExtension(primary, ext);
+    if (alternate && alternate !== primary && isSafeMarketplaceIconUrl(alternate)) {
+      urls.push(alternate);
+    }
+  }
+  return urls;
+}
+
+export function resolvePluginIconSrc(
+  plugin?: Plugin,
+  marketplacePlugin?: MarketplacePlugin,
+): string | undefined {
+  return resolvePluginIconSrcs(plugin, marketplacePlugin)[0];
 }
 
 // --- CORE FETCHERS ---
