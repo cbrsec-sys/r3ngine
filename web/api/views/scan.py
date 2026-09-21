@@ -848,13 +848,16 @@ class ScanTierRetryAPIView(APIView):
 
         with transaction.atomic():
             # Reset the failed rows so the serializer counts them as pending and
-            # _create_scan_activity can claim them normally.
+            # _create_scan_activity can claim them normally. time_started is kept:
+            # the timeline drops INITIATED rows that have none, treating them as
+            # ghosts of an earlier run, which would hide the very tasks the
+            # operator just asked to re-run.
             ScanActivity.objects.filter(pk__in=[a.pk for a in retryable]).update(
                 status=INITIATED_TASK,
-                time_started=None,
                 time_ended=None,
                 error_message=None,
                 traceback=None,
+                time=timezone.now(),
             )
             scan.scan_status = RUNNING_TASK
             scan.error_message = None

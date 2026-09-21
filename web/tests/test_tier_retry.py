@@ -102,7 +102,9 @@ class TestTierRetryOnlyFailedRows(TierRetryTestCase):
 
         failed.refresh_from_db()
         self.assertEqual(failed.status, INITIATED_TASK)
-        self.assertIsNone(failed.time_started)
+        # Kept, not cleared: the timeline hides INITIATED rows without a start
+        # time, so clearing it would remove the row the operator just retried.
+        self.assertIsNotNone(failed.time_started)
 
         for untouched, expected in (
             (succeeded, SUCCESS_TASK),
