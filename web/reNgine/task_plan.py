@@ -151,11 +151,26 @@ def get_task_tier(name: str) -> int:
     return _TASK_TIER.get(name, 7)
 
 
+def email_security_enabled(yaml_configuration: dict) -> bool:
+    """True unless the engine config turns email security off.
+
+    The workflow schedules the activity whenever port_scan is in the task list,
+    so this is the only switch an operator has. Absent config means enabled, to
+    keep existing engines behaving as they did.
+    """
+    section = yaml_configuration.get('email_security') if isinstance(yaml_configuration, dict) else None
+    if not isinstance(section, dict):
+        return True
+    return bool(section.get('enabled', True))
+
+
 def _mailbox_verification_planned(tasks: list, yaml_configuration: dict, is_subscan: bool = False) -> bool:
     """True when MasterScanWorkflow will run mailbox verification."""
     if is_subscan:
         return False
     if 'port_scan' not in tasks:
+        return False
+    if not email_security_enabled(yaml_configuration):
         return False
     section = yaml_configuration.get('email_security') if isinstance(yaml_configuration, dict) else None
     if not isinstance(section, dict):

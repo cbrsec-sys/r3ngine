@@ -4398,6 +4398,7 @@ def _run_email_security_sync(ctx: dict) -> dict:
         ACTIVITY_START_TO_CLOSE_SECONDS,
     )
     from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, ABORTED_TASK
+    from reNgine.task_plan import email_security_enabled
     from django.db.models import Q
     import time
 
@@ -4406,6 +4407,20 @@ def _run_email_security_sync(ctx: dict) -> dict:
     scan_id: int = ctx.get('scan_history_id')
     domain_name: str = ctx.get('domain_name') or ctx.get('domain', '')
     logger.info('[EMAIL_SECURITY] START scan_id=%s domain=%s', scan_id, domain_name)
+
+    if not email_security_enabled(ctx.get('yaml_configuration')):
+        # Turned off in the engine config. Checked here rather than in the
+        # workflow: the workflow schedules this activity whenever port_scan is
+        # in the task list, and adding a branch there would change the command
+        # sequence and need a workflow.patched() guard for in-flight scans.
+        logger.info('[EMAIL_SECURITY] disabled in engine config — skipping | scan_id=%s', scan_id)
+        return {
+            'findings_count': 0,
+            'smtp_hosts_checked': 0,
+            'mailboxes_confirmed': 0,
+            'mailboxes_checked': 0,
+            'skipped': 'disabled',
+        }
 
     scan = ScanHistory.objects.select_related('domain').get(pk=scan_id)
     if not domain_name:
