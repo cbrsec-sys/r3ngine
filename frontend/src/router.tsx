@@ -707,7 +707,7 @@ function NotFound() {
         NOT FOUND
       </Typography>
 
-      <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.6)', maxWidth: 500, mb: 6, lineHeight: 1.8 }}>
+      <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 500, mb: 6, lineHeight: 1.8 }}>
         This page has not yet been migrated to the new interface.
       </Typography>
 
@@ -761,7 +761,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     >
       <AlertCircle size={80} color="#ff003c" style={{ marginBottom: 20 }} />
       <Typography variant="h3" sx={{ fontFamily: 'Orbitron', mb: 2, color: 'text.primary' }}>SYSTEM_CRASH</Typography>
-      <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', mb: 4, maxWidth: 600 }}>
+      <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4, maxWidth: 600 }}>
         An unexpected error occurred in the tactical interface.
         Error: {error.message}
       </Typography>

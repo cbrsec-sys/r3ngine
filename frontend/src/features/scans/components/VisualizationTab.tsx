@@ -281,7 +281,7 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
                 }}
               />
             }
-            label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 900, fontFamily: 'Orbitron' }}>EXPAND ALL</Typography>}
+            label={<Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 900, fontFamily: 'Orbitron' }}>EXPAND ALL</Typography>}
           />
           <Tooltip title="Download as PNG">
             <IconButton size="small" onClick={handleDownload} sx={{ color: tokens.accent.primary }}>

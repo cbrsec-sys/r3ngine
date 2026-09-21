@@ -161,9 +161,9 @@ export const TodoPage: React.FC = () => {
             }}
           />
           <Stack direction="row" spacing={1}>
-            <Button sx={{ minWidth: 40, p: 1, color: 'rgba(255,255,255,0.4)', bgcolor: 'rgba(255,255,255,0.02)' }}><Filter size={18} /></Button>
+            <Button sx={{ minWidth: 40, p: 1, color: 'text.secondary', bgcolor: 'rgba(255,255,255,0.02)' }}><Filter size={18} /></Button>
             <Button sx={{ minWidth: 40, p: 1, color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' }}><List size={18} /></Button>
-            <Button sx={{ minWidth: 40, p: 1, color: 'rgba(255,255,255,0.4)', bgcolor: 'rgba(255,255,255,0.02)' }}><LayoutGrid size={18} /></Button>
+            <Button sx={{ minWidth: 40, p: 1, color: 'text.secondary', bgcolor: 'rgba(255,255,255,0.02)' }}><LayoutGrid size={18} /></Button>
           </Stack>
         </Box>
 

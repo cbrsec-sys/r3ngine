@@ -94,7 +94,7 @@ export const OrganizationTable: React.FC<OrganizationTableProps> = ({
                   {org.name}
                 </Typography>
               </TableCell>
-              <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+              <TableCell sx={{ color: 'text.secondary' }}>
                 {org.description || '—'}
               </TableCell>
               <TableCell align="center">
@@ -110,7 +110,7 @@ export const OrganizationTable: React.FC<OrganizationTableProps> = ({
                   }}
                 />
               </TableCell>
-              <TableCell align="center" sx={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.875rem' }}>
+              <TableCell align="center" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
                 <Tooltip title={new Date(org.insert_date).toLocaleString()}>
                   <span>{formatRelativeTime(org.insert_date)}</span>
                 </Tooltip>
@@ -123,7 +123,7 @@ export const OrganizationTable: React.FC<OrganizationTableProps> = ({
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Schedule Scan">
-                    <IconButton size="small" sx={{ color: 'rgba(255, 255, 255, 0.7)', '&:hover': { color: 'text.primary', backgroundColor: 'rgba(255, 255, 255, 0.05)' } }}>
+                    <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary', backgroundColor: 'rgba(255, 255, 255, 0.05)' } }}>
                       <Clock size={18} />
                     </IconButton>
                   </Tooltip>

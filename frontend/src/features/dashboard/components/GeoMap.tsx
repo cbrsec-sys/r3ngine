@@ -254,7 +254,7 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                                                         boxShadow: '0 0 5px rgba(0,0,0,0.5)'
                                                     }}
                                                 />
-                                                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.9)' }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'text.primary' }}>
                                                     {country.name}
                                                 </Typography>
                                             </Box>

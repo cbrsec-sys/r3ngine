@@ -431,7 +431,7 @@ export const ReportSettingsPage: React.FC = () => {
                       }}>
                         {item.tag}
                       </Typography>
-                      <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{item.desc}</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px' }}>{item.desc}</Typography>
                     </Box>
                   ))}
                 </Stack>

@@ -39,7 +39,7 @@ export const TodoSidebar: React.FC<TodoSidebarProps> = ({ activeFilter, setActiv
                 transition: 'all 0.3s ease'
               }}
             >
-              <ListItemIcon sx={{ minWidth: 40, color: activeFilter === item.id ? item.color : 'rgba(255,255,255,0.4)' }}>
+              <ListItemIcon sx={{ minWidth: 40, color: activeFilter === item.id ? item.color : 'text.secondary' }}>
                 <item.icon size={20} />
               </ListItemIcon>
               <ListItemText 
