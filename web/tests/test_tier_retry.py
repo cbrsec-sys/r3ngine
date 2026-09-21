@@ -363,7 +363,17 @@ class TestRetryableTaskNamesStayInSync(unittest.TestCase):
 
         start = source.index('class SingleTaskRetryWorkflow')
         end = source.index('Unrecognised task_name for retry', start)
-        dispatched = set(re.findall(r'task_name == "([^"]+)"', source[start:end]))
+        block = source[start:end]
+
+        # Two branch shapes dispatch a task: an equality test, and a membership
+        # test listing the aliases a task is also known by.
+        dispatched = set(re.findall(r'task_name == "([^"]+)"', block))
+        for group in re.findall(r'task_name in \(([^)]*)\)', block):
+            dispatched.update(
+                name.strip().strip('\'"')
+                for name in group.split(',')
+                if name.strip()
+            )
 
         self.assertTrue(dispatched, 'Failed to parse the dispatch chain')
         self.assertEqual(
