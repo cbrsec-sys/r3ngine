@@ -565,6 +565,9 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	processed_paramspider_subdomains = set()
 	processed_arjun_subdomains = set()
 	processed_linkfinder_subdomains = set()
+	processed_inql_subdomains = set()
+	processed_jwt_subdomains = set()
+	processed_graphql_cop_subdomains = set()
 	# Gate-check caches: has_graphql_endpoint probes up to 6 network paths with a
 	# 5s timeout each, and has_jwt_tokens issues 2 DB queries — both return the
 	# same result for every URL sharing a subdomain.  Evaluate each gate once per
@@ -713,10 +716,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				logger.warning('[WEB_API] LinkFinder: output file missing for %s', subdomain_name)
 
 		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected).
+		# processed_inql_subdomains is the primary dedup guard so the tool runs at
+		# most once per subdomain regardless of how many URLs that subdomain has.
 		# _graphql_gate_cache[subdomain_name] is populated on first visit so that
 		# has_graphql_endpoint (which issues a DB iregex query + up to 6 network
 		# probes × 5 s each) is called at most once per subdomain, not per URL.
-		if 'inql' in uses_tools:
+		if 'inql' in uses_tools and subdomain_name not in processed_inql_subdomains:
+			processed_inql_subdomains.add(subdomain_name)
 			if subdomain_name not in _graphql_gate_cache:
 				logger.warning('[WEB_API] InQL: checking GraphQL gate for %s (first visit)', subdomain_name)
 				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
@@ -744,9 +750,12 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 					logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
 
 		# jwt_tool - JWT security testing (only when JWT tokens have been found).
+		# processed_jwt_subdomains is the primary dedup guard so the tool runs at
+		# most once per subdomain regardless of how many URLs that subdomain has.
 		# _jwt_gate_cache[subdomain_name] is populated on first visit so that
 		# has_jwt_tokens (2 DB queries per call) runs at most once per subdomain.
-		if JWT_TOOL in uses_tools:
+		if JWT_TOOL in uses_tools and subdomain_name not in processed_jwt_subdomains:
+			processed_jwt_subdomains.add(subdomain_name)
 			if subdomain_name not in _jwt_gate_cache:
 				logger.warning('[WEB_API] jwt_tool: checking JWT gate for %s (first visit)', subdomain_name)
 				_jwt_gate_cache[subdomain_name] = has_jwt_tokens(self.scan_id, subdomain=subdomain)
@@ -759,8 +768,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				logger.warning('[WEB_API] jwt_tool: no JWT tokens detected, skipping %s', subdomain_name)
 
 		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected).
+		# processed_graphql_cop_subdomains is the primary dedup guard so the tool runs
+		# at most once per subdomain regardless of how many URLs that subdomain has.
 		# Shares _graphql_gate_cache with InQL — no second round of probes needed.
-		if GRAPHQL_COP in uses_tools:
+		if GRAPHQL_COP in uses_tools and subdomain_name not in processed_graphql_cop_subdomains:
+			processed_graphql_cop_subdomains.add(subdomain_name)
 			if subdomain_name not in _graphql_gate_cache:
 				logger.warning('[WEB_API] graphql-cop: checking GraphQL gate for %s (first visit)', subdomain_name)
 				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
