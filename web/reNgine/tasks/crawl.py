@@ -45,6 +45,23 @@ _TLS_SERVICE_HINTS = ('https', 'ssl', 'tls')
 _GRPC_MAX_PORTS_PER_HOST = 5
 
 
+def gqlspection_schema_dumped(return_code, output):
+	"""True when GQLSpection printed a schema.
+
+	The tool does not report whether introspection is enabled; it dumps the
+	schema *through* introspection, so a successful dump is itself the finding
+	and a failure means there was nothing to dump. The previous check looked for
+	the word "enabled" anywhere in the output, which appears only in the tool's
+	own help text.
+	"""
+	if return_code != 0:
+		return False
+	text = (output or '').strip()
+	if not text:
+		return False
+	return 'traceback' not in text.lower()
+
+
 def grpc_probe_targets(open_ports, url_port, url_is_https):
 	"""Decide which ports to try gRPC on for one host.
 
@@ -973,15 +990,24 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				save_vulnerability(vuln_data, self.scan, self.domain)
 		logger.warning('[WEB_API] Sourcemapper: finished')
 
-	# GQLSpection
+	# GQLSpection — dumps a GraphQL schema through introspection. A successful
+	# dump is the finding; the tool has no "is introspection on?" mode.
 	if 'gqlspection' in uses_tools and urls:
 		from reNgine.tasks.parsers import parse_gqlspection_result
-		logger.warning('[WEB_API] GQLSpection: running on %d URLs', len(urls))
-		run_command("pipx inject gqlspection click", shell=True)
-		for url in urls:
-			cmd = f"GQLSpection -e {url}"
+		targets = [url for url in urls if is_graphql_endpoint_url(url)]
+		logger.warning(
+			'[WEB_API] GQLSpection: %d of %d URLs address a GraphQL endpoint',
+			len(targets), len(urls),
+		)
+		seen_hosts = set()
+		for url in targets:
+			hostname = urlparse(url).hostname
+			if not hostname or hostname in seen_hosts:
+				continue
+			seen_hosts.add(hostname)
+			cmd = f"gqlspection -u {url} -l all"
 			return_code, output = run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
-			if "Introspection is enabled" in output or "enabled" in output.lower():
+			if gqlspection_schema_dumped(return_code, output):
 				vuln_data = parse_gqlspection_result(url, output)
 				save_vulnerability(vuln_data, self.scan, self.domain)
 		logger.warning('[WEB_API] GQLSpection: finished')
