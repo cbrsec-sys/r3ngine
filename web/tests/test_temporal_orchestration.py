@@ -348,8 +348,10 @@ class TestTemporalOrchestration(TestCase):
 
         # Assert both the stuck running scan and the failed scan are resumed (dead workflows)
         self.assertEqual(mock_resume_scan.call_count, 2)
-        mock_resume_scan.assert_any_call(scan_running_stuck.id)
-        mock_resume_scan.assert_any_call(scan_failed.id)
+        # automatic=True marks these as budget-consuming auto-recoveries, unlike
+        # a manual resume from the UI.
+        mock_resume_scan.assert_any_call(scan_running_stuck.id, automatic=True)
+        mock_resume_scan.assert_any_call(scan_failed.id, automatic=True)
 
         # Clean up database records
         scan_running_stuck.delete()

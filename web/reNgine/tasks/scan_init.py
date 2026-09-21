@@ -827,11 +827,47 @@ def report(self, ctx={}, description=None):
 #--------------------------#
 
 
-def resume_scan_temporal(scan_id):
+def _next_resume_workflow_id(scan) -> str:
+	"""Build the next `master-scan-<scan id>-run-<n>` workflow id for a resume.
+
+	`n` is one past the highest run number already recorded for this scan, so
+	every resume attempt — manual or automatic — gets a distinct workflow id and
+	never reuses the id of an earlier TemporalWorkflowExecution record.
+	"""
+	from startScan.models import TemporalWorkflowExecution
+
+	prefix = f"master-scan-{scan.id}-run-"
+	known_ids = list(scan.workflow_ids or [])
+	known_ids += list(
+		TemporalWorkflowExecution.objects
+		.filter(workflow_id__startswith=prefix)
+		.values_list('workflow_id', flat=True)
+	)
+
+	highest = -1
+	for workflow_id in known_ids:
+		if not workflow_id.startswith(prefix):
+			continue
+		suffix = workflow_id[len(prefix):]
+		if suffix.isdigit():
+			highest = max(highest, int(suffix))
+
+	return f"{prefix}{highest + 1}"
+
+
+def resume_scan_temporal(scan_id: int, automatic: bool = False) -> None:
 	"""Resume a scan from the last completed task.
-	
+
 	1. Identifies completed tasks by checking ScanActivity records.
 	2. Spawns MasterScanWorkflow with only the remaining tasks.
+
+	Args:
+		scan_id: ScanHistory id to resume.
+		automatic: True only when called by `recover_stuck_scans`. An automatic
+			resume spends one unit of the auto-recovery budget that
+			`recover_stuck_scans` caps with `recovery_count < 3`; a manual
+			resume from the UI is an operator decision, so it resets the budget
+			instead of consuming it.
 	"""
 	from reNgine.temporal_client import TemporalClientProvider, run_and_close
 	import asyncio
@@ -871,13 +907,16 @@ def resume_scan_temporal(scan_id):
 		scan.save()
 		return
 		
-	# Update scan status. Clear stop_scan_date and reset recovery_count so that
-	# recover_stuck_scans can find this scan if the container crashes again — a
-	# manually resumed scan is a fresh attempt, not a continuation of prior failures.
+	# Update scan status. Clear stop_scan_date so recover_stuck_scans can find
+	# this scan if the container crashes again.
+	# recovery_count is the automatic-recovery budget: an automatic resume spends
+	# one attempt so the `recovery_count < 3` cap in recover_stuck_scans actually
+	# bounds a scan that keeps dying, while a manually resumed scan is a fresh
+	# attempt, not a continuation of prior failures, and resets the budget.
 	scan.scan_status = RUNNING_TASK
 	scan.error_message = None
 	scan.stop_scan_date = None
-	scan.recovery_count = 0
+	scan.recovery_count = ((scan.recovery_count or 0) + 1) if automatic else 0
 	scan.tasks = remaining_tasks
 	scan.save()
 
@@ -896,8 +935,8 @@ def resume_scan_temporal(scan_id):
 		'tasks': remaining_tasks,
 	}
 	
-	workflow_id = f"master-scan-{scan.id}-run-{scan.recovery_count}"
-	
+	workflow_id = _next_resume_workflow_id(scan)
+
 	# Append the new workflow ID to the scan
 	workflow_ids = scan.workflow_ids or []
 	workflow_ids.append(workflow_id)
@@ -1050,7 +1089,7 @@ def recover_stuck_scans():
 			scan.id, scan.domain, workflow_id, scan.recovery_count
 		)
 		try:
-			resume_scan_temporal(scan.id)
+			resume_scan_temporal(scan.id, automatic=True)
 			recovered += 1
 			logger.info("[RECOVERY] Scan %d resumed successfully", scan.id)
 		except Exception as e:
