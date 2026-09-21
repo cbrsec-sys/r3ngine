@@ -16,10 +16,10 @@ _TASK_TITLES = {
     'spiderfoot_scan':            'SpiderFoot OSINT',
     'baddns':                     'BadDNS Vulnerability Check',
     'vigolium_harvest':           'Vigolium Passive Harvest',
-    'vigolium_discovery':         'Vigolium Discovery',
     # Tier 2
     'http_crawl':                 'HTTP Crawl',
     'port_scan':                  'Port Scan',
+    'vigolium_discovery':         'Vigolium Discovery',
     'acunetix_submit':            'Acunetix Target Submission',
     # Tier 3
     'fetch_url':                  'URL Fetching',
@@ -65,9 +65,13 @@ _TASK_TIER = {
     'spiderfoot_scan':       1,
     'baddns':                1,
     'vigolium_harvest':      1,
-    'vigolium_discovery':    1,
     'http_crawl':            2,
     'port_scan':             2,
+    # Both MasterScanWorkflow and SubScanWorkflow schedule vigolium_discovery in
+    # Tier 2, after subdomain enumeration, so it targets every enumerated
+    # subdomain. The timeline groups rows by this map, and the tier retry
+    # endpoint selects rows by it, so it has to name the tier that really runs it.
+    'vigolium_discovery':    2,
     'fetch_url':             3,
     'http_crawl_bridge':     3,
     'screenshot':            3,
@@ -112,8 +116,8 @@ _TIER7_TASKS = [
 _TIER1_TO_5 = [
     'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
     'dns_security', 'osint', 'spiderfoot_scan', 'baddns',
-    'vigolium_harvest', 'vigolium_discovery',
-    'http_crawl', 'port_scan',
+    'vigolium_harvest',
+    'http_crawl', 'port_scan', 'vigolium_discovery',
     'fetch_url', 'screenshot', 'param_discovery',
     'http_crawl_bridge',
     'dir_file_fuzz',

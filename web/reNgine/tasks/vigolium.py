@@ -550,8 +550,8 @@ def vigolium_discovery(self, ctx={}, description=None):
 
     Executes vigolium's discovery phase (active probing / crawling). The workflow
     schedules it in Tier 2 — after subdomain enumeration has finished, so it sees
-    every enumerated subdomain — concurrently with http_crawl and port_scan.
-    (`task_plan._TASK_TIER` still labels it tier 1 for the timeline.)
+    every enumerated subdomain — concurrently with http_crawl and port_scan, and
+    `task_plan._TASK_TIER` labels it tier 2 to match.
 
     Falls back to the root domain if no subdomains have been enumerated yet,
     ensuring the task is never a no-op early in a full scan.
