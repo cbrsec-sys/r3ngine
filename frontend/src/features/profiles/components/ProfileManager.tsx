@@ -174,7 +174,7 @@ export const ProfileManager: React.FC = () => {
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    color: '#fff',
+                    color: 'text.primary',
                     '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
                     '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
                     '&.Mui-focused fieldset': { borderColor: '#00ff62' },
@@ -194,7 +194,7 @@ export const ProfileManager: React.FC = () => {
                 onChange={e => setForm(f => ({ ...f, rate_limit: e.target.value ? +e.target.value : undefined }))}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    color: '#fff',
+                    color: 'text.primary',
                     '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
                     '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
                     '&.Mui-focused fieldset': { borderColor: '#00ff62' },
@@ -214,7 +214,7 @@ export const ProfileManager: React.FC = () => {
                 onChange={e => setForm(f => ({ ...f, threads: e.target.value ? +e.target.value : undefined }))}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    color: '#fff',
+                    color: 'text.primary',
                     '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
                     '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
                     '&.Mui-focused fieldset': { borderColor: '#00ff62' },
@@ -307,7 +307,7 @@ export const ProfileManager: React.FC = () => {
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography
                     variant="body2"
-                    sx={{ fontWeight: 600, color: '#fff', fontFamily: 'monospace', fontSize: '0.82rem' }}
+                    sx={{ fontWeight: 600, color: 'text.primary', fontFamily: 'monospace', fontSize: '0.82rem' }}
                   >
                     {p.name}
                   </Typography>

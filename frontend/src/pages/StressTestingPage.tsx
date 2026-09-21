@@ -515,7 +515,7 @@ export const StressTestingPage: React.FC = () => {
       case 'connected': return { label: 'PIPELINE READY', color: '#10b981', icon: <Wifi size={14} />, pulse: true };
       case 'connecting': return { label: 'ESTABLISHING LINK...', color: '#facc15', icon: <Wifi size={14} />, pulse: true };
       case 'error': return { label: 'SIGNAL ERROR', color: '#ef4444', icon: <WifiOff size={14} />, pulse: false };
-      default: return { label: 'PIPELINE OFFLINE', color: alpha('#fff', 0.3), icon: <WifiOff size={14} />, pulse: false };
+      default: return { label: 'PIPELINE OFFLINE', color: alpha(theme.palette.text.primary, 0.3), icon: <WifiOff size={14} />, pulse: false };
     }
   };
 
@@ -646,7 +646,7 @@ export const StressTestingPage: React.FC = () => {
             <Typography variant="h4" sx={{
               fontFamily: 'Orbitron',
               fontWeight: 900,
-              color: '#fff',
+              color: 'text.primary',
               letterSpacing: 4,
               textShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.3)}`
             }}>

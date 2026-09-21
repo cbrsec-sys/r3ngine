@@ -89,7 +89,7 @@ export const OrganizationTable: React.FC<OrganizationTableProps> = ({
                   sx={{ color: '#1a1a2e', '&.Mui-checked': { color: '#00f3ff' } }}
                 />
               </TableCell>
-              <TableCell sx={{ color: '#fff' }}>
+              <TableCell sx={{ color: 'text.primary' }}>
                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                   {org.name}
                 </Typography>
@@ -123,7 +123,7 @@ export const OrganizationTable: React.FC<OrganizationTableProps> = ({
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Schedule Scan">
-                    <IconButton size="small" sx={{ color: 'rgba(255, 255, 255, 0.7)', '&:hover': { color: '#fff', backgroundColor: 'rgba(255, 255, 255, 0.05)' } }}>
+                    <IconButton size="small" sx={{ color: 'rgba(255, 255, 255, 0.7)', '&:hover': { color: 'text.primary', backgroundColor: 'rgba(255, 255, 255, 0.05)' } }}>
                       <Clock size={18} />
                     </IconButton>
                   </Tooltip>

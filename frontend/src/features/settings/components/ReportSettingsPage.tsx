@@ -543,7 +543,7 @@ export const ReportSettingsPage: React.FC = () => {
                   placeholder="Footer text..."
                   value={form.footer_text}
                   onChange={(e) => setForm({ ...form, footer_text: e.target.value })}
-                  sx={{ mt: 1, '& .MuiOutlinedInput-root': { color: '#fff' } }}
+                  sx={{ mt: 1, '& .MuiOutlinedInput-root': { color: 'text.primary' } }}
                 />
               )}
             </Box>

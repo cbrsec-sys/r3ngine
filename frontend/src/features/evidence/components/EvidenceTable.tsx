@@ -71,7 +71,7 @@ function CollectionHeader({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Shield size={20} color="#00f3ff" />
         <Box>
-          <Typography variant="subtitle1" sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>
+          <Typography variant="subtitle1" sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: 'text.primary', fontSize: '0.85rem' }}>
             {collection.name}
           </Typography>
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -143,7 +143,7 @@ function EvidenceRow({
             {EVIDENCE_TYPE_ICONS[item.evidence_type] ?? <FileText size={14} />}
           </Box>
           <Box>
-            <Typography variant="body2" sx={{ color: '#fff', fontWeight: 500, fontSize: '0.8rem' }}>
+            <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '0.8rem' }}>
               {item.title}
             </Typography>
             {item.file_name && (

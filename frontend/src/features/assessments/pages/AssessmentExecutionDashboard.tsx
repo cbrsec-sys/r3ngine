@@ -43,7 +43,7 @@ export const AssessmentExecutionDashboard: React.FC = () => {
         <Box>
           <Typography
             variant="h5"
-            sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: '#fff', letterSpacing: 1 }}
+            sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: 'text.primary', letterSpacing: 1 }}
           >
             {assessment.name}
           </Typography>

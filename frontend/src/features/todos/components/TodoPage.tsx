@@ -157,7 +157,7 @@ export const TodoPage: React.FC = () => {
                 '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
                 '&.Mui-focused fieldset': { borderColor: '#00f3ff' }
               },
-              '& .MuiInputBase-input': { color: '#fff', fontSize: '0.9rem' }
+              '& .MuiInputBase-input': { color: 'text.primary', fontSize: '0.9rem' }
             }}
           />
           <Stack direction="row" spacing={1}>

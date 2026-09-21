@@ -215,7 +215,7 @@ const subScansRoute = createRoute({
         textAlign: 'center'
       }}>
         ACCESSING TACTICAL REGISTRY... <br />
-        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>RETRIEVING SUB SCANS... PLEASE WAIT</span>
+        <Box component="span" sx={{ fontSize: '10px', opacity: 0.5, color: 'text.primary' }}>RETRIEVING SUB SCANS... PLEASE WAIT</Box>
       </Typography>
       <style>
         {`
@@ -260,7 +260,7 @@ const scheduledScansRoute = createRoute({
         textAlign: 'center'
       }}>
         ACCESSING TACTICAL REGISTRY... <br />
-        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>RETRIEVING SCHEDULED OPERATIONS... PLEASE WAIT</span>
+        <Box component="span" sx={{ fontSize: '10px', opacity: 0.5, color: 'text.primary' }}>RETRIEVING SCHEDULED OPERATIONS... PLEASE WAIT</Box>
       </Typography>
       {/* <style>
         {`
@@ -308,7 +308,7 @@ const subdomainsRoute = createRoute({
         textAlign: 'center'
       }}>
         INITIALIZING TACTICAL DATA... <br />
-        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING SUBDOMAINS... PLEASE WAIT</span>
+        <Box component="span" sx={{ fontSize: '10px', opacity: 0.5, color: 'text.primary' }}>FETCHING SUBDOMAINS... PLEASE WAIT</Box>
       </Typography>
       {/* <style>
         {`
@@ -451,7 +451,7 @@ const vulnsRoute = createRoute({
         textAlign: 'center'
       }}>
         INITIALIZING TACTICAL DATA... <br />
-        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING VULNERABILITIES... PLEASE WAIT</span>
+        <Box component="span" sx={{ fontSize: '10px', opacity: 0.5, color: 'text.primary' }}>FETCHING VULNERABILITIES... PLEASE WAIT</Box>
       </Typography>
     </Box>
   )
@@ -691,7 +691,7 @@ function NotFound() {
         fontSize: { xs: '3rem', md: '5rem' },
         letterSpacing: 8,
         mb: 2,
-        color: '#fff',
+        color: 'text.primary',
         textShadow: '0 0 20px rgba(255, 0, 60, 0.5)'
       }}>
         SIGNAL LOST
@@ -719,7 +719,7 @@ function NotFound() {
           startIcon={<Home size={18} />}
           sx={{
             borderColor: 'rgba(255, 255, 255, 0.2)',
-            color: '#fff',
+            color: 'text.primary',
             px: 4,
             py: 1.5,
             '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(0, 243, 255, 0.05)' }
@@ -760,7 +760,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
       }}
     >
       <AlertCircle size={80} color="#ff003c" style={{ marginBottom: 20 }} />
-      <Typography variant="h3" sx={{ fontFamily: 'Orbitron', mb: 2, color: '#fff' }}>SYSTEM_CRASH</Typography>
+      <Typography variant="h3" sx={{ fontFamily: 'Orbitron', mb: 2, color: 'text.primary' }}>SYSTEM_CRASH</Typography>
       <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', mb: 4, maxWidth: 600 }}>
         An unexpected error occurred in the tactical interface.
         Error: {error.message}

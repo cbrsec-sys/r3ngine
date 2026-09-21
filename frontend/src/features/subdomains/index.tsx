@@ -199,7 +199,7 @@ export const SubdomainsPage: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Results :</Typography>
               <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}>
-                <Typography sx={{ fontSize: '11px', color: '#fff', fontWeight: 700 }}>50</Typography>
+                <Typography sx={{ fontSize: '11px', color: 'text.primary', fontWeight: 700 }}>50</Typography>
               </Box>
             </Box>
             <Box sx={{ px: 3, py: 0.8, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -294,7 +294,7 @@ export const SubdomainsPage: React.FC = () => {
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: 0.2 }}>{sub.name}</Typography>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'text.primary', letterSpacing: 0.2 }}>{sub.name}</Typography>
                         <IconButton size="small" sx={{ p: 0.2, color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}>
                           <Copy size={12} />
                         </IconButton>
