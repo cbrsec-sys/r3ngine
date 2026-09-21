@@ -28,6 +28,58 @@ from startScan.models import *
 
 logger = get_module_logger(__name__)
 
+#: Ports where gRPC is plausibly served. Every probe costs a connect timeout, and
+#: gRPC has no convention of living on arbitrary ports, so the rest of what the
+#: port scan found is not worth the wait.
+_GRPC_CANDIDATE_PORTS = frozenset({443, 8443, 9443, 8080, 8081, 9090, 9091, 50051, 50052})
+
+#: Ports that speak TLS. grpcurl must not be told -plaintext for these.
+_GRPC_TLS_PORTS = frozenset({443, 8443, 9443})
+
+#: Service names that mark a port as worth probing, or as TLS, whatever its number.
+_GRPC_SERVICE_HINTS = ('grpc', 'http2', 'h2')
+_TLS_SERVICE_HINTS = ('https', 'ssl', 'tls')
+
+#: Upper bound on probes per host, so a host with many open ports cannot stall
+#: the task on connect timeouts alone.
+_GRPC_MAX_PORTS_PER_HOST = 5
+
+
+def grpc_probe_targets(open_ports, url_port, url_is_https):
+	"""Decide which ports to try gRPC on for one host.
+
+	Args:
+		open_ports: (number, service_name) pairs the port scan found for the host.
+		url_port: the port carried by the host's URL, used only when the port scan
+			produced nothing — a scan without port_scan must not lose coverage.
+		url_is_https: whether that URL was https, which decides TLS for the fallback.
+
+	Returns:
+		list[tuple[int, bool]]: (port, use_tls) pairs, ordered and capped.
+	"""
+	def _is_tls(port, service):
+		lowered = (service or '').lower()
+		return port in _GRPC_TLS_PORTS or any(hint in lowered for hint in _TLS_SERVICE_HINTS)
+
+	candidates = {}
+	for number, service in open_ports:
+		lowered = (service or '').lower()
+		named = any(hint in lowered for hint in _GRPC_SERVICE_HINTS)
+		if number in _GRPC_CANDIDATE_PORTS or named:
+			candidates[number] = _is_tls(number, service)
+
+	if candidates:
+		ordered = sorted(candidates.items())[:_GRPC_MAX_PORTS_PER_HOST]
+		return ordered
+
+	if open_ports:
+		# The port scan ran and found nothing gRPC-shaped. Probing the web port
+		# anyway is what made every run report "Failed to dial" on 443.
+		return []
+
+	return [(url_port, url_is_https)]
+
+
 def fetch_url(self, urls=[], ctx={}, description=None):
 	"""Fetch URLs using different tools like gauplus, gau, gospider, waybackurls ...
 
@@ -939,33 +991,56 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		from reNgine.tasks.parsers import parse_grpcurl_result
 		logger.warning('[WEB_API] grpcurl: evaluating %d URLs', len(urls))
 
-		target_map = {}
+		host_urls = {}
 		for url in urls:
 			parsed = urlparse(url)
 			if not parsed.hostname:
 				continue
-			port = parsed.port or (443 if parsed.scheme == 'https' else 80)
-			target = f"{parsed.hostname}:{port}"
-			if target not in target_map:
-				target_map[target] = url
+			if parsed.hostname not in host_urls:
+				host_urls[parsed.hostname] = (
+					url,
+					parsed.port or (443 if parsed.scheme == 'https' else 80),
+					parsed.scheme == 'https',
+				)
 
-		logger.warning('[WEB_API] grpcurl: probing %d unique target host(s)', len(target_map))
-		failed_targets = set()
+		# Ports the port scan actually found open, per host. Probing the web port
+		# the URL happens to carry is a guess; probing it with -plaintext when it
+		# is 443 is a guess that cannot come true whatever is listening there.
+		open_ports = {}
+		for name, number, service in Subdomain.objects.filter(
+			scan_history=self.scan, name__in=list(host_urls),
+		).values_list(
+			'name', 'ip_addresses__ports__number', 'ip_addresses__ports__service_name',
+		).distinct():
+			if number:
+				open_ports.setdefault(name, []).append((number, service))
 
-		for target, representative_url in target_map.items():
-			if target in failed_targets:
+		for hostname, (representative_url, url_port, url_is_https) in host_urls.items():
+			targets = grpc_probe_targets(
+				open_ports.get(hostname, []), url_port, url_is_https
+			)
+			if not targets:
+				logger.warning(
+					'[WEB_API] grpcurl: no plausible gRPC port for %s — skipping', hostname
+				)
 				continue
 
-			cmd = f"grpcurl -connect-timeout 3 -plaintext {target} list"
-			return_code, output = run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
+			for port, use_tls in targets:
+				transport = '-insecure' if use_tls else '-plaintext'
+				cmd = f"grpcurl -connect-timeout 3 {transport} {hostname}:{port} list"
+				return_code, output = run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 
-			if return_code == 0 and output.strip() and "Failed to dial" not in output:
-				vuln_data = parse_grpcurl_result(representative_url, output)
-				save_vulnerability(vuln_data, self.scan, self.domain)
-			else:
-				if "Failed to dial" in output or "context deadline exceeded" in output or return_code != 0:
-					logger.warning('[WEB_API] grpcurl: target %s dial/connection failed — skipping further attempts', target)
-					failed_targets.add(target)
+				if return_code == 0 and output.strip() and "Failed to dial" not in output:
+					vuln_data = parse_grpcurl_result(representative_url, output)
+					save_vulnerability(vuln_data, self.scan, self.domain)
+					break
+
+				if 'no such host' in output.lower():
+					logger.warning(
+						'[WEB_API] grpcurl: %s does not resolve — skipping its remaining ports',
+						hostname,
+					)
+					break
 
 		logger.warning('[WEB_API] grpcurl: finished')
 
