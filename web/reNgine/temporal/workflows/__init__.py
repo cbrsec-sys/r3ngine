@@ -3739,8 +3739,11 @@ class SingleTaskRetryWorkflow:
                 await workflow.execute_activity(
                     "RunEmailSecurityActivity",
                     ctx,
-                    start_to_close_timeout=timedelta(minutes=90),
+                    # Match MasterScanWorkflow: 2h stopped the restart loop on
+                    # targets with many mail hosts (upstream's 90m was too short).
+                    start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=10),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue",
                 )
             elif task_name == "generate_impact_assessment":
