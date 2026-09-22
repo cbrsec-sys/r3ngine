@@ -410,7 +410,7 @@ export const ScanHistoryPage: React.FC = () => {
                     <TableCell padding="checkbox" sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Checkbox
                         checked={isItemSelected}
-                        sx={{ color: 'rgba(255,255,255,0.2)', '&.Mui-checked': { color: tokens.accent.primary } }}
+                        sx={{ color: 'text.disabled', '&.Mui-checked': { color: tokens.accent.primary } }}
                       />
                     </TableCell>
                     <TableCell

@@ -50,6 +50,15 @@ _RETRY_NETWORK_SCAN = RetryPolicy(
     backoff_coefficient=2.0,
     maximum_interval=timedelta(minutes=5),
 )
+# Tier 6 scanners signal failure by returning False, which _run_task converts into
+# an exception. Without an explicit policy Temporal retries such an activity forever,
+# so a scanner whose backend is unreachable floods the timeline for hours.
+_RETRY_SCANNER = RetryPolicy(
+    maximum_attempts=3,
+    initial_interval=timedelta(minutes=2),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=10),
+)
 _RETRY_INTERNAL = RetryPolicy(
     maximum_attempts=5,
     initial_interval=timedelta(seconds=5),
@@ -466,6 +475,20 @@ class MasterScanWorkflow:
                 )
                 await _fan_out_search_vulns(ctx, services or [])
 
+            # Push every live subdomain to Acunetix as soon as liveness is known,
+            # rather than waiting for Tier 6. Hosts already submitted inside the
+            # configured window are skipped by the activity itself.
+            acunetix_cfg = (yaml_config.get('vulnerability_scan') or {}).get('acunetix') or {}
+            if acunetix_cfg.get('submit_live_subdomains', False) and "http_crawl" in tasks:
+                await workflow.execute_activity(
+                    "SubmitLiveSubdomainsToAcunetixActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=1),
+                    heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
+
             await self._check_paused()
             # Post-Tier-2: dispatch any enabled "run after tier_2" plugins
             await _dispatch_tier_plugins(ctx, "tier_2", str(ctx.get('scan_history_id', 'scan')))
@@ -475,8 +498,15 @@ class MasterScanWorkflow:
                 await workflow.execute_activity(
                     "RunEmailSecurityActivity",
                     ctx,
-                    start_to_close_timeout=timedelta(minutes=90),
+                    # Probes every SMTP host found by the port scan: relay, STARTTLS,
+                    # certificate and VRFY enumeration, each with its own timeout. On a
+                    # target with many mail hosts 30 minutes was not enough, and the
+                    # activity was killed and restarted forever. Upstream settled on 90
+                    # minutes; the longer bound is kept because it is the one that stopped
+                    # the restart loop.
+                    start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=10),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue",
                 )
 
@@ -1240,6 +1270,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=4),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1249,6 +1280,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=4),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1258,6 +1290,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1267,6 +1300,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1276,6 +1310,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1285,6 +1320,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=4),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1295,6 +1331,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=4),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1305,6 +1342,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1314,6 +1352,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1324,6 +1363,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1334,6 +1374,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1353,6 +1394,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_SCANNER,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -1365,6 +1407,7 @@ class NucleiPlannerWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue",
                 )
 
@@ -2296,6 +2339,7 @@ class SubScanWorkflow:
                             args=[ctx, task_ok, sid],
                             start_to_close_timeout=timedelta(seconds=60),
                             heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
                             task_queue="python-orchestrator-queue"
                         )
                 else:
@@ -2305,6 +2349,7 @@ class SubScanWorkflow:
                         args=[ctx, success],
                         start_to_close_timeout=timedelta(seconds=60),
                         heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
 
@@ -2345,6 +2390,9 @@ class StressTestWorkflow:
             ctx,
             start_to_close_timeout=timedelta(minutes=2),
             heartbeat_timeout=timedelta(minutes=5),
+            # Not idempotent: it creates a StressTestResult row unconditionally, so a
+            # retry would leave an orphaned all-zero result behind.
+            retry_policy=RetryPolicy(maximum_attempts=1),
             task_queue="python-orchestrator-queue",
         )
 
@@ -2454,6 +2502,7 @@ class StressTestWorkflow:
             final_ctx,
             start_to_close_timeout=timedelta(minutes=5),
             heartbeat_timeout=timedelta(minutes=5),
+            retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue",
         )
 
@@ -2587,7 +2636,12 @@ class GoExecutorTaskWorkflow:
             "RunToolSubprocessActivity",
             input_data,
             start_to_close_timeout=timedelta(seconds=timeout_sec),
+            # Bound the total wall-time across retries: a tool can run for hours, and
+            # the usual retryable failure here is a heartbeat timeout after the executor
+            # container restarted, which re-runs the whole tool from scratch.
+            schedule_to_close_timeout=timedelta(seconds=int(timeout_sec * 2.2)),
             heartbeat_timeout=timedelta(minutes=10),
+            retry_policy=_RETRY_LONG_SCAN,
             task_queue="go-executor-queue"
         )
 
@@ -2826,10 +2880,11 @@ class WordPressWorkflow:
         )
 
         await workflow.execute_activity(
-            "RunWPTaintScanActivity", 
-            ctx, 
-            start_to_close_timeout=timedelta(hours=2), 
+            "RunWPTaintScanActivity",
+            ctx,
+            start_to_close_timeout=timedelta(hours=2),
             heartbeat_timeout=timedelta(minutes=5),
+            retry_policy=_RETRY_SCANNER,
             task_queue="python-orchestrator-queue"
         )
 

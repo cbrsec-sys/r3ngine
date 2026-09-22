@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { getSeverityColor as getSemanticSeverityColor, getSeverityLabel } from '../../../theme/semanticColors';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
@@ -39,7 +39,8 @@ import {
   Backdrop,
   DialogActions,
   Link,
-  Alert
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   Activity,
@@ -83,7 +84,9 @@ import {
   GitBranch,
   Brain
 } from 'lucide-react';
-import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useRetryScanTask } from '../api';
+import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useRetryScanTask, useRetryScanTier } from '../api';
+import { getFailureCategoryLabel, summariseTier } from '../utils/failureCategories';
+import { TimelineTierHeader } from './TimelineTierHeader';
 import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote } from '../types';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
@@ -488,26 +491,200 @@ const getToolColor = (binary: string, tokens: any, isLight?: boolean) => {
   return tokens.accent.secondary;
 };
 
+const TIER_LABELS: Record<number, string> = {
+  0: 'Initialization',
+  1: 'Discovery',
+  2: 'Enumeration',
+  3: 'URL & Screenshots',
+  4: 'Fuzzing',
+  5: 'Analysis',
+  6: 'Security Assessment',
+  7: 'Post-Processing',
+};
+
+type ActivityStatusConfig = { color: string, label: string };
+
+const getActivityStatusConfig = (
+  status: ScanActivity['status'],
+  tokens: ReturnType<typeof useThemeTokens>['tokens'],
+  fallbackColor: string
+): ActivityStatusConfig => {
+  const statusConfig: Record<string, ActivityStatusConfig> = {
+    'SUCCESS': { color: tokens.accent.success, label: 'Completed' },
+    'RUNNING': { color: tokens.accent.primary, label: 'In Progress' },
+    'FAILED': { color: tokens.accent.error, label: 'Failed' },
+    'ABORTED': { color: tokens.accent.error, label: 'Aborted' },
+    'PENDING': { color: tokens.accent.warning, label: 'Pending' }
+  };
+  return statusConfig[status] || { color: fallbackColor, label: status };
+};
+
+const getActivityDurationSeconds = (activity: Pick<ScanActivity, 'time_started' | 'time_ended'>): number | null => {
+  if (!activity.time_started || !activity.time_ended) return null;
+  return Math.round((new Date(activity.time_ended).getTime() - new Date(activity.time_started).getTime()) / 1000);
+};
+
+const ActivityDetailField: React.FC<{ label: string; value: React.ReactNode; monospace?: boolean }> = ({ label, value, monospace }) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography sx={{ fontSize: '0.55rem', color: 'text.disabled', fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase' }}>
+      {label}
+    </Typography>
+    <Typography
+      component="div"
+      sx={{
+        fontSize: '0.7rem',
+        color: 'text.primary',
+        fontWeight: 600,
+        fontFamily: monospace ? 'monospace' : undefined,
+        wordBreak: 'break-all'
+      }}
+    >
+      {value}
+    </Typography>
+  </Box>
+);
+
+const ActivityDetailsPanel: React.FC<{ activity: ScanActivity }> = ({ activity }) => {
+  const { tokens, isLight, theme } = useThemeTokens();
+  const [showTraceback, setShowTraceback] = useState(false);
+  const config = getActivityStatusConfig(activity.status, tokens, theme.palette.text.primary);
+  const durationSeconds = getActivityDurationSeconds(activity);
+  const traceback = activity.traceback || '';
+  const isFailed = activity.status === 'FAILED' || activity.status === 'ABORTED';
+  const failureCategoryLabel = getFailureCategoryLabel(activity.failure_category);
+
+  return (
+    <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: { xs: 1.5, sm: 3 } }}>
+        <Box sx={{
+          alignSelf: 'center',
+          px: 1,
+          py: 0.2,
+          borderRadius: 1,
+          bgcolor: `${config.color}20`,
+          border: `1px solid ${config.color}40`,
+          color: config.color,
+          fontSize: '0.65rem',
+          fontWeight: 800,
+          whiteSpace: 'nowrap'
+        }}>
+          {config.label}
+        </Box>
+        {activity.target_host && (
+          <ActivityDetailField label="Target host" value={activity.target_host} monospace />
+        )}
+        {activity.tier !== null && activity.tier !== undefined && (
+          <ActivityDetailField label="Tier" value={`${activity.tier} — ${TIER_LABELS[activity.tier] ?? 'Unknown'}`} />
+        )}
+        <ActivityDetailField label="Started" value={activity.time_started ? new Date(activity.time_started).toLocaleString() : 'N/A'} />
+        <ActivityDetailField label="Ended" value={activity.time_ended ? new Date(activity.time_ended).toLocaleString() : 'N/A'} />
+        {durationSeconds !== null && (
+          <ActivityDetailField label="Duration" value={`${durationSeconds}s`} />
+        )}
+        {activity.execution_id && (
+          <ActivityDetailField label="Execution ID" value={activity.execution_id} monospace />
+        )}
+      </Box>
+
+      {isFailed && failureCategoryLabel && (
+        <Box sx={{
+          mt: 1.5,
+          p: 1,
+          bgcolor: `${tokens.accent.error}0D`,
+          border: `1px solid ${tokens.accent.error}33`,
+          borderLeft: `3px solid ${tokens.accent.error}`,
+          borderRadius: 0.5
+        }}>
+          <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, color: tokens.accent.error, letterSpacing: 0.5 }}>
+            {failureCategoryLabel.toUpperCase()}
+          </Typography>
+          {activity.failure_hint && (
+            <Typography sx={{ mt: 0.3, fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', wordBreak: 'break-word' }}>
+              {activity.failure_hint}
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {isFailed && activity.error_message && (
+        <Typography sx={{
+          mt: 1.5,
+          p: 1,
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          color: tokens.accent.error,
+          bgcolor: `${tokens.accent.error}15`,
+          border: `1px solid ${tokens.accent.error}33`,
+          borderRadius: 0.5,
+          wordBreak: 'break-word'
+        }}>
+          ERROR: {activity.error_message}
+        </Typography>
+      )}
+
+      {traceback && (
+        <Box sx={{ mt: 1.5 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button
+              size="small"
+              startIcon={showTraceback ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              onClick={() => setShowTraceback((v) => !v)}
+              sx={{ color: 'text.secondary', fontSize: '0.6rem', border: 1, borderColor: 'divider', '&:hover': { color: 'text.primary', border: `1px solid ${tokens.accent.primary}` } }}
+            >
+              {showTraceback ? 'Hide traceback' : 'Show traceback'}
+            </Button>
+            <Button
+              size="small"
+              startIcon={<Copy size={12} />}
+              onClick={() => navigator.clipboard.writeText(traceback)}
+              sx={{ color: 'text.secondary', fontSize: '0.6rem', border: 1, borderColor: 'divider', '&:hover': { color: 'text.primary', border: `1px solid ${tokens.accent.primary}` } }}
+            >
+              Copy traceback
+            </Button>
+          </Stack>
+          {showTraceback && (
+            <Box sx={{
+              mt: 1,
+              p: 1.5,
+              maxHeight: '30vh',
+              overflow: 'auto',
+              bgcolor: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.5)',
+              border: 1, borderColor: 'divider',
+              borderLeft: `3px solid ${tokens.accent.error}`,
+              borderRadius: 1,
+              fontFamily: 'monospace',
+              fontSize: '0.7rem',
+              color: 'text.primary',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all'
+            }}>
+              {traceback}
+            </Box>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 const TaskOverlay: React.FC<{
   open: boolean;
   onClose: () => void;
   activityId: number | null;
   scanId?: number | null;
   activityTitle: string;
-}> = ({ open, onClose, activityId, scanId, activityTitle }) => {
+  activity: ScanActivity | null;
+}> = ({ open, onClose, activityId, scanId, activityTitle, activity }) => {
   const { tokens, isLight, theme } = useThemeTokens();
   const { data: logs, isLoading } = useScanLogs(activityId, scanId ?? null);
 
-  const [selectedLog, setSelectedLog] = useState<Command | null>(null);
-
-  // Set first log as selected when logs load
-  React.useEffect(() => {
-    if (logs && logs.length > 0) {
-      if (!selectedLog || !logs.find((l: Command) => l.id === selectedLog.id)) {
-        setSelectedLog(logs[0]);
-      }
-    }
-  }, [logs]);
+  const [selectedLogId, setSelectedLogId] = useState<Command['id'] | null>(null);
+  const hasCommands = !!logs && logs.length > 0;
+  // Derived rather than synced via an effect: a selection that no longer exists
+  // (or belongs to a previously opened task) falls back to the first command.
+  const selectedLog: Command | null = hasCommands
+    ? (logs.find((l: Command) => l.id === selectedLogId) ?? logs[0])
+    : null;
 
   return (
     <Dialog
@@ -541,15 +718,26 @@ const TaskOverlay: React.FC<{
           <X size={20} />
         </IconButton>
       </DialogTitle>
-      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-        <Grid container sx={{ height: '60vh' }}>
+      <DialogContent sx={{ p: 0, overflow: 'auto' }}>
+        {activity && <ActivityDetailsPanel activity={activity} />}
+        <Grid container sx={{ height: { xs: 'auto', md: '60vh' } }}>
           {/* Command List */}
-          <Grid size={{ xs: 4 }} sx={{ borderRight: 1, borderColor: 'divider', height: '100%', overflowY: 'auto' }}>
+          <Grid
+            size={{ xs: 12, md: 4 }}
+            sx={{
+              borderRight: { xs: 0, md: 1 },
+              borderBottom: { xs: 1, md: 0 },
+              borderColor: 'divider',
+              height: { xs: 'auto', md: '100%' },
+              maxHeight: { xs: '30vh', md: 'none' },
+              overflowY: 'auto'
+            }}
+          >
             {isLoading ? (
               <Box sx={{ p: 4, textAlign: 'center' }}>
                 <CircularProgress size={24} sx={{ color: tokens.accent.primary }} />
               </Box>
-            ) : logs && logs.length > 0 ? (
+            ) : hasCommands ? (
               <List sx={{ p: 0 }}>
                 {logs.map((log: Command) => {
                   const cmdStr = log.command || '';
@@ -562,7 +750,7 @@ const TaskOverlay: React.FC<{
                     <ListItem
                       key={log.id}
                       component="div"
-                      onClick={() => setSelectedLog(log)}
+                      onClick={() => setSelectedLogId(log.id)}
                       sx={{
                         cursor: 'pointer',
                         borderBottom: 1,
@@ -624,14 +812,25 @@ const TaskOverlay: React.FC<{
               </List>
             ) : (
               <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography sx={{ color: 'text.disabled', fontSize: '0.8rem' }}>
-                  No commands found.
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.8rem', fontWeight: 600 }}>
+                  This task records no shell commands (it runs via an HTTP API).
+                </Typography>
+                <Typography sx={{ color: 'text.disabled', fontSize: '0.7rem', mt: 1 }}>
+                  Use the status, error message and traceback above to diagnose it.
                 </Typography>
               </Box>
             )}
           </Grid>
           {/* Command Output */}
-          <Grid size={{ xs: 8 }} sx={{ height: '100%', overflowY: 'auto', bgcolor: isLight ? 'rgba(0,0,0,0.01)' : 'background.default' }}>
+          <Grid
+            size={{ xs: 12, md: 8 }}
+            sx={{
+              height: { xs: 'auto', md: '100%' },
+              minHeight: { xs: '30vh', md: 0 },
+              overflowY: 'auto',
+              bgcolor: isLight ? 'rgba(0,0,0,0.01)' : 'background.default'
+            }}
+          >
             {selectedLog ? (
               <Box sx={{ p: 2 }}>
                 {/* Clean Command Box Header */}
@@ -730,9 +929,11 @@ const TaskOverlay: React.FC<{
                 </Box>
               </Box>
             ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.3 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.3, p: 2, textAlign: 'center' }}>
                 <Terminal size={48} />
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>Select a command to view output</Typography>
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>
+                  {!isLoading && !hasCommands ? 'No command output to display' : 'Select a command to view output'}
+                </Typography>
               </Box>
             )}
           </Grid>
@@ -742,27 +943,11 @@ const TaskOverlay: React.FC<{
   );
 };
 
-const TIER_LABELS: Record<number, string> = {
-  0: 'Initialization',
-  1: 'Discovery',
-  2: 'Enumeration',
-  3: 'URL & Screenshots',
-  4: 'Fuzzing',
-  5: 'Analysis',
-  6: 'Security Assessment',
-  7: 'Post-Processing',
-};
-
 const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onRetry?: (activity: ScanActivity) => void, isTerminal?: boolean, allowRetryAny?: boolean }> = ({ activity, onClick, onRetry, isTerminal, allowRetryAny }) => {
   const { theme, isLight, tokens } = useThemeTokens();
-  const statusConfig: Record<string, { color: string, label: string }> = {
-    'SUCCESS': { color: tokens.accent.success, label: 'Completed' },
-    'RUNNING': { color: tokens.accent.primary, label: 'In Progress' },
-    'FAILED': { color: tokens.accent.error, label: 'Failed' },
-    'ABORTED': { color: tokens.accent.error, label: 'Aborted' },
-    'PENDING': { color: tokens.accent.warning, label: 'Pending' }
-  };
-  const config = statusConfig[activity.status] || { color: theme.palette.text.primary, label: activity.status };
+  const config = getActivityStatusConfig(activity.status, tokens, theme.palette.text.primary);
+  const durationSeconds = getActivityDurationSeconds(activity);
+  const failureCategoryLabel = getFailureCategoryLabel(activity.failure_category);
 
   return (
     <Box
@@ -850,6 +1035,23 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
             </MuiTooltip>
           )}
         </Stack>
+        {activity.target_host && (
+          <Typography
+            title={activity.target_host}
+            sx={{
+              fontSize: '0.7rem',
+              fontFamily: 'monospace',
+              fontWeight: 600,
+              color: 'text.secondary',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '100%'
+            }}
+          >
+            {activity.target_host}
+          </Typography>
+        )}
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Typography sx={{ fontSize: '0.7rem', color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
             {activity.status === 'PENDING'
@@ -858,12 +1060,30 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
                 ? new Date(activity.time_started).toLocaleString()
                 : new Date(activity.time).toLocaleString()}
           </Typography>
-          {activity.time_started && activity.time_ended && (
+          {durationSeconds !== null && (
             <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', fontWeight: 600 }}>
-              ({Math.round((new Date(activity.time_ended).getTime() - new Date(activity.time_started).getTime()) / 1000)}s)
+              ({durationSeconds}s)
             </Typography>
           )}
         </Stack>
+        {failureCategoryLabel && (
+          <Box sx={{
+            alignSelf: 'flex-start',
+            mt: 0.5,
+            px: 0.8,
+            py: 0.1,
+            borderRadius: 0.5,
+            bgcolor: `${tokens.accent.error}20`,
+            border: `1px solid ${tokens.accent.error}40`,
+            color: tokens.accent.error,
+            fontSize: '0.55rem',
+            fontWeight: 900,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase'
+          }}>
+            {failureCategoryLabel}
+          </Box>
+        )}
         {activity.error_message && (
           <Typography sx={{ fontSize: '0.65rem', color: isLight ? tokens.accent.error : '#ff003c', bgcolor: isLight ? `${tokens.accent.error}15` : 'rgba(255,0,60,0.1)', p: 1, borderRadius: 0.5, border: `1px solid ${isLight ? `${tokens.accent.error}33` : 'rgba(255,0,60,0.2)'}`, mt: 1 }}>
             ERROR: {activity.error_message}
@@ -909,25 +1129,81 @@ const SubScanWidget: React.FC<{ subscans: SubScan[], targetName: string }> = ({ 
   );
 };
 
-const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploitable: number }> = ({ counts, exploitable }) => {
+const FULL_HEIGHT_SX = { height: '100%' } as const;
+const EMPTY_VULNERABILITIES: Vulnerability[] = [];
+const EMPTY_SUBDOMAINS: Subdomain[] = [];
+const EMPTY_PARTIAL_SUBDOMAINS: Partial<Subdomain>[] = [];
+
+interface VulnerabilityCounts {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  unknown: number;
+  total: number;
+}
+
+const VULN_BREAKDOWN_LABELS = ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown', 'Exploitable'];
+
+// react-apexcharts deep-compares `options` on every render and treats any function
+// (the donut `formatter`) as changed, which triggers a full SVG rebuild. Memoising the
+// options object so it only changes with the data or the theme avoids that.
+const VulnerabilityBreakdown = React.memo(function VulnerabilityBreakdown({ counts, exploitable }: { counts: VulnerabilityCounts, exploitable: number }) {
   const { tokens, isLight } = useThemeTokens();
-  const series = [counts.critical, counts.high, counts.medium, counts.low, counts.info, counts.unknown, exploitable];
-  const labels = ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown', 'Exploitable'];
-  const colors = [
-    isLight ? tokens.accent.error : '#ff003c',
+  const { critical, high, medium, low, info, unknown, total } = counts;
+  const series = useMemo(
+    () => [critical, high, medium, low, info, unknown, exploitable],
+    [critical, high, medium, low, info, unknown, exploitable]
+  );
+  const errorColor = tokens.accent.error;
+  const infoColor = tokens.accent.info;
+  const successColor = tokens.accent.success;
+  const disabledColor = tokens.text.disabled;
+  const secondaryTextColor = tokens.text.secondary;
+  const colors = useMemo(() => [
+    isLight ? errorColor : '#ff003c',
     isLight ? '#d97706' : '#ff5722',
     isLight ? '#b45309' : '#ff9800',
     isLight ? '#9a6700' : '#ffeb3b',
-    isLight ? tokens.accent.info : '#2196f3',
-    tokens.text.disabled,
-    isLight ? tokens.accent.success : '#00ff62'
-  ];
+    isLight ? infoColor : '#2196f3',
+    disabledColor,
+    isLight ? successColor : '#00ff62'
+  ], [isLight, errorColor, infoColor, disabledColor, successColor]);
+
+  const options = useMemo(() => ({
+    chart: { type: 'donut' as const, background: 'transparent' },
+    theme: { mode: isLight ? 'light' : 'dark' as any },
+    stroke: { show: false },
+    labels: VULN_BREAKDOWN_LABELS,
+    dataLabels: { enabled: false },
+    legend: { show: true, position: 'bottom' as const, fontSize: '10px', labels: { colors: isLight ? secondaryTextColor : 'rgba(255,255,255,0.7)' } },
+    colors,
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '65%',
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: 'Total',
+              color: 'text.secondary',
+              fontSize: '12px',
+              formatter: () => total.toString()
+            },
+            value: { color: 'text.primary', fontSize: '20px', fontWeight: 900 }
+          }
+        }
+      }
+    }
+  }), [isLight, secondaryTextColor, colors, total]);
 
   return (
     <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} color={isLight ? tokens.accent.error : '#ff003c'} />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
       <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, textAlign: 'center', width: '100%', px: 1 }}>
-          {labels.map((l, i) => (
+          {VULN_BREAKDOWN_LABELS.map((l, i) => (
             <Box key={l} sx={{ flex: 1 }}>
               <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>{l.substring(0, 4)}</Typography>
               <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
@@ -936,33 +1212,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
         </Box>
         <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Chart
-            options={{
-              chart: { type: 'donut', background: 'transparent' },
-              theme: { mode: isLight ? 'light' : 'dark' as any },
-              stroke: { show: false },
-              labels: labels,
-              dataLabels: { enabled: false },
-              legend: { show: true, position: 'bottom', fontSize: '10px', labels: { colors: isLight ? tokens.text.secondary : 'rgba(255,255,255,0.7)' } },
-              colors: colors,
-              plotOptions: {
-                pie: {
-                  donut: {
-                    size: '65%',
-                    labels: {
-                      show: true,
-                      total: {
-                        show: true,
-                        label: 'Total',
-                        color: 'text.secondary',
-                        fontSize: '12px',
-                        formatter: () => counts.total.toString()
-                      },
-                      value: { color: 'text.primary', fontSize: '20px', fontWeight: 900 }
-                    }
-                  }
-                }
-              }
-            }}
+            options={options}
             series={series}
             type="donut"
             width="100%"
@@ -972,9 +1222,9 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
       </Box>
     </TacticalPanel>
   );
-};
+});
 
-const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => {
+const VulnHighlights = React.memo(function VulnHighlights({ highlights, onVulnClick }: { highlights: Vulnerability[], onVulnClick: (v: any) => void }) {
   const { tokens, isLight } = useThemeTokens();
   return (
     <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color={tokens.accent.error} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -1049,7 +1299,7 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
       </TableContainer>
     </TacticalPanel>
   );
-};
+});
 
 interface SubdomainVulnCounts {
   host: string;
@@ -1060,35 +1310,35 @@ interface SubdomainVulnCounts {
   total: number;
 }
 
-const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
+const MostVulnerableSubdomain = React.memo(function MostVulnerableSubdomain({ vulnerabilities = EMPTY_VULNERABILITIES, sx = FULL_HEIGHT_SX }: { vulnerabilities: Vulnerability[], sx?: any }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
-  const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
-
-  const subdomainMap = filteredVulns.reduce(
-    (acc: Record<string, SubdomainVulnCounts>, v: Vulnerability) => {
-      try {
-        if (!v.http_url) return acc;
-        const normalizedUrl = v.http_url.match(/^https?:\/\//) ? v.http_url : `http://${v.http_url}`;
-        const host = new URL(normalizedUrl).hostname;
-        if (!host) return acc;
-        if (!acc[host]) acc[host] = { host, critical: 0, high: 0, medium: 0, low: 0, total: 0 };
-        const sev = Number(v.severity);
-        if (sev === 4) acc[host].critical += 1;
-        else if (sev === 3) acc[host].high += 1;
-        else if (sev === 2) acc[host].medium += 1;
-        else if (sev === 1) acc[host].low += 1;
-        acc[host].total += 1;
-      } catch {
-        // ignore invalid URLs
-      }
-      return acc;
-    },
-    {}
-  );
-
-  const rows = Object.values(subdomainMap).sort((a, b) => b.total - a.total);
+  const rows = useMemo(() => {
+    const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
+    const subdomainMap = filteredVulns.reduce(
+      (acc: Record<string, SubdomainVulnCounts>, v: Vulnerability) => {
+        try {
+          if (!v.http_url) return acc;
+          const normalizedUrl = v.http_url.match(/^https?:\/\//) ? v.http_url : `http://${v.http_url}`;
+          const host = new URL(normalizedUrl).hostname;
+          if (!host) return acc;
+          if (!acc[host]) acc[host] = { host, critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+          const sev = Number(v.severity);
+          if (sev === 4) acc[host].critical += 1;
+          else if (sev === 3) acc[host].high += 1;
+          else if (sev === 2) acc[host].medium += 1;
+          else if (sev === 1) acc[host].low += 1;
+          acc[host].total += 1;
+        } catch {
+          // ignore invalid URLs
+        }
+        return acc;
+      },
+      {}
+    );
+    return Object.values(subdomainMap).sort((a, b) => b.total - a.total);
+  }, [vulnerabilities, ignoreInfo]);
 
   const cellStyle = { borderBottom: 1, borderColor: 'divider', py: 0.75 };
 
@@ -1155,21 +1405,22 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
       )}
     </TacticalPanel>
   );
-};
+});
 
-const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVulnClick: (v: any) => void, sx?: any }> = ({ vulnerabilities = [], onVulnClick, sx = {} }) => {
+const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulnerabilities = EMPTY_VULNERABILITIES, onVulnClick, sx = FULL_HEIGHT_SX }: { vulnerabilities: Vulnerability[], onVulnClick: (v: any) => void, sx?: any }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
-  const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
 
-  // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
-  const commonMap = filtered.reduce((acc: Record<string, any>, v: Vulnerability) => {
-    acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity, vulnerability: v };
-    acc[v.name].count += 1;
-    return acc;
-  }, {});
-
-  const data = Object.values(commonMap).sort((a: { count: number }, b: { count: number }) => b.count - a.count).slice(0, 10);
+  const data = useMemo(() => {
+    const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
+    // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
+    const commonMap = filtered.reduce((acc: Record<string, any>, v: Vulnerability) => {
+      acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity, vulnerability: v };
+      acc[v.name].count += 1;
+      return acc;
+    }, {});
+    return Object.values(commonMap).sort((a: { count: number }, b: { count: number }) => b.count - a.count).slice(0, 10);
+  }, [vulnerabilities, ignoreInfo]);
 
   return (
     <TacticalPanel
@@ -1228,9 +1479,9 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVuln
       </TableContainer>
     </TacticalPanel>
   );
-};
+});
 
-const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+const ImportantSubdomainsWidget = React.memo(function ImportantSubdomainsWidget({ subdomains = EMPTY_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Subdomain[], sx?: any }) {
   const { tokens } = useThemeTokens();
   return (
     <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
@@ -1249,7 +1500,7 @@ const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }>
       </Box>
     </TacticalPanel>
   );
-};
+});
 
 const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
@@ -1284,9 +1535,12 @@ const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx
   );
 };
 
-const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+const IpAddressesWidget = React.memo(function IpAddressesWidget({ subdomains = EMPTY_PARTIAL_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Partial<Subdomain>[], sx?: any }) {
   const { tokens, isLight } = useThemeTokens();
-  const ips = Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0')));
+  const ips = useMemo(
+    () => Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0'))),
+    [subdomains]
+  );
   return (
     <TacticalPanel title="IP ADDRESSES" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ips.length}</Box>} sx={{ height: '100%', ...sx }}>
       <Box sx={{ p: 2 }}>
@@ -1301,7 +1555,7 @@ const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }
       </Box>
     </TacticalPanel>
   );
-};
+});
 
 const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
@@ -1345,6 +1599,7 @@ export const ScanDetailPage = () => {
   const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
   const stopScanMutation = useStopScan(projectSlug);
   const retryScanTaskMutation = useRetryScanTask(projectSlug, parseInt(scanId));
+  const retryScanTierMutation = useRetryScanTier(projectSlug, parseInt(scanId));
   const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
@@ -1352,17 +1607,42 @@ export const ScanDetailPage = () => {
   const [aiExportModalOpen, setAiExportModalOpen] = useState(false);
   const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
   const [taskOverlayOpen, setTaskOverlayOpen] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<{ id: number; title: string } | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ScanActivity | null>(null);
   const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
   const [pendingRetryActivity, setPendingRetryActivity] = useState<ScanActivity | null>(null);
+  const [pendingTierRetry, setPendingTierRetry] = useState<{ tier: number; label: string } | null>(null);
+  const [tierRetryNotice, setTierRetryNotice] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({ open: false, message: '', severity: 'success' });
 
   const [selectedVulnForInfo, setSelectedVulnForInfo] = useState<any | null>(null);
   const [vulnInfoModalOpen, setVulnInfoModalOpen] = useState(false);
 
-  const handleVulnClick = (v: any) => {
+  // Stable identity so the memoised summary widgets do not re-render on every poll.
+  const handleVulnClick = useCallback((v: any) => {
     setSelectedVulnForInfo(v);
     setVulnInfoModalOpen(true);
-  };
+  }, []);
+
+  const vulnCounts = useMemo<VulnerabilityCounts>(() => ({
+    critical: data?.critical_count ?? 0,
+    high: data?.high_count ?? 0,
+    medium: data?.medium_count ?? 0,
+    low: data?.low_count ?? 0,
+    info: data?.info_count ?? 0,
+    unknown: data?.unknown_count ?? 0,
+    total: data?.vulnerability_count ?? 0
+  }), [
+    data?.critical_count,
+    data?.high_count,
+    data?.medium_count,
+    data?.low_count,
+    data?.info_count,
+    data?.unknown_count,
+    data?.vulnerability_count
+  ]);
 
 
   const [selectedScanId, setSelectedScanId] = useState<number | null>(null);
@@ -1373,10 +1653,7 @@ export const ScanDetailPage = () => {
       setSelectedActivity(null);
     } else {
       setSelectedScanId(null);
-      setSelectedActivity({
-        id: Number(activity.id),
-        title: activity.title
-      });
+      setSelectedActivity(activity);
     }
     setTaskOverlayOpen(true);
   };
@@ -1384,6 +1661,28 @@ export const ScanDetailPage = () => {
   const handleRetryTask = (activity: ScanActivity) => {
     setPendingRetryActivity(activity);
     setRetryConfirmOpen(true);
+  };
+
+  const handleRetryTier = (tier: number, label: string) => setPendingTierRetry({ tier, label });
+
+  const confirmRetryTier = () => {
+    if (!pendingTierRetry) return;
+    const { tier } = pendingTierRetry;
+    setPendingTierRetry(null);
+    retryScanTierMutation.mutate(tier, {
+      onSuccess: (result) => setTierRetryNotice({
+        open: true,
+        message: result.message,
+        severity: result.queued_count > 0
+          ? (result.skipped_count > 0 ? 'warning' : 'success')
+          : 'info',
+      }),
+      onError: (error: Error) => setTierRetryNotice({
+        open: true,
+        message: error.message,
+        severity: 'error',
+      }),
+    });
   };
 
   const groupedTimeline = useMemo(() => {
@@ -1420,8 +1719,10 @@ export const ScanDetailPage = () => {
     const sortedTiers = Array.from(tierGroups.entries()).map(([tier, activities]) => ({
       id: `tier-${tier}`,
       sortOrder: tier,
+      tier,
       label: `Tier ${tier} — ${TIER_LABELS[tier] ?? 'Unknown'}`,
       activities,
+      summary: summariseTier(activities),
       type: 'tier' as const,
     }));
 
@@ -1437,8 +1738,10 @@ export const ScanDetailPage = () => {
       return {
         id: `plugin-${plugin.slug}`,
         sortOrder,
+        tier: null,
         label: `Plugin — ${plugin.name}`,
         activities,
+        summary: summariseTier(activities),
         type: 'plugin' as const,
       };
     });
@@ -1455,6 +1758,12 @@ export const ScanDetailPage = () => {
   }
 
   const scanStatus = data.scan_info.scan_status;
+  // Mirrors ScanTierRetryAPIView: a live scan owns its own activity rows.
+  const tierRetryBlockedReason = scanStatus === 1
+    ? 'Cannot retry a tier while the scan is running'
+    : scanStatus === 5
+      ? 'Cannot retry a tier while the scan is paused'
+      : null;
   const isTerminal = [0, 2, 3, 4].includes(scanStatus);
   const progressColor = scanStatus === 2 ? tokens.accent.success : (scanStatus === 3 || scanStatus === 0) ? tokens.accent.error : scanStatus === 4 ? tokens.accent.warning : tokens.accent.primary;
   const progressValue = isTerminal ? 100 : data.scan_info.progress;
@@ -1593,19 +1902,22 @@ export const ScanDetailPage = () => {
             <Stack>
               {groupedTimeline.map((group) => (
                 <Box key={group.id}>
-                  <Typography sx={{
-                    display: 'block',
-                    fontSize: '0.55rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: group.type === 'plugin' ? tokens.accent.primary : 'text.secondary',
-                    mt: 1.5,
-                    mb: 0.5,
-                    px: 1,
-                  }}>
-                    {group.label}
-                  </Typography>
+                  <TimelineTierHeader
+                    label={group.label}
+                    summary={group.summary}
+                    isPlugin={group.type === 'plugin'}
+                    onRetryTier={
+                      group.tier !== null && tierRetryBlockedReason === null
+                        ? () => handleRetryTier(group.tier as number, group.label)
+                        : undefined
+                    }
+                    retryBlockedReason={
+                      group.tier === null
+                        ? 'Only tier groups can be re-run as a whole'
+                        : tierRetryBlockedReason ?? undefined
+                    }
+                    isRetrying={retryScanTierMutation.isPending && retryScanTierMutation.variables === group.tier}
+                  />
                   <Box sx={{ position: 'relative' }}>
                     {group.activities.map((activity) => (
                       <TimelineItem
@@ -1893,28 +2205,17 @@ export const ScanDetailPage = () => {
 
       {/* Row 3: Vulnerability Distribution & Highlights */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2, mb: 2, width: '100%' }}>
-        <VulnerabilityBreakdown
-          counts={{
-            critical: data.critical_count,
-            high: data.high_count,
-            medium: data.medium_count,
-            low: data.low_count,
-            info: data.info_count,
-            unknown: data.unknown_count,
-            total: data.vulnerability_count
-          }}
-          exploitable={data.exploitable_count}
-        />
+        <VulnerabilityBreakdown counts={vulnCounts} exploitable={data.exploitable_count} />
         <VulnHighlights highlights={data.vulnerability_highlights} onVulnClick={handleVulnClick} />
       </Box>
 
       {/* Row 4: Vulnerability Deep Dive */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
+          <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={FULL_HEIGHT_SX} />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} onVulnClick={handleVulnClick} sx={{ height: '100%' }} />
+          <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} onVulnClick={handleVulnClick} sx={FULL_HEIGHT_SX} />
         </Grid>
       </Grid>
 
@@ -1927,7 +2228,7 @@ export const ScanDetailPage = () => {
       {/* Row 5: Contextual Assets */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={{ height: '100%' }} />
+          <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={FULL_HEIGHT_SX} />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           <ReconNotesWidget notes={data.todo_notes} sx={{ height: '100%' }} />
@@ -1937,7 +2238,7 @@ export const ScanDetailPage = () => {
       {/* Row 6: Infrastructure & Fingerprinting */}
       <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 4 }}>
-          <IpAddressesWidget subdomains={data.subdomains} sx={{ height: '100%' }} />
+          <IpAddressesWidget subdomains={data.subdomains} sx={FULL_HEIGHT_SX} />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <DiscoveredPortsWidget ports={data.discovered_ports} sx={{ height: '100%' }} />
@@ -2405,9 +2706,10 @@ export const ScanDetailPage = () => {
       <TaskOverlay
         open={taskOverlayOpen}
         onClose={() => setTaskOverlayOpen(false)}
-        activityId={selectedActivity?.id || null}
+        activityId={selectedActivity ? Number(selectedActivity.id) : null}
         scanId={selectedScanId}
         activityTitle={selectedActivity?.title || (selectedScanId ? 'Raw Scan History' : '')}
+        activity={selectedActivity}
       />
 
       {startScanTargets && (
@@ -2436,6 +2738,36 @@ export const ScanDetailPage = () => {
         isLoading={retryScanTaskMutation.isPending}
         type="info"
       />
+
+      <ConfirmDialog
+        open={!!pendingTierRetry}
+        onClose={() => setPendingTierRetry(null)}
+        onConfirm={confirmRetryTier}
+        title="Retry Tier"
+        message={pendingTierRetry
+          ? `Re-run every failed task of ${pendingTierRetry.label}? Tasks that cannot be retried on their own are skipped and reported.`
+          : ''}
+        confirmText="RETRY TIER"
+        cancelText="CANCEL"
+        isDestructive={false}
+        isLoading={retryScanTierMutation.isPending}
+        type="info"
+      />
+
+      <Snackbar
+        open={tierRetryNotice.open}
+        autoHideDuration={6000}
+        onClose={() => setTierRetryNotice((n) => ({ ...n, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setTierRetryNotice((n) => ({ ...n, open: false }))}
+          severity={tierRetryNotice.severity}
+          variant="filled"
+        >
+          {tierRetryNotice.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

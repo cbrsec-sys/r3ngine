@@ -87,6 +87,8 @@ from reNgine.tasks.acunetix import (
     _start_acunetix_scan_direct,
     _fetch_acunetix_vulnerabilities,
     acunetix_scan,
+    acunetix_submit_live_subdomains,
+    get_live_subdomains_for_submission,
 )
 from reNgine.tasks.geo import (
     geo_localize,
@@ -303,6 +305,9 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 			"[TIER7][IMPACT] LLM disabled in Settings — skipping | scan_id=%s",
 			scan_history_id,
 		)
+		# Return None, not False: a disabled feature is a skip, not a failure.
+		# _run_task raises on False, which would fail the activity, exhaust its
+		# retries and mark the whole scan FAILED. run_apme skips the same way.
 		return
 
 	# Cap the per-run vuln limit so the activity stays well inside start_to_close_timeout.
@@ -332,6 +337,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		)
 	else:
 		logger.error("[TIER7][IMPACT] Neither scan_history_id nor vulnerability_id provided — aborting.")
+		self.error = "Neither scan_history_id nor vulnerability_id was provided."
 		return False
 
 	# Check if there are other scanning tasks still running

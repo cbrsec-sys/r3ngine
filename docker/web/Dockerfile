@@ -618,7 +618,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pipx install "bypass-url-parser" --force && \
     pipx install bbot --force && \
     pipx install sploitscan --force && \
-    pipx install git+https://github.com/doyensec/GQLSpection --force
+    pipx install git+https://github.com/doyensec/GQLSpection --force && \
+    # GQLSpection's own metadata omits click, so its entry point raises
+    # ModuleNotFoundError on every invocation. Injected here rather than at scan
+    # time: the runtime `pipx inject` it used to rely on is a network call in the
+    # middle of a scan, racing every other scan for the same virtualenv.
+    pipx inject gqlspection click
 
 # credspy — Microsoft account enumeration via Azure GetCredentialType endpoint
 # Python 3.10+ required (image runs 3.12); only runs when Microsoft MX records detected

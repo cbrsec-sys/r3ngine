@@ -103,3 +103,9 @@ web/evidence/log
 *.pem
 *.key
 *.crt
+
+# Companion repositories cloned next to this one (the compose build context for
+# the MCP sidecar is <repo>/r3ngine-mcp). They are separate git checkouts.
+r3ngine-mcp/
+r3ngine-mobile/
+r3ngine-plugins/

@@ -43,11 +43,11 @@ export const AssessmentExecutionDashboard: React.FC = () => {
         <Box>
           <Typography
             variant="h5"
-            sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: '#fff', letterSpacing: 1 }}
+            sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: 'text.primary', letterSpacing: 1 }}
           >
             {assessment.name}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
             Assessment ID: {assessment.uuid}
           </Typography>
         </Box>
@@ -84,7 +84,7 @@ export const AssessmentExecutionDashboard: React.FC = () => {
                 </span>
               </Box>
             }
-            sx={{ minHeight: 36, py: 0, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }}
+            sx={{ minHeight: 36, py: 0, color: 'text.secondary', '&.Mui-selected': { color: '#00f3ff' } }}
           />
         ))}
       </Tabs>

@@ -16,10 +16,11 @@ _TASK_TITLES = {
     'spiderfoot_scan':            'SpiderFoot OSINT',
     'baddns':                     'BadDNS Vulnerability Check',
     'vigolium_harvest':           'Vigolium Passive Harvest',
-    'vigolium_discovery':         'Vigolium Discovery',
     # Tier 2
     'http_crawl':                 'HTTP Crawl',
     'port_scan':                  'Port Scan',
+    'vigolium_discovery':         'Vigolium Discovery',
+    'acunetix_submit':            'Acunetix Target Submission',
     'check_if_email_exists':      'Mailbox Verification',
     # Tier 3
     'fetch_url':                  'URL Fetching',
@@ -65,9 +66,13 @@ _TASK_TIER = {
     'spiderfoot_scan':       1,
     'baddns':                1,
     'vigolium_harvest':      1,
-    'vigolium_discovery':    1,
     'http_crawl':            2,
     'port_scan':             2,
+    # Both MasterScanWorkflow and SubScanWorkflow schedule vigolium_discovery in
+    # Tier 2, after subdomain enumeration, so it targets every enumerated
+    # subdomain. The timeline groups rows by this map, and the tier retry
+    # endpoint selects rows by it, so it has to name the tier that really runs it.
+    'vigolium_discovery':    2,
     'check_if_email_exists': 2,
     'fetch_url':             3,
     'http_crawl_bridge':     3,
@@ -84,12 +89,21 @@ _TASK_TIER = {
     'dalfox_xss_scan':       6,
     's3scanner':             6,
     'acunetix_scan':         6,
+    'acunetix_submit':       2,
     'wpscan_scan':           6,
     'vigolium_scan':         6,
     'cpanel_scan':           6,
     'react2shell_scan':      6,
     'waf_bypass':            6,
 
+    # Runtime-only tasks: never part of the planned list, but their activity rows
+    # need a tier so they are not all filed under Tier 7 in the timeline.
+    'search_vulns_scan':     2,
+    'smugglex_scan':         6,
+    'second_order_scan':     6,
+    'nuclei_dast_scan':      6,
+    'semgrep_scan':          6,
+    'wptaint_scan':          6,
 }
 
 _TIER7_TASKS = [
@@ -122,8 +136,8 @@ def canonical_scan_task_name(name: str):
 _TIER1_TO_5 = [
     'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
     'dns_security', 'osint', 'spiderfoot_scan', 'baddns',
-    'vigolium_harvest', 'vigolium_discovery',
-    'http_crawl', 'port_scan',
+    'vigolium_harvest',
+    'http_crawl', 'port_scan', 'vigolium_discovery',
     'fetch_url', 'screenshot', 'param_discovery',
     'http_crawl_bridge',
     'dir_file_fuzz',
@@ -132,11 +146,31 @@ _TIER1_TO_5 = [
 ]
 
 
+def get_task_tier(name: str) -> int:
+    """Return the timeline tier a task belongs to (7 for unplanned/post-processing)."""
+    return _TASK_TIER.get(name, 7)
+
+
+def email_security_enabled(yaml_configuration: dict) -> bool:
+    """True unless the engine config turns email security off.
+
+    The workflow schedules the activity whenever port_scan is in the task list,
+    so this is the only switch an operator has. Absent config means enabled, to
+    keep existing engines behaving as they did.
+    """
+    section = yaml_configuration.get('email_security') if isinstance(yaml_configuration, dict) else None
+    if not isinstance(section, dict):
+        return True
+    return bool(section.get('enabled', True))
+
+
 def _mailbox_verification_planned(tasks: list, yaml_configuration: dict, is_subscan: bool = False) -> bool:
     """True when MasterScanWorkflow will run mailbox verification."""
     if is_subscan:
         return False
     if 'port_scan' not in tasks:
+        return False
+    if not email_security_enabled(yaml_configuration):
         return False
     section = yaml_configuration.get('email_security') if isinstance(yaml_configuration, dict) else None
     if not isinstance(section, dict):
@@ -153,7 +187,7 @@ def _entry(name: str) -> dict:
     return {
         'name': name,
         'title': _TASK_TITLES.get(name, name.replace('_', ' ').title()),
-        'tier': _TASK_TIER.get(name, 7),
+        'tier': get_task_tier(name),
         'status': INITIATED_TASK,
     }
 
@@ -184,6 +218,12 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict, is_subscan: bool
             add(t)
         elif t == 'http_crawl_bridge' and 'fetch_url' in tasks:
             add(t)
+
+    # Acunetix target submission rides on http_crawl, which is what establishes
+    # liveness — it is independent of whether the Acunetix scanner itself runs.
+    acunetix_cfg = (yaml_configuration.get('vulnerability_scan') or {}).get('acunetix') or {}
+    if 'http_crawl' in tasks and acunetix_cfg.get('submit_live_subdomains', False):
+        add('acunetix_submit')
 
     # Post-tier-2 mailbox verification (same gate as RunEmailSecurityActivity).
     if _mailbox_verification_planned(tasks, yaml_configuration, is_subscan=is_subscan):
