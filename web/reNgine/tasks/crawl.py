@@ -44,6 +44,16 @@ _TLS_SERVICE_HINTS = ('https', 'ssl', 'tls')
 #: the task on connect timeouts alone.
 _GRPC_MAX_PORTS_PER_HOST = 5
 
+#: Seconds allowed for the connection itself.
+_GRPC_CONNECT_TIMEOUT = 3
+#: Seconds allowed for the whole call. Without it a host that completes the
+#: handshake and then ignores the reflection request holds grpcurl open with no
+#: deadline of any kind.
+_GRPC_MAX_TIME = 10
+#: Backstop at the subprocess level, in case grpcurl itself does not exit.
+#: run_command's default is 43200 seconds, which is no bound at this scale.
+_GRPC_COMMAND_TIMEOUT = 30
+
 
 def gqlspection_schema_dumped(return_code, output):
 	"""True when GQLSpection printed a schema.
@@ -1053,8 +1063,21 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 
 			for port, use_tls in targets:
 				transport = '-insecure' if use_tls else '-plaintext'
-				cmd = f"grpcurl -connect-timeout 3 {transport} {hostname}:{port} list"
-				return_code, output = run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
+				# -connect-timeout bounds the handshake only. A host that accepts
+				# the connection and then never answers the reflection request
+				# leaves grpcurl waiting forever — two such hosts spent four hours
+				# of a scan's Tier 3 budget, three times over. -max-time bounds the
+				# whole call, and run_command's own timeout backs it up in case the
+				# process ignores it.
+				cmd = (
+					f"grpcurl -connect-timeout {_GRPC_CONNECT_TIMEOUT} "
+					f"-max-time {_GRPC_MAX_TIME} {transport} {hostname}:{port} list"
+				)
+				return_code, output = run_command(
+					cmd, shell=True, cwd=results_dir,
+					scan_id=self.scan_id, activity_id=self.activity_id,
+					timeout=_GRPC_COMMAND_TIMEOUT,
+				)
 
 				if return_code == 0 and output.strip() and "Failed to dial" not in output:
 					vuln_data = parse_grpcurl_result(representative_url, output)

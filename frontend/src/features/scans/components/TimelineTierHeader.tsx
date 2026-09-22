@@ -9,6 +9,7 @@ const useTierStatusStyle = (status: TierStatus): { label: string; color: string 
   const { tokens, theme } = useThemeTokens();
   const styles: Record<TierStatus, { label: string; color: string }> = {
     FAILED: { label: 'FAILED', color: tokens.accent.error },
+    NOT_RUN: { label: 'DID NOT RUN', color: theme.palette.text.disabled },
     RUNNING: { label: 'RUNNING', color: tokens.accent.primary },
     PENDING: { label: 'PENDING', color: tokens.accent.warning },
     COMPLETE: { label: 'COMPLETE', color: tokens.accent.success },
@@ -130,6 +131,11 @@ export const TimelineTierHeader: React.FC<TimelineTierHeaderProps> = ({
         <Typography sx={{ mt: 0.3, fontSize: '0.55rem', fontWeight: 700, color: 'text.secondary', wordBreak: 'break-word' }}>
           Cause: {categoryLabels.join(', ')}
           {summary.allFailuresTransient ? ' — looks transient, a retry may clear it' : ''}
+        </Typography>
+      )}
+      {summary.status === 'NOT_RUN' && (
+        <Typography sx={{ mt: 0.3, fontSize: '0.55rem', fontWeight: 700, color: 'text.disabled', wordBreak: 'break-word' }}>
+          {summary.notRunCount} task{summary.notRunCount === 1 ? '' : 's'} never started — the scan stopped before this tier
         </Typography>
       )}
     </Box>

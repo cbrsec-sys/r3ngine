@@ -5,9 +5,21 @@ That cannot succeed whatever is listening: -plaintext speaks cleartext and 443
 is a TLS port. It cost a three-second connect timeout per host and filled the
 command log with "Failed to dial".
 """
+import os
 from unittest import TestCase
 
 from reNgine.tasks.crawl import grpc_probe_targets
+
+CRAWL_SOURCE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'reNgine', 'tasks', 'crawl.py'
+)
+
+
+def _grpcurl_block():
+    with open(CRAWL_SOURCE, encoding='utf-8') as handle:
+        source = handle.read()
+    start = source.index('# grpcurl')
+    return source[start:source.index("grpcurl: finished", start)]
 
 
 class TestPortSelection(TestCase):
@@ -70,6 +82,40 @@ class TestFallbackWithoutPortScanData(TestCase):
 
     def test_explicit_url_port_is_kept(self):
         self.assertEqual(grpc_probe_targets([], 8090, False), [(8090, False)])
+
+
+class TestEveryProbeIsBounded(TestCase):
+    """-connect-timeout bounds the handshake only.
+
+    A host that completes the handshake and then never answers the reflection
+    request holds grpcurl open indefinitely. Two such hosts consumed the whole
+    four-hour Tier 3 budget of a scan, three attempts running, because
+    run_command's default timeout is 43200 seconds.
+    """
+
+    def setUp(self):
+        self.block = _grpcurl_block()
+
+    def test_call_carries_an_overall_deadline(self):
+        self.assertIn('-max-time', self.block)
+
+    def test_call_still_bounds_the_handshake(self):
+        self.assertIn('-connect-timeout', self.block)
+
+    def test_subprocess_has_its_own_timeout(self):
+        self.assertIn('timeout=_GRPC_COMMAND_TIMEOUT', self.block)
+
+    def test_the_bounds_are_ordered(self):
+        from reNgine.tasks.crawl import (
+            _GRPC_COMMAND_TIMEOUT, _GRPC_CONNECT_TIMEOUT, _GRPC_MAX_TIME,
+        )
+        self.assertLess(_GRPC_CONNECT_TIMEOUT, _GRPC_MAX_TIME)
+        self.assertLess(_GRPC_MAX_TIME, _GRPC_COMMAND_TIMEOUT)
+
+    def test_worst_case_per_host_stays_small(self):
+        """Five ports at the subprocess bound must not approach a tier budget."""
+        from reNgine.tasks.crawl import _GRPC_COMMAND_TIMEOUT, _GRPC_MAX_PORTS_PER_HOST
+        self.assertLessEqual(_GRPC_COMMAND_TIMEOUT * _GRPC_MAX_PORTS_PER_HOST, 300)
 
 
 class TestTheOriginalDefect(TestCase):

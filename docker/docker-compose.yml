@@ -124,6 +124,11 @@ services:
       - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
       - POSTGRES_SSLMODE=${POSTGRES_SSLMODE}
+      # No persistent database connections in this process. It serves ASGI under
+      # a uvicorn worker and does not reuse them: they are opened, used once and
+      # abandoned until something reaps them. The Temporal worker keeps the
+      # default, where every activity closes its own connection.
+      - DJANGO_CONN_MAX_AGE=0
       - NEO4J_URI=${NEO4J_URI}
       - NEO4J_USER=${NEO4J_USER}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}

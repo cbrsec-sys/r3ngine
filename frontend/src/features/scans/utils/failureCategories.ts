@@ -43,12 +43,19 @@ export const getFailureCategoryLabel = (category?: string | null): string | null
 export const isTransientFailureCategory = (category?: string | null): boolean =>
   !!category && TRANSIENT_FAILURE_CATEGORIES.has(category);
 
-export type TierStatus = 'FAILED' | 'RUNNING' | 'PENDING' | 'COMPLETE' | 'EMPTY';
+export type TierStatus = 'FAILED' | 'NOT_RUN' | 'RUNNING' | 'PENDING' | 'COMPLETE' | 'EMPTY';
 
 export interface TierSummary {
   status: TierStatus;
   total: number;
+  /** Rows that ran and failed. */
   failedCount: number;
+  /**
+   * Rows marked failed without ever starting. When a scan stops, the finalizer
+   * flips every still-planned task to FAILED with the scan's own error message,
+   * so one real failure can leave a dozen tiers reporting failures of their own.
+   */
+  notRunCount: number;
   runningCount: number;
   pendingCount: number;
   successCount: number;
@@ -58,10 +65,14 @@ export interface TierSummary {
   allFailuresTransient: boolean;
 }
 
+/** A row the finalizer flipped to FAILED without it ever having started. */
+const neverStarted = (activity: ScanActivity): boolean => !activity.time_started;
+
 /** Roll a tier group's activities up into one status the header can show. */
 export const summariseTier = (activities: ScanActivity[]): TierSummary => {
   const failureCategories: string[] = [];
   let failedCount = 0;
+  let notRunCount = 0;
   let runningCount = 0;
   let pendingCount = 0;
   let successCount = 0;
@@ -69,6 +80,10 @@ export const summariseTier = (activities: ScanActivity[]): TierSummary => {
 
   activities.forEach((activity) => {
     if (activity.status === 'FAILED' || activity.status === 'ABORTED') {
+      if (neverStarted(activity)) {
+        notRunCount += 1;
+        return;
+      }
       failedCount += 1;
       const category = activity.failure_category;
       if (category && !failureCategories.includes(category)) {
@@ -85,21 +100,26 @@ export const summariseTier = (activities: ScanActivity[]): TierSummary => {
   });
 
   // A single failed row makes the whole tier read as failed: that is the
-  // question the operator opens the timeline with.
+  // question the operator opens the timeline with. A tier whose rows were only
+  // swept up by the finalizer reads as not run, so one real failure does not
+  // look like a dozen.
   const status: TierStatus = activities.length === 0
     ? 'EMPTY'
     : failedCount > 0
       ? 'FAILED'
       : runningCount > 0
         ? 'RUNNING'
-        : successCount === activities.length
-          ? 'COMPLETE'
-          : 'PENDING';
+        : notRunCount > 0
+          ? 'NOT_RUN'
+          : successCount === activities.length
+            ? 'COMPLETE'
+            : 'PENDING';
 
   return {
     status,
     total: activities.length,
     failedCount,
+    notRunCount,
     runningCount,
     pendingCount,
     successCount,
