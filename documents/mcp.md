@@ -74,6 +74,8 @@ Click any tool call in the Audit table, or **Replay** on an audit-chain event, t
 
 ## What agents cannot do
 
-Delete or edit targets, vulns, notes, users, or files. They cannot list keys, read audit events, or revoke sessions — those stay in this UI. MCP keys do not authenticate on `/api/action/` delete routes.
+Delete targets, vulns, users, or files. They cannot **delete** notes (create and update are allowed for pentester/sys-admin keys). They cannot list keys, read audit events, or revoke sessions — those stay in this UI. MCP keys do not authenticate on `/api/action/` delete routes.
+
+Agents can queue allowed work including **subscans** (`r3ngine_start_subscan`) when the key’s role permits dispatch.
 
 See also the [r3ngine-mcp README](../r3ngine-mcp/README.md).

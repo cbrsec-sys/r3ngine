@@ -37,6 +37,7 @@ from mcp.views.read import (
     McpScanStatusView,
     McpSearchView,
 )
+from mcp.views.notes import McpNoteDetailView, McpNotesListCreateView
 from mcp.views.sessions import (
     McpAgentDeleteView,
     McpSessionEndView,
@@ -76,6 +77,8 @@ urlpatterns = [
     path('attack-paths/', McpAttackPathsView.as_view()),
     path('engines/', McpListEnginesView.as_view()),
     path('health/', McpHealthView.as_view()),
+    path('notes/', McpNotesListCreateView.as_view()),
+    path('notes/<int:pk>/', McpNoteDetailView.as_view()),
     path('scans/start/', McpStartScanView.as_view()),
     path('scans/pause/', McpPauseScanView.as_view()),
     path('scans/resume/', McpResumeScanView.as_view()),

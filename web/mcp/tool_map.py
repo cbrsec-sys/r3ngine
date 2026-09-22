@@ -33,6 +33,14 @@ PATH_TOOLS = (
     (re.compile(r'^/api/mcp/employee-intel/stop/?$'), {'POST': 'r3ngine_stop_employee_intel'}),
     (re.compile(r'^/api/mcp/apme/trigger/?$'), {'POST': 'r3ngine_trigger_apme'}),
     (re.compile(r'^/api/mcp/apme/recalculate/?$'), {'POST': 'r3ngine_recalculate_apme'}),
+    (re.compile(r'^/api/mcp/notes/\d+/?$'), {
+        'GET': 'r3ngine_get_note',
+        'PATCH': 'r3ngine_update_note',
+    }),
+    (re.compile(r'^/api/mcp/notes/?$'), {
+        'GET': 'r3ngine_list_notes',
+        'POST': 'r3ngine_create_note',
+    }),
     (re.compile(r'^/api/mcp/workflows/start/?$'), {'POST': 'r3ngine_start_workflow'}),
 )
 
