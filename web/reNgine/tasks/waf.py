@@ -9,6 +9,31 @@ from startScan.models import Subdomain, Waf
 
 logger = logging.getLogger(__name__)
 
+#: Waf.name and Waf.manufacturer are both CharField(max_length=500).
+_WAF_FIELD_MAX_LENGTH = 500
+
+
+def parse_wafw00f_entry(waf_info):
+	"""Split wafw00f's "Name (Manufacturer)" into its two parts.
+
+	Returns (None, None) for a line that is not in that shape. str.find returns
+	-1 when the parenthesis is absent, so slicing on it unguarded turned such a
+	line into "everything but the last character" — a value far longer than the
+	500-character column, which failed the whole task with a DataError rather
+	than skipping one unparseable line.
+	"""
+	open_idx = waf_info.find('(')
+	close_idx = waf_info.find(')', open_idx + 1) if open_idx != -1 else -1
+	if open_idx == -1 or close_idx == -1:
+		return None, None
+
+	name = waf_info[:open_idx].strip()
+	if not name or name == 'None':
+		return None, None
+
+	manufacturer = waf_info[open_idx + 1:close_idx].strip().replace('.', '')
+	return name[:_WAF_FIELD_MAX_LENGTH], manufacturer[:_WAF_FIELD_MAX_LENGTH]
+
 
 def waf_detection(self, ctx={}, description=None):
 	"""
@@ -49,12 +74,14 @@ def waf_detection(self, ctx={}, description=None):
 	for line in wafs:
 		line = " ".join(line.split())
 		splitted = line.split(' ', 1)
-		waf_info = splitted[1].strip()
-		waf_name = waf_info[:waf_info.find('(')].strip()
-		waf_manufacturer = waf_info[waf_info.find('(')+1:waf_info.find(')')].strip().replace('.', '')
-		http_url = sanitize_url(splitted[0].strip())
-		if not waf_name or waf_name == 'None':
+		if len(splitted) < 2:
 			continue
+
+		waf_name, waf_manufacturer = parse_wafw00f_entry(splitted[1].strip())
+		if not waf_name:
+			continue
+
+		http_url = sanitize_url(splitted[0].strip())
 
 		# Add waf to db
 		waf, _ = Waf.objects.get_or_create(
