@@ -641,16 +641,20 @@ class ScanActivityRetryAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        from reNgine.definitions import PAUSED_TASK
+        from reNgine.definitions import PAUSED_TASK, ABORTED_TASK
         if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
             return Response(
                 {"status": False, "message": "Cannot retry a task while the scan is running or paused"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if scan.scan_status != SUCCESS_TASK and activity_obj.status != FAILED_TASK:
+        # Single-task retry accepts FAILED and ABORTED. Tier retry stays
+        # FAILED-only so a stop/cancel does not offer "Retry Tier".
+        if scan.scan_status != SUCCESS_TASK and activity_obj.status not in (
+            FAILED_TASK, ABORTED_TASK,
+        ):
             return Response(
-                {"status": False, "message": "Task is not in a failed state"},
+                {"status": False, "message": "Task is not in a failed or aborted state"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

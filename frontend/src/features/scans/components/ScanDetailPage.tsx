@@ -1024,7 +1024,7 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
               • Click to view details <ChevronRight size={10} />
             </Typography>
           </Stack>
-          {isTerminal && (activity.status === 'FAILED' || allowRetryAny) && activity.name !== 'raw_scan_history' && onRetry && (
+          {isTerminal && (activity.status === 'FAILED' || activity.status === 'ABORTED' || allowRetryAny) && activity.name !== 'raw_scan_history' && onRetry && (
             <MuiTooltip title="Retry Task" placement="top">
               <IconButton 
                 size="small" 
