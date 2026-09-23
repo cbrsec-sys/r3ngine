@@ -678,6 +678,12 @@ class ScanActivityRetryAPIView(APIView):
             scan.stop_scan_date = None
             scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
 
+        # abort_scan_history leaves Redis scan_stop_{id} set; clear it the same
+        # way resume / retry_failed_tasks_temporal do, or the Go executor will
+        # kill the retry process group within seconds.
+        from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
+        set_scan_stop_kill_switch(scan.id, enabled=False)
+
         yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "")
         ctx = {
             "scan_history_id": scan.id,
@@ -883,6 +889,9 @@ class ScanTierRetryAPIView(APIView):
             scan.error_message = None
             scan.stop_scan_date = None
             scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
+
+        from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
+        set_scan_stop_kill_switch(scan.id, enabled=False)
 
         yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "") or {}
 
