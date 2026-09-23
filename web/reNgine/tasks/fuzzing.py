@@ -76,7 +76,13 @@ def filter_fuzz_batch_with_redis(batch, scan_history_id, subdomain_id, max_repea
 		keys = []
 		for item in batch:
 			status = item.get('status') or item.get('http_status') or 0
-			length = item.get('length') or item.get('content_length') or item.get('content-length') or 0
+			length = (
+			item.get('length')
+			or item.get('contentLength')
+			or item.get('content_length')
+			or item.get('content-length')
+			or 0
+		)
 			words = item.get('words') or item.get('word_count') or 0
 			lines = item.get('lines') or item.get('line_count') or 0
 			
@@ -185,6 +191,20 @@ def _flush_ffuf_batch(batch, dirscan, ctx, scan, subdomain_id=0, max_repeat=10):
 		dirscan.directory_files.add(*dfiles)
 
 
+def build_dirsearch_run_cmd(base_cmd, target_url, output_path, proxy=None):
+	"""Build a single-target dirsearch CLI (compatible with dirsearch >= 0.5.0).
+
+	dirsearch 0.5.0 renamed ``--format`` to ``--output-formats``.
+	"""
+	cmd = (
+		f'{base_cmd} -u {str(target_url).rstrip("/")}'
+		f' --output-formats=json -o {output_path} --no-color'
+	)
+	if proxy:
+		cmd += f' --proxy {proxy}'
+	return cmd
+
+
 def _flush_ds_batch(batch, dirscan_ds, ctx, scan, subdomain_id=0, max_repeat=10):
 	"""Persist a batch of dirsearch result dicts with batched DB writes."""
 	if not batch or not scan:
@@ -236,8 +256,20 @@ def _flush_ds_batch(batch, dirscan_ds, ctx, scan, subdomain_id=0, max_repeat=10)
 		if not ep:
 			continue
 		status = ds_res.get('status', 0)
-		length = ds_res.get('content-length', 0)
-		content_type = ds_res.get('content-type', '')
+		# dirsearch 0.5+ uses camelCase; older reports used kebab-case
+		length = (
+			ds_res.get('contentLength')
+			or ds_res.get('content-length')
+			or ds_res.get('content_length')
+			or ds_res.get('length')
+			or 0
+		)
+		content_type = (
+			ds_res.get('contentType')
+			or ds_res.get('content-type')
+			or ds_res.get('content_type')
+			or ''
+		)
 		ep.http_status = status
 		ep.content_length = length
 		ep.content_type = content_type
@@ -644,9 +676,12 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						target_url_stripped = target_url.rstrip('/')
 
 						def _build_dcmd(p):
-							cmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
-							if p:
-								cmd += f' --proxy {p}'
+							cmd = build_dirsearch_run_cmd(
+								dirsearch_base_cmd,
+								target_url_stripped,
+								dirsearch_output,
+								proxy=p,
+							)
 							return opsec.apply_stealth('dirsearch', cmd, proxy=p)
 
 						current_proxy = proxy

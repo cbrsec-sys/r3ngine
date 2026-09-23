@@ -53,7 +53,11 @@ class McpAllowlistTests(TestCase):
                 methods = methods - {'DELETE'}
             self.assertTrue(methods.isdisjoint(FORBIDDEN_METHODS), msg=str(pattern.pattern))
             if 'PATCH' in methods:
-                self.assertIn('settings', str(pattern.pattern))
+                pattern_s = str(pattern.pattern)
+                self.assertTrue(
+                    'settings' in pattern_s or 'notes' in pattern_s,
+                    msg=pattern_s,
+                )
 
     def test_mcp_key_cannot_delete_vulnerability(self):
         user = User.objects.create_user(username='allow', password='x')

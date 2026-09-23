@@ -120,14 +120,33 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD'),
         'HOST': env('POSTGRES_HOST'),
         'PORT': env('POSTGRES_PORT'),
-        'CONN_MAX_AGE': 0,
+        # Persistent connections, per process rather than globally.
+        #
+        # 60 suits the Temporal worker: DjangoAwareThreadPoolExecutor closes
+        # connections at the end of every activity
+        # (scanEngine/management/commands/run_temporal_orchestrator.py:51), so a
+        # reused connection saves a reconnect and is never orphaned.
+        #
+        # The web process needs 0. It serves ASGI under a uvicorn worker, and
+        # its connections are opened, used once and never reused: a production
+        # instance accumulated 150 of them and exhausted max_connections, which
+        # took down manage.py and every scan's ability to write results. The
+        # handshake this used to save is smaller than the original note claimed
+        # — the database runs with ssl=off, so `sslmode: prefer` negotiates no
+        # TLS, leaving only TCP and SCRAM over the container network.
+        #
+        # Set DJANGO_CONN_MAX_AGE=0 for that service; tests force 0 too, see
+        # reNgine.test_runner.
+        'CONN_MAX_AGE': env.int('DJANGO_CONN_MAX_AGE', default=60),
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
-            'sslmode': env('POSTGRES_SSLMODE', default='prefer'),
+            'sslmode': env('POSTGRES_SSLMODE', default='prefer') or 'prefer',
             'sslrootcert': os.path.join(BASE_DIR, 'ca.crt'),
         }
     }
 }
+
+TEST_RUNNER = 'reNgine.test_runner.RengineTestRunner'
 
 # Application definition
 INSTALLED_APPS = [

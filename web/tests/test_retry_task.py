@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from unittest.mock import patch, MagicMock, AsyncMock
 from startScan.models import ScanHistory, ScanActivity
-from reNgine.definitions import FAILED_TASK, RUNNING_TASK, INITIATED_TASK, SUCCESS_TASK
+from reNgine.definitions import FAILED_TASK, RUNNING_TASK, INITIATED_TASK, SUCCESS_TASK, ABORTED_TASK
 
 
 def _make_scan(status=FAILED_TASK):
@@ -155,6 +155,31 @@ class RetryTaskViewTests(TestCase):
         ctx_arg = call_kwargs["args"][0]
         self.assertEqual(ctx_arg.get("original_scan_status"), SUCCESS_TASK)
 
+    @patch("api.views.run_and_close")
+    @patch("reNgine.utils.scan_cancellation.set_scan_stop_kill_switch")
+    def test_retry_aborted_activity_clears_kill_switch(self, mock_kill, mock_run):
+        """Abort leaves Redis scan_stop_{id}; retry must clear it or Go kills the run."""
+        mock_run.return_value = None
+        scan = _make_scan(status=ABORTED_TASK)
+        act = _make_activity(scan, status=ABORTED_TASK)
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        act.refresh_from_db()
+        self.assertEqual(act.status, INITIATED_TASK)
+        scan.refresh_from_db()
+        self.assertEqual(scan.scan_status, RUNNING_TASK)
+        mock_kill.assert_called_with(scan.id, enabled=False)
+
+    @patch("api.views.run_and_close")
+    def test_retry_aborted_activity_on_aborted_scan_returns_200(self, mock_run):
+        mock_run.return_value = None
+        scan = _make_scan(status=ABORTED_TASK)
+        act = _make_activity(scan, status=ABORTED_TASK)
+        url = reverse("api:retry_task", kwargs={"pk": act.pk})
+        resp = self.client.post(url, content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+
 
 class RetryFailedTasksTemporalTests(TestCase):
     @patch("reNgine.temporal_client.TemporalClientProvider.get_client", new_callable=AsyncMock)
@@ -209,6 +234,14 @@ class GetScanFinalStatusTests(TestCase):
             time_started="2026-06-21T09:00:00Z",
             time="2026-06-21T09:00:00Z",
         )
+        result = get_scan_final_status_activity(scan.id, True)
+        self.assertEqual(result, FAILED_TASK)
+
+    def test_returns_failed_when_sibling_tasks_remain_aborted(self):
+        """A successful single retry must not erase an aborted scan's unfinished work."""
+        scan = _make_scan(status=ABORTED_TASK)
+        _make_activity(scan, name="http_crawl", status=SUCCESS_TASK)
+        _make_activity(scan, name="port_scan", status=ABORTED_TASK)
         result = get_scan_final_status_activity(scan.id, True)
         self.assertEqual(result, FAILED_TASK)
 

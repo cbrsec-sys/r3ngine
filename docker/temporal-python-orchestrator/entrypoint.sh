@@ -25,8 +25,34 @@ echo "GF patterns synced: $(ls /root/.gf/*.json | wc -l) patterns installed"
 # /usr/src/internal_tools.sh &
 # INTERNAL_TOOLS_PID=$!
 
+# ---------------------------------------------------------------------------
+# Tool updates (pip upgrades, whatportis, vulnx, template repo pulls) are
+# network-bound and take minutes, so running them on every start made a PyPI or
+# GitHub outage enough to block the worker from coming up at all. Run them at
+# most once a week, tracked by a sentinel on the persistent tool_config volume.
+# A first-ever start has no sentinel and therefore updates as before.
+# ---------------------------------------------------------------------------
+TOOL_UPDATE_STAMP="/root/.config/r3ngine/python-orchestrator-tool-update.stamp"
+TOOL_UPDATE_MAX_AGE_DAYS=7
+TOOL_UPDATE_RC=0
+
+mkdir -p "$(dirname "$TOOL_UPDATE_STAMP")"
+
+if [ ! -f "$TOOL_UPDATE_STAMP" ]; then
+  RUN_TOOL_UPDATES=1
+  echo "[entrypoint] No tool-update sentinel found - running tool updates."
+elif [ -n "$(find "$TOOL_UPDATE_STAMP" -mtime +"$TOOL_UPDATE_MAX_AGE_DAYS" 2>/dev/null)" ]; then
+  RUN_TOOL_UPDATES=1
+  echo "[entrypoint] Tool updates older than ${TOOL_UPDATE_MAX_AGE_DAYS} days - refreshing."
+else
+  RUN_TOOL_UPDATES=0
+  echo "[entrypoint] Tool updates ran within ${TOOL_UPDATE_MAX_AGE_DAYS} days - skipping."
+fi
+
 # Ensure OpenSSL compatibility
-pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0 tenacity==8.2.2
+if [ "$RUN_TOOL_UPDATES" = "1" ]; then
+  pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0 tenacity==8.2.2 || TOOL_UPDATE_RC=1
+fi
 
 
 
@@ -123,7 +149,9 @@ fi
 
 
 # update whatportis
-yes | whatportis --update
+if [ "$RUN_TOOL_UPDATES" = "1" ]; then
+  yes | whatportis --update || TOOL_UPDATE_RC=1
+fi
 
 # clone dirsearch default wordlist
 if [ ! -d "/usr/src/wordlist" ]; then
@@ -286,12 +314,14 @@ if [ ! -d "/root/nuclei-templates/wordfence/.git" ]; then
   echo "Installing Wordfence nuclei templates"
   git clone --depth 1 https://github.com/topscoder/nuclei-wordfence-cve.git \
     /root/nuclei-templates/wordfence
-else
+elif [ "$RUN_TOOL_UPDATES" = "1" ]; then
   echo "Updating Wordfence nuclei templates"
-  git -C /root/nuclei-templates/wordfence pull --quiet || true
+  git -C /root/nuclei-templates/wordfence pull --ff-only --quiet || TOOL_UPDATE_RC=1
 fi
 # Install repo dependencies
-pip3 install -q -r /root/nuclei-templates/wordfence/requirements.txt || true
+if [ "$RUN_TOOL_UPDATES" = "1" ]; then
+  pip3 install -q -r /root/nuclei-templates/wordfence/requirements.txt || TOOL_UPDATE_RC=1
+fi
 # Merge wordfence nuclei-templates/ into the main templates directory so nuclei
 # picks them up directly under /root/nuclei-templates without extra nesting.
 cp -ru /root/nuclei-templates/wordfence/nuclei-templates/. /root/nuclei-templates/
@@ -300,16 +330,25 @@ cp -ru /root/nuclei-templates/wordfence/nuclei-templates/. /root/nuclei-template
 echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc
 
 # Install spiderfoot packages
-if [ -d '/usr/src/github/spiderfoot' ]; then
+if [ -d '/usr/src/github/spiderfoot' ] && [ "$RUN_TOOL_UPDATES" = "1" ]; then
   echo "Installing Spiderfoot dependencies..."
-  pip3 install -r /usr/src/github/spiderfoot/requirements.txt
+  pip3 install -r /usr/src/github/spiderfoot/requirements.txt || TOOL_UPDATE_RC=1
   # Python 3.12 removed the 'imp' module. SpiderFoot's sfp_whois uses python-whois
   # which depends on the 'future' package — old versions of future still import imp.
   # Upgrade future and python-whois to Python 3.12-compatible releases.
-  pip3 install 'future>=1.0.0' 'python-whois>=0.9.4' --upgrade
+  pip3 install 'future>=1.0.0' 'python-whois>=0.9.4' --upgrade || TOOL_UPDATE_RC=1
 fi
 
-vulnx update
+if [ "$RUN_TOOL_UPDATES" = "1" ]; then
+  vulnx update || TOOL_UPDATE_RC=1
+
+  if [ "$TOOL_UPDATE_RC" = "0" ]; then
+    touch "$TOOL_UPDATE_STAMP"
+    echo "[entrypoint] Tool updates completed; sentinel refreshed."
+  else
+    echo "[entrypoint] Some tool updates failed; sentinel left stale so the next start retries."
+  fi
+fi
 
 # Split oversized nuclei tags
 # echo "[entrypoint] Running Nuclei tag splitter..."

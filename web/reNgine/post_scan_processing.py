@@ -27,6 +27,8 @@ from urllib.parse import urljoin, urlparse
 import requests
 import urllib3
 
+from reNgine.common_func import GRAPHQL_ENDPOINT_URL_REGEX
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
@@ -53,8 +55,9 @@ _SWAGGER_URL_RE = re.compile(
 # Patterns used to identify OpenAPI/Swagger candidate URLs in the DB
 _SWAGGER_URL_IREGEX = r'swagger|openapi|api-docs|/docs|/redoc'
 
-# GraphQL endpoint iregex (mirrors has_graphql_endpoint DB check)
-_GRAPHQL_URL_IREGEX = r'/graphi?ql'
+# GraphQL endpoint iregex — one definition, shared with has_graphql_endpoint and
+# with graphql-cop's target selection so the three cannot disagree.
+_GRAPHQL_URL_IREGEX = GRAPHQL_ENDPOINT_URL_REGEX
 
 _REQUEST_TIMEOUT = 15  # seconds
 _THREAD_WORKERS = 8

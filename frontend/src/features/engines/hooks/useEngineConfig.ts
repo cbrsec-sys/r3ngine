@@ -180,6 +180,15 @@ function serialiseConfigToYaml(config: EngineConfig): string {
     if (c.run_nuclei) s.nuclei = { use_nuclei_config: c.nuclei.use_nuclei_config, severities: c.nuclei.severities, ...(c.nuclei.tags.length ? { tags: c.nuclei.tags } : {}), ...(c.nuclei.templates.length ? { templates: c.nuclei.templates } : {}), ...(c.nuclei.custom_templates.length ? { custom_templates: c.nuclei.custom_templates } : {}) };
     s.cpanel_scanner = { run_cpanel2shell: c.cpanel_scanner.run_cpanel2shell, cpanel_user_wordlist: c.cpanel_scanner.cpanel_user_wordlist, proxy_type: c.cpanel_scanner.proxy_type };
     if (c.run_vigolium) s.vigolium = { strategy: c.vigolium.strategy, concurrency: c.vigolium.concurrency, rate_limit: c.vigolium.rate_limit, timeout: c.vigolium.timeout, run_phase_a: c.vigolium.run_phase_a, run_phase_b: c.vigolium.run_phase_b, scope_origin: c.vigolium.scope_origin, skip_spidering: c.vigolium.skip_spidering };
+    // Tier-2 live-subdomain submission — independent of run_acunetix (Tier 6).
+    // Must round-trip or submit_live_subdomains never reaches the backend.
+    if (c.acunetix) {
+      s.acunetix = {
+        submit_live_subdomains: !!c.acunetix.submit_live_subdomains,
+        resubmit_after_days: c.acunetix.resubmit_after_days ?? 3,
+        start_scan_on_submit: !!c.acunetix.start_scan_on_submit,
+      };
+    }
     writeSection('vulnerability_scan', s);
   }
 
@@ -396,6 +405,8 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       const cp: any = r.cpanel_scanner ?? {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vig: any = r.vigolium ?? {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ac: any = r.acunetix ?? {};
       return {
         run_nuclei: (r.run_nuclei as boolean) ?? true,
         run_dalfox: (r.run_dalfox as boolean) ?? false,
@@ -417,6 +428,11 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
         enable_http_crawl: (r.enable_http_crawl as boolean) ?? true,
         wpscan_enumeration: (r.wpscan_enumeration as string) ?? 'vp,vt,u',
         wpscan_detection_mode: (r.wpscan_detection_mode as 'mixed' | 'passive' | 'aggressive') ?? 'mixed',
+        acunetix: {
+          submit_live_subdomains: ac.submit_live_subdomains ?? false,
+          resubmit_after_days: typeof ac.resubmit_after_days === 'number' ? ac.resubmit_after_days : 3,
+          start_scan_on_submit: ac.start_scan_on_submit ?? false,
+        },
         nuclei: {
           use_nuclei_config: n.use_nuclei_config ?? false,
           severities: n.severities ?? ['unknown', 'info', 'low', 'medium', 'high', 'critical'],

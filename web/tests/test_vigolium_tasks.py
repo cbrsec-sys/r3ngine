@@ -280,13 +280,17 @@ class VigoliumTaskGatingTest(TestCase):
              patch('builtins.open', mock_open()), \
              patch('reNgine.tasks.vigolium.Subdomain'):
             vigolium_scan(task, urls=['https://example.com'])
-            mock_run.assert_called_once()
-            # Verify the command includes the correct phases
-            call_args = mock_run.call_args
-            cmd = call_args[0][1]
-            self.assertIn('--stateless', cmd)
-            self.assertIn('--skip-dependency-check', cmd)
-            self.assertIn('--omit-response', cmd)
+            # Phase A (spidering+discovery) and Phase B (known-issue-scan+
+            # dynamic-assessment) are separate runs so a Phase B timeout cannot
+            # restart Phase A. Both default to enabled.
+            self.assertEqual(mock_run.call_count, 2)
+            commands = [call[0][1] for call in mock_run.call_args_list]
+            for cmd in commands:
+                self.assertIn('--stateless', cmd)
+                self.assertIn('--skip-dependency-check', cmd)
+                self.assertIn('--omit-response', cmd)
+            self.assertIn('--only spidering,discovery', commands[0])
+            self.assertIn('--only known-issue-scan,dynamic-assessment', commands[1])
 
 
 class VigoliumActivitiesTest(TestCase):

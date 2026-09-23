@@ -515,7 +515,7 @@ export const StressTestingPage: React.FC = () => {
       case 'connected': return { label: 'PIPELINE READY', color: '#10b981', icon: <Wifi size={14} />, pulse: true };
       case 'connecting': return { label: 'ESTABLISHING LINK...', color: '#facc15', icon: <Wifi size={14} />, pulse: true };
       case 'error': return { label: 'SIGNAL ERROR', color: '#ef4444', icon: <WifiOff size={14} />, pulse: false };
-      default: return { label: 'PIPELINE OFFLINE', color: alpha('#fff', 0.3), icon: <WifiOff size={14} />, pulse: false };
+      default: return { label: 'PIPELINE OFFLINE', color: alpha(theme.palette.text.primary, 0.3), icon: <WifiOff size={14} />, pulse: false };
     }
   };
 
@@ -634,7 +634,7 @@ export const StressTestingPage: React.FC = () => {
             component={RouterLink}
             to={`/${projectSlug}/scans`}
             sx={{
-              color: 'rgba(255,255,255,0.5)',
+              color: 'text.secondary',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 2,
               '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05), borderColor: theme.palette.primary.main }
@@ -646,7 +646,7 @@ export const StressTestingPage: React.FC = () => {
             <Typography variant="h4" sx={{
               fontFamily: 'Orbitron',
               fontWeight: 900,
-              color: '#fff',
+              color: 'text.primary',
               letterSpacing: 4,
               textShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.3)}`
             }}>
@@ -803,7 +803,7 @@ export const StressTestingPage: React.FC = () => {
               fontFamily: 'Orbitron',
               fontWeight: 700,
               fontSize: '0.85rem',
-              color: 'rgba(255,255,255,0.4)',
+              color: 'text.secondary',
               minWidth: 100,
               letterSpacing: 2,
               '&.Mui-selected': { color: '#00f3ff' }
@@ -902,7 +902,7 @@ export const StressTestingPage: React.FC = () => {
               title="LOCUST AGGREGATED STATISTICS"
               icon={<FileText size={18} color={theme.palette.primary.main} />}
             >
-              <TableContainer component={Paper} sx={{ bgcolor: 'rgba(0,0,0,0.3)', backgroundImage: 'none' }}>
+              <TableContainer component={Paper} sx={{ bgcolor: 'action.hover', backgroundImage: 'none' }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ '& th': { color: theme.palette.primary.main, fontFamily: 'Orbitron', fontSize: '0.75rem' } }}>
@@ -921,7 +921,7 @@ export const StressTestingPage: React.FC = () => {
                   </TableHead>
                   <TableBody>
                     {(latestMetrics as any).main_table.map((row: any, i: number) => (
-                      <TableRow key={i} sx={{ '& td': { color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.05)' } }}>
+                      <TableRow key={i} sx={{ '& td': { color: 'text.secondary', borderColor: 'rgba(255,255,255,0.05)' } }}>
                         <TableCell>{row.method}</TableCell>
                         <TableCell>{row.name}</TableCell>
                         <TableCell align="right">{row.reqs}</TableCell>
@@ -947,7 +947,7 @@ export const StressTestingPage: React.FC = () => {
                 title="LOCUST RESPONSE TIME PERCENTILES"
                 icon={<Activity size={18} color="#6be6c1" />}
               >
-                <TableContainer component={Paper} sx={{ bgcolor: 'rgba(0,0,0,0.3)', backgroundImage: 'none' }}>
+                <TableContainer component={Paper} sx={{ bgcolor: 'action.hover', backgroundImage: 'none' }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ '& th': { color: '#6be6c1', fontFamily: 'Orbitron', fontSize: '0.75rem' } }}>
@@ -969,7 +969,7 @@ export const StressTestingPage: React.FC = () => {
                     </TableHead>
                     <TableBody>
                       {(latestMetrics as any).percentile_table.map((row: any, i: number) => (
-                        <TableRow key={i} sx={{ '& td': { color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.05)' } }}>
+                        <TableRow key={i} sx={{ '& td': { color: 'text.secondary', borderColor: 'rgba(255,255,255,0.05)' } }}>
                           <TableCell>{row.method}</TableCell>
                           <TableCell>{row.name}</TableCell>
                           <TableCell align="right">{row.p50}</TableCell>

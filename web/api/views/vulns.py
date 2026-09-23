@@ -136,6 +136,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		subdomain_id = req.query_params.get('subdomain_id')
 		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
+		has_exploit = req.query_params.get('has_exploit')
 		slug = self.request.GET.get('project', None)
 
 		if slug:
@@ -202,6 +203,12 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 				qs = qs.exclude(exclude_source_query)
 		if subdomain_id:
 			qs = qs.filter(subdomain__id=subdomain_id)
+		if has_exploit is not None:
+			# Same definition as scan-summary exploitable_count: non-empty exploit_url.
+			if has_exploit.lower() in ('true', '1', 't', 'y', 'yes'):
+				qs = qs.exclude(exploit_url__isnull=True).exclude(exploit_url__exact='')
+			elif has_exploit.lower() in ('false', '0', 'f', 'n', 'no'):
+				qs = qs.filter(Q(exploit_url__isnull=True) | Q(exploit_url__exact=''))
 		self.queryset = qs
 		return self.queryset
 

@@ -25,7 +25,7 @@ const MonoValue: React.FC<{ value: string; copyable?: boolean }> = ({ value, cop
   const handleCopy = () => navigator.clipboard.writeText(value);
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'rgba(255,255,255,0.8)' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'text.secondary' }}>
         {value}
       </Typography>
       {copyable && (
@@ -95,7 +95,7 @@ const TypedContent: React.FC<{
           )}
           <FieldRow label="Profile URL" value={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'rgba(255,255,255,0.8)' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'text.secondary' }}>
                 {profileUrl}
               </Typography>
               {isSafe && (
@@ -149,7 +149,7 @@ const TypedContent: React.FC<{
       return (
         <Typography sx={{
           fontFamily: 'monospace', fontSize: '0.7rem',
-          color: 'rgba(255,255,255,0.6)', whiteSpace: 'pre-wrap',
+          color: 'text.secondary', whiteSpace: 'pre-wrap',
         }}>
           {JSON.stringify(meta, null, 2)}
         </Typography>

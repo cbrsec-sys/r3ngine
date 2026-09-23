@@ -10,7 +10,11 @@ from plotly.io import to_image
 
 # Kaleido's Chromium subprocess refuses to start as root (common in Docker)
 # without the --no-sandbox flag, which causes to_image() to hang indefinitely.
-pio.kaleido.scope.chromium_args = ("--no-sandbox",)
+# Host-side unit tests often omit kaleido entirely; skip when the scope is
+# missing so imports still succeed.
+_kaleido_scope = getattr(getattr(pio, 'kaleido', None), 'scope', None)
+if _kaleido_scope is not None:
+    _kaleido_scope.chromium_args = ("--no-sandbox",)
 from django.db.models import Count
 from reNgine.definitions import NUCLEI_SEVERITY_MAP
 

@@ -32,6 +32,10 @@ logger = logging.getLogger(__name__)
 
 FETCH_URL_PERSIST_BATCH_SIZE = 2000
 _COMMAND_OUTPUT_MAX_CHARS = 512_000
+# Minimum wall-clock gap between two persists of a running command's output.
+# Streaming tools emit tens of thousands of lines; persisting per line count
+# rewrites a TOASTed text column thousands of times for a single command.
+_COMMAND_OUTPUT_FLUSH_INTERVAL = 5.0
 PRECRAWL_MAX_URLS = 500
 
 ROUTED_TOOLS = {
@@ -381,9 +385,13 @@ def run_command(
                 universal_newlines=True,
                 errors='replace',
                 preexec_fn=os.setsid)
+            import time as _time
             output = ''
             _run_cmd_line_count = 0
             _run_cmd_aborted = False
+            # Heartbeat and abort polling run on a timer rather than every Nth
+            # line, so a chatty tool does not issue one SELECT per 10 lines.
+            _last_poll = _time.monotonic()
             for stdout_line in iter(popen.stdout.readline, ""):
                 item = stdout_line.strip()
                 output += '\n' + item
@@ -391,34 +399,25 @@ def run_command(
                 if redis_client and soc_config:
                     _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, item)
                 _run_cmd_line_count += 1
-                if _run_cmd_line_count % 10 == 0:
+                _now = _time.monotonic()
+                if _now - _last_poll < _COMMAND_OUTPUT_FLUSH_INTERVAL:
+                    continue
+                _last_poll = _now
+                activity_heartbeat_safe(f"Command executing... line {_run_cmd_line_count}")
+                if is_scan_aborted(scan_id):
+                    logger.warning("[run_command] Scan %s aborted — killing subprocess.", scan_id)
                     try:
-                        from reNgine.utils.task import activity_heartbeat_safe
-                        activity_heartbeat_safe(f"Command executing... line {_run_cmd_line_count}")
-                    except Exception:
+                        os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
                         pass
-                if _run_cmd_line_count % 10 == 0 and scan_id:
-                    try:
-                        from startScan.models import ScanHistory as _SH
-                        from reNgine.definitions import ABORTED_TASK as _ABORTED
-                        _s = _SH.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
-                        if _s == _ABORTED:
-                            logger.warning(f"[run_command] Scan {scan_id} aborted — killing subprocess.")
-                            try:
-                                os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
-                            except (ProcessLookupError, OSError):
-                                pass
-                            _run_cmd_aborted = True
-                            break
-                    except Exception:
-                        pass
+                    _run_cmd_aborted = True
+                    break
             popen.stdout.close()
             if _run_cmd_aborted:
                 return_code = -1
             else:
                 # Replace bare 7200 s wait with a polling loop so abort is
                 # detected even if the process is slow to produce output.
-                import time as _time
                 _deadline = _time.monotonic() + timeout
                 _timed_out = False
                 while True:
@@ -426,21 +425,14 @@ def run_command(
                         popen.wait(timeout=10)
                         break
                     except subprocess.TimeoutExpired:
-                        if scan_id:
+                        if is_scan_aborted(scan_id):
+                            logger.warning("[run_command] Scan %s aborted during wait — killing.", scan_id)
                             try:
-                                from startScan.models import ScanHistory as _SH
-                                from reNgine.definitions import ABORTED_TASK as _ABORTED
-                                _s = _SH.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
-                                if _s == _ABORTED:
-                                    logger.warning(f"[run_command] Scan {scan_id} aborted during wait — killing.")
-                                    try:
-                                        os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
-                                    except (ProcessLookupError, OSError):
-                                        pass
-                                    _run_cmd_aborted = True
-                                    break
-                            except Exception:
+                                os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                            except (ProcessLookupError, OSError):
                                 pass
+                            _run_cmd_aborted = True
+                            break
                         if _time.monotonic() > _deadline:
                             _timed_out = True
                             break
@@ -496,9 +488,11 @@ def run_command(
 
     if command_obj:
         logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
-        command_obj.output = output.replace('\x00', '')
-        command_obj.return_code = return_code
-        command_obj.save()
+        # run_command has no output cap: unlike stream_command it returns the
+        # output to the caller and has never truncated what it stores.
+        persist_command_output(
+            command_obj, output, max_output_chars=None, return_code=return_code
+        )
     else:
         logger.warning(f"Command finished with return code {return_code} (no database record saved)")
 
@@ -903,6 +897,71 @@ def save_parameter(
 
 	return param, created
 
+
+def persist_command_output(
+		command_obj,
+		output: str,
+		max_output_chars=_COMMAND_OUTPUT_MAX_CHARS,
+		return_code=None,
+	) -> None:
+	"""Persist a command's captured output, writing only the changed columns.
+
+	`update_fields` keeps the UPDATE off the columns that never change, so a
+	half-megabyte text column is not rewritten together with the whole row.
+
+	Args:
+		command_obj: Command instance to update (may be None).
+		output: Full accumulated output; only the last `max_output_chars` are stored.
+		max_output_chars: Storage cap, or a falsy value to store the output untrimmed.
+		return_code: When not None, also persist the process return code.
+	"""
+	if not command_obj:
+		return
+
+	stored_output = output.replace('\x00', '')
+	if max_output_chars and len(stored_output) > max_output_chars:
+		stored_output = stored_output[-max_output_chars:]
+
+	command_obj.output = stored_output
+	update_fields = ['output']
+	if return_code is not None:
+		command_obj.return_code = return_code
+		update_fields.append('return_code')
+
+	try:
+		command_obj.save(update_fields=update_fields)
+	except Exception as e:
+		# The Command row is an audit artifact; the tool's results have already
+		# been yielded to the caller. Losing the log is not worth failing the
+		# scan over, and this is also called from a finally block where raising
+		# would mask the original exception. Note save(update_fields=...) raises
+		# when the row is gone (scan deleted mid-run) where a bare save() would
+		# silently re-insert it.
+		logger.warning("Could not persist output for command %s: %s", command_obj.pk, e)
+
+
+def is_scan_aborted(scan_id) -> bool:
+	"""Return True when the scan has been marked as aborted.
+
+	Reads a single column so the poll does not pull the whole ScanHistory row.
+	"""
+	if not scan_id:
+		return False
+	try:
+		from reNgine.definitions import ABORTED_TASK
+		status = (
+			ScanHistory.objects
+			.filter(pk=scan_id)
+			.values_list('scan_status', flat=True)
+			.first()
+		)
+		return status == ABORTED_TASK
+	except Exception as e:
+		# Fail open: a failing status poll must never kill a healthy tool run.
+		logger.debug("Abort status check failed for scan %s: %s", scan_id, e)
+		return False
+
+
 def stream_command(
 		cmd, 
 		cwd=None, 
@@ -1092,10 +1151,9 @@ def stream_command(
 			stdout = ""
 			stderr = output
 
-		if command_obj:
-			command_obj.output = output.replace('\x00', '')
-			command_obj.return_code = return_code
-			command_obj.save()
+		persist_command_output(
+			command_obj, output, max_output_chars, return_code=return_code
+		)
 
 		if history_file:
 			mode = 'a'
@@ -1172,8 +1230,11 @@ def stream_command(
 	# Log the output in real-time to the database
 	output = ""
 
-	# Process the output
-	line_count = 0
+	# Persist on a timer, not per line: a tool emitting 100k lines would
+	# otherwise trigger ~10k full-row UPDATEs of the output column.
+	last_flush = time.monotonic()
+	pending_flush = False
+
 	try:
 		for line in iter(lambda: process.stdout.readline(), ''):
 			if not line:
@@ -1208,36 +1269,31 @@ def stream_command(
 
 			# Update output
 			output += '\n' + line
-			line_count += 1
-			if line_count % 10 == 0:
-				stored_output = output.replace('\x00', '')
-				if max_output_chars and len(stored_output) > max_output_chars:
-					stored_output = stored_output[-max_output_chars:]
-				command_obj.output = stored_output
-				command_obj.save()
+			pending_flush = True
 
-				# Kill switch: abort the subprocess if the scan was stopped
-				if scan_id:
+			now = time.monotonic()
+			if now - last_flush >= _COMMAND_OUTPUT_FLUSH_INTERVAL:
+				last_flush = now
+				persist_command_output(command_obj, output, max_output_chars)
+				pending_flush = False
+
+				# Kill switch: abort the subprocess if the scan was stopped.
+				# Polled on the same timer as the flush, not per N lines.
+				if is_scan_aborted(scan_id):
+					logger.warning(
+						"[stream_command] Scan %s aborted — killing subprocess.", scan_id
+					)
 					try:
-						from startScan.models import ScanHistory
-						from reNgine.definitions import ABORTED_TASK
-						_scan = ScanHistory.objects.filter(pk=scan_id).only('scan_status').first()
-						if _scan and _scan.scan_status == ABORTED_TASK:
-							logger.warning(
-								f"[stream_command] Scan {scan_id} aborted — killing subprocess."
-							)
-							try:
-								os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-							except (ProcessLookupError, OSError):
-								pass
-							break
-					except Exception:
+						os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+					except (ProcessLookupError, OSError):
 						pass
+					break
 
 		process.wait()
-		command_obj.output = output.replace('\x00', '')
-		command_obj.return_code = process.returncode
-		command_obj.save()
+		persist_command_output(
+			command_obj, output, max_output_chars, return_code=process.returncode
+		)
+		pending_flush = False
 
 	except BaseException as e:
 		if not isinstance(e, GeneratorExit):
@@ -1249,6 +1305,10 @@ def stream_command(
 				pass
 		raise
 	finally:
+		# Lines produced since the last timed flush would otherwise be lost when
+		# the consumer stops iterating early or the command fails.
+		if pending_flush:
+			persist_command_output(command_obj, output, max_output_chars)
 		if process:
 			if process.stdout:
 				try:

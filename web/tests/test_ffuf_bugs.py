@@ -603,3 +603,58 @@ class TestFfufStreamingHeartbeat(TestCase):
             dir_file_fuzz(proxy, ctx=ctx)
 
         mock_heartbeat.assert_called()
+
+
+class TestDirsearchCliV050(TestCase):
+    """dirsearch 0.5.0 renamed --format to --output-formats."""
+
+    def test_build_dirsearch_run_cmd_uses_output_formats(self):
+        from reNgine.tasks.fuzzing import build_dirsearch_run_cmd
+
+        cmd = build_dirsearch_run_cmd(
+            'dirsearch -w /tmp/w.txt -e php -t 10',
+            'http://example.com/',
+            '/tmp/out.json',
+            proxy='socks5://1.2.3.4:1080',
+        )
+        self.assertIn('--output-formats=json', cmd)
+        self.assertNotIn('--format=', cmd)
+        self.assertNotIn('--format ', cmd)
+        self.assertIn('-o /tmp/out.json', cmd)
+        self.assertIn('-u http://example.com', cmd)
+        self.assertIn('--proxy socks5://1.2.3.4:1080', cmd)
+        self.assertIn('--no-color', cmd)
+
+    def test_build_dirsearch_run_cmd_omits_proxy_when_none(self):
+        from reNgine.tasks.fuzzing import build_dirsearch_run_cmd
+
+        cmd = build_dirsearch_run_cmd(
+            'dirsearch -w /tmp/w.txt',
+            'http://example.com',
+            '/tmp/out.json',
+        )
+        self.assertIn('--output-formats=json', cmd)
+        self.assertNotIn('--proxy', cmd)
+
+    def test_prepare_only_still_builds_dirsearch_base(self):
+        config = {
+            'dir_file_fuzz': {
+                'auto_calibration': False,
+                'rate_limit': 0,
+                'threads': 10,
+                'wordlist_name': 'dicc',
+                'extensions': ['.php'],
+                'match_http_status': [200],
+                'recursive_level': 1,
+                'max_time': 60,
+                'stop_on_error': False,
+                'follow_redirect': True,
+                'timeout': 10,
+                'run_dirsearch': True,
+            }
+        }
+        result = _prepare(config)
+        self.assertIsNotNone(result.get('dirsearch_base_cmd'))
+        self.assertTrue(result['dirsearch_base_cmd'].startswith('dirsearch'))
+        self.assertIn('-e php', result['dirsearch_base_cmd'])
+        self.assertIn('--follow-redirects', result['dirsearch_base_cmd'])

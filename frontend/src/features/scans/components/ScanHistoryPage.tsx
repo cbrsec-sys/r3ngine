@@ -72,6 +72,23 @@ import { timeout } from 'd3';
 import type { ScanHistory } from '../types';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
+/** Overall bar for history rows: prefer tier position while running/paused so
+ * leftover FAILED rows from a crash/resume do not inflate the percentage. */
+function getScanHistoryDisplayProgress(scan: ScanHistory): number {
+  const status = scan.scan_status;
+  if (status === 2 || status === 0 || status === 3) return 100;
+
+  const totalTiers = Number(scan.total_tiers || 0);
+  const currentTier = Number(scan.current_tier || 0);
+  if ((status === 1 || status === 5) && totalTiers > 0 && currentTier > 0) {
+    const tierShare =
+      (currentTier - 1 + Number(scan.current_tier_progress || 0) / 100) / totalTiers;
+    return Math.min(100, Math.round(tierShare * 10000) / 100);
+  }
+
+  return Number(scan.current_progress || 0);
+}
+
 export const ScanHistoryPage: React.FC = () => {
   const { tokens, isLight, theme } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -391,7 +408,7 @@ export const ScanHistoryPage: React.FC = () => {
             <TableBody>
               {paginatedScans.map((scan) => {
                 const isItemSelected = isSelected(scan.id!);
-                const displayProgress = (scan.scan_status === 2 || scan.scan_status === 0 || scan.scan_status === 3) ? 100 : Number(scan.current_progress || 0);
+                const displayProgress = getScanHistoryDisplayProgress(scan);
                 return (
                   <TableRow
                     key={scan.id!}
@@ -410,7 +427,7 @@ export const ScanHistoryPage: React.FC = () => {
                     <TableCell padding="checkbox" sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Checkbox
                         checked={isItemSelected}
-                        sx={{ color: 'rgba(255,255,255,0.2)', '&.Mui-checked': { color: tokens.accent.primary } }}
+                        sx={{ color: 'text.disabled', '&.Mui-checked': { color: tokens.accent.primary } }}
                       />
                     </TableCell>
                     <TableCell

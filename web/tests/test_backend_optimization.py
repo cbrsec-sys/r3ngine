@@ -98,10 +98,10 @@ class BackendOptimizationTest(TransactionTestCase):
         self.assertNotIn('nginx-1-18-0', tags)
         self.assertIn('moment-js', tags)
 
-    @patch('reNgine.tasks.get_http_urls')
-    @patch('reNgine.tasks.Subdomain.objects.filter')
-    @patch('reNgine.tasks.stream_command')
-    @patch('reNgine.tasks.run_command')
+    @patch('reNgine.tasks.vuln.get_http_urls')
+    @patch('reNgine.tasks.vuln.Subdomain.objects.filter')
+    @patch('reNgine.tasks.vuln.stream_command')
+    @patch('reNgine.tasks.vuln.run_command')
     def test_nuclei_tag_injection(self, mock_run_cmd, mock_stream, mock_subdomain_filter, mock_get_urls):
         """Test that nuclei_scan correctly runs without restricting tags based on discovered technologies."""
         mock_sub = MagicMock()
@@ -138,10 +138,10 @@ class BackendOptimizationTest(TransactionTestCase):
         # Verify that discovered technology tags are properly injected
         self.assertIn('wordpress', cmd)
 
-    @patch('reNgine.tasks.get_http_urls')
-    @patch('reNgine.tasks.Subdomain.objects.filter')
-    @patch('reNgine.tasks.stream_command')
-    @patch('reNgine.tasks.run_command')
+    @patch('reNgine.tasks.vuln.get_http_urls')
+    @patch('reNgine.tasks.vuln.Subdomain.objects.filter')
+    @patch('reNgine.tasks.vuln.stream_command')
+    @patch('reNgine.tasks.vuln.run_command')
     def test_nuclei_tag_batch_limit_in_fallback_path(self, mock_run_cmd, mock_stream, mock_subdomain_filter, mock_get_urls):
         """When tags_override is not provided (legacy path) and many tech tags are found,
         the command must never receive more than 3 tags via -tags to prevent overload."""
@@ -207,8 +207,8 @@ class BackendOptimizationTest(TransactionTestCase):
         
         dirsearch_results = {
             "results": [
-                {"url": f"http://{self.domain_name}/admin", "status": 200, "content-length": 1234},
-                {"url": f"http://{self.domain_name}/new-page", "status": 200, "content-length": 888}
+                {"url": f"http://{self.domain_name}/admin", "status": 200, "contentLength": 1234},
+                {"url": f"http://{self.domain_name}/new-page", "status": 200, "contentLength": 888}
             ]
         }
         
@@ -221,6 +221,8 @@ class BackendOptimizationTest(TransactionTestCase):
         
         def run_side_effect(cmd, *args, **kwargs):
             if 'dirsearch' in cmd:
+                self.assertIn('--output-formats=json', cmd)
+                self.assertNotIn('--format=', cmd)
                 import re
                 match = re.search(r'-o\s+([^\s]+)', cmd)
                 if match:
@@ -256,7 +258,7 @@ class BackendOptimizationTest(TransactionTestCase):
         unique_df_count = DirectoryFile.objects.values('url').distinct().count()
         self.assertEqual(unique_df_count, 3)
 
-    @patch('reNgine.tasks.run_command')
+    @patch('reNgine.tasks.subdomain.run_command')
     def test_amass_intel_discovery(self, mock_run):
         """Test that amass_intel_discovery runs and attempts to save results."""
         output_file = f"{self.results_dir}/amass_intel.txt"

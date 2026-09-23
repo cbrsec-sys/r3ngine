@@ -74,9 +74,16 @@ def run_graphql_cop(self, ctx, url, subdomain):
     """Run graphql-cop against all /graphql endpoints and save findings."""
     from startScan.models import EndPoint
 
+    from reNgine.common_func import GRAPHQL_ENDPOINT_URL_REGEX
+
     candidate_urls = set()
-    # Collect existing /graphql endpoints
-    for ep in EndPoint.objects.filter(scan_history=self.scan, http_url__icontains='/graphql'):
+    # Endpoints that ARE a GraphQL endpoint, not ones that merely mention it:
+    # a shipped node_modules tree puts "/graphql" in the path of every file of
+    # the graphql package, and each one used to be probed as if it served the API.
+    for ep in EndPoint.objects.filter(
+        scan_history=self.scan,
+        http_url__iregex=GRAPHQL_ENDPOINT_URL_REGEX,
+    ):
         candidate_urls.add(ep.http_url)
     # Always try appending /graphql to the base URL
     base = url.rstrip('/')

@@ -3116,6 +3116,19 @@ _OPENAPI_PROBE_PATHS = [
 _PROBE_HEADERS = {'User-Agent': 'r3ngine-probe/1.0'}
 _PROBE_TIMEOUT = 5  # seconds per HEAD request
 
+#: A URL whose path *ends* at a GraphQL endpoint, rather than one that merely
+#: mentions graphql somewhere. A front-end bundle ships its dependency tree, so
+#: /node_modules/graphql/error/syntaxError.js contains "/graphql" and used to
+#: both switch the GraphQL tooling on and become one of its targets.
+#: Usable both as a Django `__iregex` lookup and with `re.search(..., re.I)`,
+#: so the database filter and the Python check can never disagree.
+GRAPHQL_ENDPOINT_URL_REGEX = r'/graphi?ql/?($|[?#])'
+
+
+def is_graphql_endpoint_url(url: str) -> bool:
+	"""True when the URL addresses a GraphQL endpoint itself."""
+	return bool(url and re.search(GRAPHQL_ENDPOINT_URL_REGEX, url, re.IGNORECASE))
+
 
 def has_graphql_endpoint(scan_id, url, proxy=None):
 	"""Return True if a GraphQL endpoint has been detected for this scan.
@@ -3126,7 +3139,7 @@ def has_graphql_endpoint(scan_id, url, proxy=None):
 	logger.info('[GATE] has_graphql_endpoint: DB query — scan_id=%s url=%s', scan_id, url)
 	db_match = EndPoint.objects.filter(
 		scan_history_id=scan_id,
-		http_url__iregex=r'/graphi?ql',
+		http_url__iregex=GRAPHQL_ENDPOINT_URL_REGEX,
 	).exists()
 	if db_match:
 		logger.info('[GATE] has_graphql_endpoint: DB hit — GraphQL endpoint already recorded for scan %s', scan_id)

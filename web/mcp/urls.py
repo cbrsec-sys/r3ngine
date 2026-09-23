@@ -17,6 +17,15 @@ from mcp.views.dispatch import (
     McpStopScanView,
     McpTriggerApmeView,
 )
+from mcp.views.detail import (
+    McpGetEndpointDetailView,
+    McpGetExposureDetailView,
+    McpGetScanDetailView,
+    McpGetSubdomainDetailView,
+    McpGetSubscanDetailView,
+    McpGetTargetDetailView,
+    McpGetVulnerabilityDetailView,
+)
 from mcp.views.read import (
     McpAttackPathsView,
     McpDashboardView,
@@ -37,6 +46,7 @@ from mcp.views.read import (
     McpScanStatusView,
     McpSearchView,
 )
+from mcp.views.notes import McpNoteDetailView, McpNotesListCreateView
 from mcp.views.sessions import (
     McpAgentDeleteView,
     McpSessionEndView,
@@ -59,15 +69,22 @@ urlpatterns = [
     path('agents/<str:agent_id>/', McpAgentDeleteView.as_view()),
     path('audit/', McpAuditListView.as_view()),
     path('projects/', McpListProjectsView.as_view()),
+    path('targets/<int:pk>/detail/', McpGetTargetDetailView.as_view()),
     path('targets/<int:pk>/', McpGetTargetView.as_view()),
     path('targets/', McpListTargetsView.as_view()),
+    path('scans/<int:pk>/detail/', McpGetScanDetailView.as_view()),
     path('scans/<int:pk>/', McpGetScanView.as_view()),
     path('scans/', McpListScansView.as_view()),
     path('scan-status/', McpScanStatusView.as_view()),
+    path('subscans/<int:pk>/detail/', McpGetSubscanDetailView.as_view()),
     path('subscans/', McpListSubscansView.as_view()),
+    path('subdomains/<int:pk>/detail/', McpGetSubdomainDetailView.as_view()),
     path('subdomains/', McpListSubdomainsView.as_view()),
+    path('endpoints/<int:pk>/detail/', McpGetEndpointDetailView.as_view()),
     path('endpoints/', McpListEndpointsView.as_view()),
+    path('vulnerabilities/<int:pk>/detail/', McpGetVulnerabilityDetailView.as_view()),
     path('vulnerabilities/', McpListVulnerabilitiesView.as_view()),
+    path('exposures/<int:pk>/detail/', McpGetExposureDetailView.as_view()),
     path('exposures/', McpListExposuresView.as_view()),
     path('emails/', McpListEmailsView.as_view()),
     path('employees/', McpListEmployeesView.as_view()),
@@ -76,6 +93,8 @@ urlpatterns = [
     path('attack-paths/', McpAttackPathsView.as_view()),
     path('engines/', McpListEnginesView.as_view()),
     path('health/', McpHealthView.as_view()),
+    path('notes/', McpNotesListCreateView.as_view()),
+    path('notes/<int:pk>/', McpNoteDetailView.as_view()),
     path('scans/start/', McpStartScanView.as_view()),
     path('scans/pause/', McpPauseScanView.as_view()),
     path('scans/resume/', McpResumeScanView.as_view()),

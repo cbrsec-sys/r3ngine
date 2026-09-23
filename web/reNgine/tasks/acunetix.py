@@ -15,6 +15,18 @@ from dashboard.models import AcunetixAPIKey
 logger = logging.getLogger(__name__)
 
 
+def _fail(task, message: str) -> bool:
+	"""Log why the scan gave up and expose the reason on the task object.
+
+	The Temporal wrapper turns a False return into a generic
+	"execution returned False/failed" exception; storing the reason on
+	`task.error` lets it surface the real cause on the scan timeline.
+	"""
+	logger.error("Acunetix scan failed: %s", message)
+	task.error = message
+	return False
+
+
 def map_acunetix_severity(severity):
 	# Acunetix: 3 (High), 2 (Medium), 1 (Low), 0 (Informational)
 	# reNgine: 4 (Critical), 3 (High), 2 (Medium), 1 (Low), 0 (Info)
@@ -260,8 +272,7 @@ def acunetix_scan(
 		try:
 			_validate_subdomain_name(subdomain_name)
 		except ValueError as e:
-			logger.error(f"Invalid subdomain provided to acunetix_scan: {e}")
-			return False
+			return _fail(self, f"Invalid subdomain provided to acunetix_scan: {e}")
 
 	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
@@ -286,13 +297,16 @@ def acunetix_scan(
 	target_name = subdomain_name or domain.name
 	target_url = subdomain_http_url or f"https://{target_name}"
 
+	# Show the exact host on this task's timeline entry — one activity row is
+	# created per Acunetix target, and they are otherwise indistinguishable.
+	self.target_host = target_name[:500]
+
 	subscan = getattr(self, 'subscan', None)
 
 	# Get credentials from vault
 	creds = AcunetixAPIKey.objects.first()
 	if not (creds and creds.server_url and creds.api_key):
-		logger.error("Acunetix API keys not fully configured in vault. Skipping.")
-		return False
+		return _fail(self, "Acunetix API keys not fully configured in vault.")
 	logger.info(f"Acunetix credentials configured for: {creds.server_url}")
 	try:
 		logger.info(f"Starting Acunetix scan for {target_url}")
@@ -314,8 +328,7 @@ def acunetix_scan(
 			target_url=target_url,
 		)
 		if not target_id:
-			logger.error(f"Could not create or locate Acunetix target for {target_name}")
-			return False
+			return _fail(self, f"Could not create or locate Acunetix target for {target_name}")
 
 		scan_info = _start_acunetix_scan_direct(
 			base_url=base_url,
@@ -327,8 +340,7 @@ def acunetix_scan(
 		scan_id = scan_info.get('scan_id')
 
 		if not target_id:
-			logger.error(f"Target {target_name} not found in Acunetix after start_scan.")
-			return False
+			return _fail(self, f"Target {target_name} not found in Acunetix after start_scan.")
 
 		# If scan_id wasn't in scan_info, try to find it from scans query by target_id
 		if not scan_id:
@@ -340,8 +352,7 @@ def acunetix_scan(
 					scan_id = scans_list[0].get('scan_id')
 
 		if not scan_id:
-			logger.error(f"Could not determine scan_id for Acunetix scan on target {target_name}")
-			return False
+			return _fail(self, f"Could not determine scan_id for Acunetix scan on target {target_name}")
 
 		# Wait for scan to complete
 		max_retries = settings.ACUNETIX_MAX_RETRIES
@@ -359,16 +370,14 @@ def acunetix_scan(
 					logger.info(f"Acunetix scan for {target_name} completed.")
 					break
 				elif current_status in ['failed', 'aborted']:
-					logger.error(f"Acunetix scan for {target_name} ended with status: {current_status}.")
-					return False
+					return _fail(self, f"Acunetix scan for {target_name} ended with status: {current_status}.")
 			else:
 				logger.warning(f"Failed to fetch scan status for {scan_id}, status code: {scan_resp.status_code}")
 
 			time.sleep(poll_interval)
 			retries += 1
 		else:
-			logger.error(f"Acunetix scan for {target_name} timed out after {max_retries} retries.")
-			return False
+			return _fail(self, f"Acunetix scan for {target_name} timed out after {max_retries} retries.")
 
 		# Fetch Vulnerabilities for the specific scan
 		vulns_url = None
@@ -385,36 +394,40 @@ def acunetix_scan(
 			# Fallback to querying by target_id
 			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
 
-		active_vulns_url = vulns_url
-		logger.info(f"Fetching Acunetix vulnerabilities from: {active_vulns_url}")
-		vulns_resp = requests.get(active_vulns_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
-		logger.info(f"Acunetix vulnerabilities response code: {vulns_resp.status_code}")
-
-		# If the URL returned 400 or 404, try fallbacks
-		if vulns_resp.status_code in [400, 404]:
-			fallback_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
-			logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
-			vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
-			logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
-			active_vulns_url = fallback_url
-
-			if vulns_resp.status_code in [400, 404]:
-				fallback_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
-				logger.info(f"Retrying with fallback 2 URL: {fallback_url}")
-				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
-				logger.info(f"Fallback 2 response code: {vulns_resp.status_code}")
-				active_vulns_url = fallback_url
-
-		v_list = []
-		if vulns_resp.status_code == 200:
-			_, v_list = _fetch_acunetix_vulnerabilities(
-				active_vulns_url,
+		# The AWVS API exposes the result list under different paths across versions,
+		# so each candidate is tried in turn. _fetch_acunetix_vulnerabilities both
+		# probes the URL and walks its pagination, returning the failing response
+		# when there is one — probing separately first would fetch every page twice.
+		def _collect(url: str, label: str):
+			logger.info("Fetching Acunetix vulnerabilities from %s (%s)", url, label)
+			return _fetch_acunetix_vulnerabilities(
+				url,
 				headers=headers,
 				verify=_acunetix_verify,
 				timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
 			)
-		elif vulns_resp.status_code in [400, 404]:
-			logger.warning("Acunetix vulnerability fetch did not return a valid list after fallbacks.")
+
+		failed_resp, v_list = _collect(vulns_url, "primary")
+		for label, candidate_url in (
+			("fallback 1", f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"),
+			("fallback 2", f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"),
+		):
+			if failed_resp is None or failed_resp.status_code not in (400, 404):
+				break
+			failed_resp, candidate_list = _collect(candidate_url, label)
+			# A URL that broke half way through its pagination still returns the
+			# pages it did read. Only take over from it when the next candidate
+			# actually found more, so a fallback answering with nothing does not
+			# throw those findings away.
+			if len(candidate_list) > len(v_list):
+				v_list = candidate_list
+
+		if failed_resp is not None:
+			logger.warning(
+				"Acunetix vulnerability fetch did not return a valid list after fallbacks "
+				"(last status %s); keeping the %d finding(s) collected so far.",
+				failed_resp.status_code, len(v_list),
+			)
 
 		if v_list:
 			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
@@ -473,5 +486,304 @@ def acunetix_scan(
 		return True
 
 	except Exception as e:
-		logger.error(f"Error in Acunetix scan: {str(e)}")
+		# The exception text carries the AWVS server URL (and, for some client
+		# errors, the request headers), and `error_message` is served to every
+		# role by the scan summary API. Keep the detail in the server log and
+		# expose only the failure class. See security rule 8.1.
+		logger.exception("Error in Acunetix scan for %s", target_name)
+		return _fail(
+			self,
+			f"Acunetix scan for {target_name} failed with {type(e).__name__}. "
+			"See the server logs for details.",
+		)
+
+
+def _record_submission(task, command: str, output: str, return_code: int = 0) -> None:
+	"""Write one line of the submission log onto the task's timeline entry.
+
+	The scan detail overlay lists a task's Command rows, so recording each decision
+	here is what makes "which hosts were added" visible in the UI.
+	"""
+	from django.utils import timezone as _tz
+
+	from startScan.models import Command
+
+	try:
+		Command.objects.create(
+			command=command,
+			output=output,
+			return_code=return_code,
+			time=_tz.now(),
+			scan_history=getattr(task, 'scan', None),
+			activity=getattr(task, 'activity', None),
+		)
+	except Exception as exc:
+		logger.warning("Could not record Acunetix submission for %s: %s", command, exc)
+
+
+def get_live_subdomains_for_submission(scan_history_id: int):
+	"""Return the subdomains of a scan that are worth sending to Acunetix.
+
+	"Live and externally reachable" means: it answered HTTP with a usable status
+	(the same definition the scan summary uses for its alive count), it has a URL
+	to scan, and it is not resolved exclusively to private addresses.
+
+	Args:
+		scan_history_id: ScanHistory PK the subdomains were discovered in.
+
+	Returns:
+		QuerySet[Subdomain]: ordered by name so submissions are deterministic.
+	"""
+	from django.db.models import Count, Q
+
+	return (
+		Subdomain.objects
+		.filter(scan_history_id=scan_history_id)
+		.filter(http_status__gt=0, http_status__lt=500)
+		.exclude(http_status=404)
+		.exclude(Q(http_url__isnull=True) | Q(http_url__exact=''))
+		.annotate(
+			public_ip_count=Count('ip_addresses', filter=Q(ip_addresses__is_private=False)),
+			ip_count=Count('ip_addresses'),
+		)
+		.filter(Q(public_ip_count__gt=0) | Q(ip_count=0))
+		.order_by('name')
+		.distinct()
+	)
+
+
+DEFAULT_RESUBMIT_AFTER_DAYS = 3
+MIN_RESUBMIT_AFTER_DAYS = 1
+
+
+def _resolve_resubmit_after_days(raw) -> int:
+	"""Turn the engine YAML value into a usable re-submission window.
+
+	The window is what stops a daily scan re-registering the same host, so a
+	value of 0 (cutoff = now, everything looks stale) defeats its only purpose,
+	and a non-numeric value would otherwise raise out of the task.
+	"""
+	if raw is None:
+		return DEFAULT_RESUBMIT_AFTER_DAYS
+
+	try:
+		days = int(raw)
+	except (TypeError, ValueError):
+		logger.warning(
+			"Ignoring malformed Acunetix resubmit_after_days %r, using %d day(s)",
+			raw, DEFAULT_RESUBMIT_AFTER_DAYS,
+		)
+		return DEFAULT_RESUBMIT_AFTER_DAYS
+
+	if days < MIN_RESUBMIT_AFTER_DAYS:
+		logger.warning(
+			"Acunetix resubmit_after_days %s is below the %d day minimum, clamping",
+			days, MIN_RESUBMIT_AFTER_DAYS,
+		)
+		return MIN_RESUBMIT_AFTER_DAYS
+
+	return days
+
+
+def _recently_submitted_hosts(hosts: list, resubmit_after_days: int) -> dict:
+	"""Map host -> last submission time for hosts pushed within the window."""
+	from datetime import timedelta
+
+	from django.utils import timezone as _tz
+
+	from dashboard.models import AcunetixTargetSubmission
+
+	cutoff = _tz.now() - timedelta(days=resubmit_after_days)
+	rows = AcunetixTargetSubmission.objects.filter(
+		host__in=hosts, last_submitted_at__gte=cutoff
+	).values_list('host', 'last_submitted_at')
+	return dict(rows)
+
+
+def _persist_acunetix_submission(host: str, target_url: str, target_id: str, scan_history_id) -> None:
+	"""Record that `host` was pushed to Acunetix, refreshing an existing row.
+
+	`host` is unique, so two scans submitting the same host concurrently can
+	collide on the insert. The write runs in its own atomic block: an
+	IntegrityError then rolls back only this savepoint and leaves the
+	surrounding transaction usable for the remaining hosts.
+	"""
+	from django.db import transaction
+	from django.utils import timezone as _tz
+
+	from dashboard.models import AcunetixTargetSubmission
+
+	now = _tz.now()
+	with transaction.atomic():
+		row, created = AcunetixTargetSubmission.objects.get_or_create(
+			host=host,
+			defaults={
+				'target_url': target_url,
+				'acunetix_target_id': str(target_id),
+				'last_submitted_at': now,
+				'last_scan_history_id': scan_history_id,
+			},
+		)
+		if not created:
+			row.target_url = target_url
+			row.acunetix_target_id = str(target_id)
+			row.last_submitted_at = now
+			row.submission_count += 1
+			row.last_scan_history_id = scan_history_id
+			row.save(update_fields=[
+				'target_url', 'acunetix_target_id', 'last_submitted_at',
+				'submission_count', 'last_scan_history_id',
+			])
+
+
+def _submit_acunetix_host(
+		task,
+		host: str,
+		target_url: str,
+		base_url: str,
+		headers: dict,
+		verify,
+		start_scan_on_submit: bool,
+		scan_history_id) -> bool:
+	"""Submit one host and write its timeline row. Never raises.
+
+	Every host is independent: a timeout on the AWVS call, a failed scan start
+	or a colliding insert is recorded against this host only, so the caller can
+	carry on with the rest of the list.
+	"""
+	command = f"acunetix submit {host}"
+	try:
+		target_id = _create_or_reuse_acunetix_target(
+			base_url=base_url,
+			headers=headers,
+			verify=verify,
+			timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+			target_name=host,
+			target_url=target_url,
+		)
+		if not target_id:
+			_record_submission(
+				task, command,
+				"FAILED — could not create or locate the Acunetix target",
+				return_code=1,
+			)
+			return False
+
+		scan_started = False
+		if start_scan_on_submit:
+			scan_info = _start_acunetix_scan_direct(
+				base_url=base_url,
+				headers=headers,
+				verify=verify,
+				timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+				target_id=target_id,
+			)
+			scan_started = bool(scan_info)
+
+		_persist_acunetix_submission(host, target_url, target_id, scan_history_id)
+	except Exception as exc:
+		logger.error("Acunetix target submission failed for %s: %s", host, exc)
+		_record_submission(
+			task, command,
+			"FAILED — %s while submitting the target" % type(exc).__name__,
+			return_code=1,
+		)
 		return False
+
+	_record_submission(
+		task, command,
+		"SUBMITTED — target_id=%s url=%s%s" % (
+			target_id, target_url, " (scan started)" if scan_started else ""
+		),
+		return_code=0,
+	)
+	return True
+
+
+def acunetix_submit_live_subdomains(
+		self,
+		scan_history_id=None,
+		ctx=None,
+		description=None):
+	"""Register every live subdomain of a scan as an Acunetix target.
+
+	Each host is submitted at most once per `resubmit_after_days` window, and every
+	decision — submitted, skipped, failed — is written as a Command row on this
+	task's timeline entry, so the scan timeline shows exactly what was added.
+
+	Args:
+		scan_history_id: ScanHistory PK.
+		ctx: Temporal workflow context; carries the engine's yaml configuration.
+		description: Human-readable task description (unused, kept for the task API).
+
+	Returns:
+		bool: True when the submission pass completed, False when it could not run.
+	"""
+	ctx = ctx or {}
+	scan_history_id = scan_history_id or ctx.get('scan_history_id')
+	yaml_configuration = ctx.get('yaml_configuration') or getattr(self, 'yaml_configuration', {}) or {}
+	acunetix_config = (yaml_configuration.get('vulnerability_scan') or {}).get('acunetix') or {}
+
+	resubmit_after_days = _resolve_resubmit_after_days(
+		acunetix_config.get('resubmit_after_days', DEFAULT_RESUBMIT_AFTER_DAYS)
+	)
+	start_scan_on_submit = bool(acunetix_config.get('start_scan_on_submit', False))
+
+	creds = AcunetixAPIKey.objects.first()
+	if not (creds and creds.server_url and creds.api_key):
+		return _fail(self, "Acunetix API keys not fully configured in vault.")
+
+	subdomains = list(get_live_subdomains_for_submission(scan_history_id))
+	if not subdomains:
+		logger.info("No live subdomains to submit to Acunetix for scan %s", scan_history_id)
+		return True
+
+	hosts = [s.name for s in subdomains]
+	recent = _recently_submitted_hosts(hosts, resubmit_after_days)
+	logger.info(
+		"Acunetix submission for scan %s: %d live subdomains, %d already sent in the last %d day(s)",
+		scan_history_id, len(hosts), len(recent), resubmit_after_days,
+	)
+
+	base_url = str(creds.server_url).rstrip('/')
+	headers = {'X-Auth': creds.api_key, 'Content-Type': 'application/json'}
+	import os as _os
+	verify = _os.environ.get('ACUNETIX_CA_BUNDLE', False)
+
+	submitted, skipped, failed = 0, 0, 0
+	for subdomain in subdomains:
+		host = subdomain.name
+		target_url = subdomain.http_url or f"https://{host}"
+
+		if host in recent:
+			skipped += 1
+			_record_submission(
+				self,
+				f"acunetix submit {host}",
+				f"SKIPPED — already submitted {recent[host].isoformat()} "
+				f"(within {resubmit_after_days}d window)",
+				return_code=0,
+			)
+			continue
+
+		if _submit_acunetix_host(
+			self,
+			host=host,
+			target_url=target_url,
+			base_url=base_url,
+			headers=headers,
+			verify=verify,
+			start_scan_on_submit=start_scan_on_submit,
+			scan_history_id=scan_history_id,
+		):
+			submitted += 1
+		else:
+			failed += 1
+
+	logger.info(
+		"Acunetix submission complete for scan %s: submitted=%d skipped=%d failed=%d",
+		scan_history_id, submitted, skipped, failed,
+	)
+	if failed and not submitted:
+		return _fail(self, f"All {failed} Acunetix target submissions failed.")
+	return True

@@ -12,12 +12,13 @@ import validators
 from django.conf import settings
 
 from ipaddress import IPv4Network
-from django.db.models import CharField, Count, F, Max, Q, Value
+from django.db.models import (
+	CharField, Count, F, IntegerField, Max, OuterRef, Q, Subquery, Value)
 from django.utils import timezone
 from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
-from django.db.models.functions import Lower
+from django.db.models.functions import Coalesce, Lower
 from rest_framework import mixins, viewsets, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_datatables.pagination import DatatablesPageNumberPagination
@@ -450,49 +451,89 @@ class ScanStatus(APIView):
 	# poll could serialize the entire backlog into a web worker at once.
 	_ACTIVE_LIMIT = 100
 
+	@staticmethod
+	def _related_total(model):
+		"""Correlated count of a scan's rows in `model`.
+
+		Three Count() annotations cannot be used instead: they span separate
+		multi-valued relations, so Django joins subdomains by endpoints by
+		vulnerabilities and the intermediate row count explodes long before
+		distinct collapses it again.
+		"""
+		return Coalesce(
+			Subquery(
+				model.objects
+				.filter(scan_history=OuterRef('pk'))
+				.order_by()
+				.values('scan_history')
+				.annotate(total=Count('id'))
+				.values('total')[:1],
+				output_field=IntegerField(),
+			),
+			0,
+		)
+
+	def _scan_queryset(self, slug):
+		"""Base scan queryset carrying everything ScanHistorySerializer reads.
+
+		The serializer declares eighteen method fields. Left unannotated each
+		one queries per row, which is what made this polled endpoint expensive.
+		"""
+		return (
+			ScanHistory.objects
+			.filter(domain__project__slug=slug)
+			.select_related('domain', 'scan_type', 'initiated_by')
+			.prefetch_related('domain__domains', 'scanactivity_set')
+			.annotate(
+				subdomain_count_ann=self._related_total(Subdomain),
+				endpoint_count_ann=self._related_total(EndPoint),
+				vulnerability_count_ann=self._related_total(Vulnerability),
+				max_severity_ann=Subquery(
+					Vulnerability.objects
+					.filter(scan_history=OuterRef('pk'))
+					.order_by()
+					.values('scan_history')
+					.annotate(top=Max('severity'))
+					.values('top')[:1],
+					output_field=IntegerField(),
+				),
+			)
+			.order_by('-start_scan_date')
+		)
+
+	def _task_queryset(self, slug):
+		"""Base subscan queryset.
+
+		SubScanSerializer dereferences subdomain and engine, and Meta.fields is
+		'__all__', which pulls the subdomain_subscan_ids many-to-many per row.
+		"""
+		return (
+			SubScan.objects
+			.filter(scan_history__domain__project__slug=slug)
+			.select_related('subdomain', 'engine')
+			.prefetch_related('subdomain_subscan_ids')
+			.order_by('-start_scan_date')
+		)
+
 	def get(self, request):
 		req = self.request
 		slug = self.request.GET.get('project', None)
 
+		scans = self._scan_queryset(slug)
+		tasks = self._task_queryset(slug)
+
 		# main tasks
-		recently_completed_scans = (
-			ScanHistory.objects
-			.filter(domain__project__slug=slug)
-			.order_by('-start_scan_date')
-			.filter(Q(scan_status=0) | Q(scan_status=2) | Q(scan_status=3))[:10]
-		)
-		current_scans = (
-			ScanHistory.objects
-			.filter(domain__project__slug=slug)
-			.order_by('-start_scan_date')
-			.filter(scan_status=1)[:self._ACTIVE_LIMIT]
-		)
-		pending_scans = (
-			ScanHistory.objects
-			.filter(domain__project__slug=slug)
-			.order_by('-start_scan_date')
-			.filter(scan_status=-1)[:self._ACTIVE_LIMIT]
-		)
+		recently_completed_scans = scans.filter(
+			Q(scan_status=0) | Q(scan_status=2) | Q(scan_status=3))[:10]
+		current_scans = scans.filter(scan_status=1)[:self._ACTIVE_LIMIT]
+		pending_scans = scans.filter(scan_status=-1)[:self._ACTIVE_LIMIT]
 
 		# subtasks
-		recently_completed_tasks = (
-			SubScan.objects
-			.filter(scan_history__domain__project__slug=slug)
-			.order_by('-start_scan_date')
-			.filter(Q(status=0) | Q(status=2) | Q(status=3))[:15]
-		)
-		current_tasks = (
-			SubScan.objects
-			.filter(scan_history__domain__project__slug=slug)
-			.order_by('-start_scan_date')
-			.filter(status=1)[:self._ACTIVE_LIMIT]
-		)
-		pending_tasks = (
-			SubScan.objects
-			.filter(scan_history__domain__project__slug=slug)
-			.order_by('-start_scan_date')
-			.filter(status=-1)[:self._ACTIVE_LIMIT]
-		)
+		recently_completed_tasks = tasks.filter(
+			Q(status=0) | Q(status=2) | Q(status=3))[:15]
+		current_tasks = tasks.filter(status=1)[:self._ACTIVE_LIMIT]
+		pending_tasks = tasks.filter(status=-1)[:self._ACTIVE_LIMIT]
+
 		response = {
 			'scans': {
 				'pending': ScanHistorySerializer(pending_scans, many=True).data,
