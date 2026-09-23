@@ -3,7 +3,7 @@
  * Clone r3ngine-mcp next to this repo (if needed) and run its Node setup script.
  *
  *   node scripts/install-mcp.mjs --url https://host --key r3n_mcp_… --yes
- *   node scripts/install-mcp.mjs --update -- --transport http --detach
+ *   node scripts/install-mcp.mjs --update
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -93,10 +93,14 @@ function usage() {
 Wrapper:
   --repo <url>   git remote (default ${DEFAULT_REPO})
   --dir <path>   checkout path (default ./r3ngine-mcp)
-  --update       git pull if the checkout already exists
+  --update       git pull the checkout (if present) and rebuild/restart the MCP server
 
 Setup options are forwarded to r3ngine-mcp/scripts/install.mjs
-  (e.g. --url --key --transport --yes --write-cursor --detach --stop --restart)
+  (e.g. --url --key --transport --yes --write-cursor --detach --stop --restart --update)
+
+Examples:
+  node scripts/install-mcp.mjs --url https://host --key r3n_mcp_… --yes --write-cursor
+  node scripts/install-mcp.mjs --update
 `);
 }
 
@@ -132,8 +136,13 @@ export function main(argv = process.argv.slice(2)) {
   }
   const dir = ensureCheckout(opts);
   const installer = path.join(dir, 'scripts', 'install.mjs');
+  const setupArgs = [...opts.rest];
+  // Wrapper --update pulls the checkout; forward --update so the sidecar rebuilds/restarts.
+  if (opts.update && !setupArgs.includes('--update')) {
+    setupArgs.unshift('--update');
+  }
   log(`Running ${installer}`);
-  run(nodeBin(), [installer, ...opts.rest], dir);
+  run(nodeBin(), [installer, ...setupArgs], dir);
   return 0;
 }
 

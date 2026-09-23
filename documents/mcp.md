@@ -52,10 +52,17 @@ node scripts/install-mcp.mjs --url https://<this-host> --key r3n_mcp_… --yes -
 
 Windows: `.\scripts\install-mcp.ps1 --url https://<this-host> --key r3n_mcp_… --yes`
 
+To pull the latest sidecar, rebuild, and restart a detached HTTP process (uses existing `.env`):
+
+```bash
+node scripts/install-mcp.mjs --update
+```
+
 From a checkout of r3ngine-mcp:
 
 ```bash
 npm run setup -- --url https://<this-host> --key r3n_mcp_… --yes
+npm run setup -- --update
 ```
 
 The setup script installs dependencies, builds `dist/`, writes `.env`, opens a throwaway MCP session against `/api/mcp/` to prove the key works, smoke-starts the process, and can merge Cursor / VS Code / Claude Desktop config.
