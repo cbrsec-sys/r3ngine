@@ -735,6 +735,7 @@ RETRYABLE_TASK_NAMES = frozenset({
     'post_crawl_osint',
     'http_crawl_bridge',
     'run_acunetix',
+    'acunetix_submit',
     # Tier 7 post-processing — dispatchable on its own since the upstream merge.
     'correlate_vulnerabilities',
     'calculate_risk_scores',

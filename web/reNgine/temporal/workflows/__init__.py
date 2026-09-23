@@ -3758,6 +3758,15 @@ class SingleTaskRetryWorkflow:
                 await workflow.execute_activity("RunGenericTaskActivity", args=[ctx, "run_apme", "Attack Path Modeling"], start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
             elif task_name == "run_acunetix":
                 await workflow.execute_activity("RunAcunetixActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            elif task_name == "acunetix_submit":
+                await workflow.execute_activity(
+                    "SubmitLiveSubdomainsToAcunetixActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=1),
+                    heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
             else:
                 raise ApplicationError(
                     f"Unrecognised task_name for retry: {task_name}",
