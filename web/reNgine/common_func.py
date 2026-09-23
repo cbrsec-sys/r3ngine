@@ -402,8 +402,12 @@ def collect_all_scan_urls(ctx, results_dir, ignore_files=True):
 	)
 
 	# --- Source 2: Spidering result files ---
+	# Skip unfiltered crawl dumps when scoped to a single subdomain — those files
+	# contain hosts from the whole scan and would break singular / subscan scope.
 	file_urls_before = len(all_urls)
-	if results_dir and os.path.isdir(results_dir):
+	subdomain_id = ctx.get('subdomain_id')
+	subdomain_name = (ctx.get('subdomain_name') or '').lower().rstrip('.')
+	if results_dir and os.path.isdir(results_dir) and not subdomain_id:
 		# fetch_url.txt is the primary consolidated file; urls_*.txt are per-tool outputs
 		candidates = [os.path.join(results_dir, 'fetch_url.txt')]
 		candidates += glob.glob(os.path.join(results_dir, 'urls_*.txt'))
@@ -415,6 +419,25 @@ def collect_all_scan_urls(ctx, results_dir, ignore_files=True):
 					for raw_line in fh:
 						url = raw_line.strip()
 						if url and is_valid_url(url):
+							all_urls.add(url)
+			except OSError as exc:
+				logger.warning(
+					'collect_all_scan_urls: cannot read %s: %s', filepath, exc
+				)
+	elif results_dir and os.path.isdir(results_dir) and subdomain_name:
+		candidates = [os.path.join(results_dir, 'fetch_url.txt')]
+		candidates += glob.glob(os.path.join(results_dir, 'urls_*.txt'))
+		for filepath in candidates:
+			if not os.path.isfile(filepath):
+				continue
+			try:
+				with open(filepath, 'r', errors='replace') as fh:
+					for raw_line in fh:
+						url = raw_line.strip()
+						if not url or not is_valid_url(url):
+							continue
+						host = (urlparse(url).hostname or '').lower().rstrip('.')
+						if host == subdomain_name or host.endswith('.' + subdomain_name):
 							all_urls.add(url)
 			except OSError as exc:
 				logger.warning(

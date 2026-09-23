@@ -21,6 +21,7 @@ from .views.followups import (
     ListCapabilitiesAPIView,
     EngineDetailAPIView,
     ToolRunAPIView,
+    ToolArgsAPIView,
     FollowupProposeAPIView,
     FollowupPlanDetailAPIView,
     FollowupUpdateAPIView,
@@ -437,6 +438,10 @@ urlpatterns = [
         'action/tool/run/',
         ToolRunAPIView.as_view(),
         name='tool_run'),
+    path(
+        'action/tool/<str:tool>/args/',
+        ToolArgsAPIView.as_view(),
+        name='tool_args'),
     path(
         'action/capabilities/',
         ListCapabilitiesAPIView.as_view(),

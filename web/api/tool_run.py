@@ -117,6 +117,7 @@ def start_pipeline_tool_run(
     scan_id: int,
     asset_id: Optional[int] = None,
     url: Optional[str] = None,
+    tool_args: Optional[dict] = None,
     user=None,
 ) -> dict[str, Any]:
     meta = get_pipeline_tool(tool)
@@ -143,19 +144,57 @@ def start_pipeline_tool_run(
         scan=scan,
     )
 
+    from reNgine.tool_args import ToolArgsError, merge_yaml_overlay, validate_tool_args
+    try:
+        validated = validate_tool_args(tool, tool_args)
+    except ToolArgsError as exc:
+        raise ToolRunError(str(exc), exc.status) from exc
+
+    yaml_cfg = merge_yaml_overlay(_load_yaml(scan), tool, validated.get('yaml_overlay') or {})
+    arg_keys = sorted((validated.get('sanitized') or {}).keys())
+
     retry_name = resolve_retry_task_name(tool)
+    from reNgine.task_plan import singular_activity_name
+    activity_name = singular_activity_name(retry_name)
     title = meta['title']
     now = timezone.now()
+    title_suffix = f' [{", ".join(arg_keys)}]' if arg_keys else ''
     activity = ScanActivity.objects.create(
         scan_of=scan,
-        name=retry_name,
-        title=f'{title} (singular)',
-        status=INITIATED_TASK,
+        name=activity_name,
+        title=f'{title} (singular){title_suffix}'[:500],
+        # RUNNING: workflow is started immediately below. For tools like
+        # nuclei_scan→vulnerability_scan the child activities track as
+        # single_tool_nuclei_scan and never claim this parent row, so leaving
+        # it INITIATED would look stuck for the whole run.
+        status=RUNNING_TASK,
         time=now,
         time_started=now,
         tier=None,
         target_host=subdomain_name or http_url or '',
     )
+
+    # Persist singular args so timeline retry can restore overlays / extras.
+    try:
+        import json
+        import os
+        meta_dir = scan.results_dir or ''
+        if meta_dir:
+            os.makedirs(meta_dir, exist_ok=True)
+            meta_path = os.path.join(meta_dir, f'singular_meta_{activity.id}.json')
+            with open(meta_path, 'w', encoding='utf-8') as fh:
+                json.dump({
+                    'tool': tool,
+                    'retry_task_name': retry_name,
+                    'sanitized': validated.get('sanitized') or {},
+                    'extra_cli_args': validated.get('extra_cli_args') or [],
+                    'yaml_overlay': validated.get('yaml_overlay') or {},
+                    'subdomain_id': subdomain.id if subdomain else None,
+                    'subdomain_name': subdomain_name,
+                    'http_url': http_url,
+                }, fh)
+    except Exception:
+        logger.exception('Failed to write singular_meta for activity %s', activity.id)
 
     original_scan_status = scan.scan_status
     scan.scan_status = RUNNING_TASK
@@ -170,7 +209,7 @@ def start_pipeline_tool_run(
         'engine_id': scan.scan_type_id,
         'domain_id': scan.domain_id,
         'results_dir': scan.results_dir,
-        'yaml_configuration': _load_yaml(scan),
+        'yaml_configuration': yaml_cfg,
         'tasks': [retry_name],
         'original_scan_status': original_scan_status if original_scan_status is not None else SUCCESS_TASK,
         'subdomain_id': subdomain.id if subdomain else None,
@@ -179,6 +218,9 @@ def start_pipeline_tool_run(
         'urls': [http_url] if http_url else [],
         'hosts': [subdomain_name] if subdomain_name else [],
         'singular_tool_run': True,
+        'singular_tool_args': validated.get('sanitized') or {},
+        'extra_cli_args': validated.get('extra_cli_args') or [],
+        'activity_id': activity.id,
         'initiated_by_user_id': getattr(user, 'id', None),
     }
 
@@ -203,10 +245,12 @@ def start_pipeline_tool_run(
         'activity_id': activity.id,
         'tool': tool,
         'retry_task_name': retry_name,
+        'activity_name': activity_name,
         'scan_id': scan.id,
         'asset_type': asset_type,
         'target_host': subdomain_name,
         'http_url': http_url,
+        'tool_args': validated.get('sanitized') or {},
     }
 
 

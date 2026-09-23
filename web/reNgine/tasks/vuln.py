@@ -338,6 +338,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	cmd = 'nuclei -j -hang-monitor -stats'
 	cmd += ' -config /root/.config/nuclei/config.yaml' if use_nuclei_conf else ''
 	cmd += f' -irr'
+	if ctx.get('singular_tool_run') and ctx.get('extra_cli_args'):
+		from reNgine.tool_args import append_extra_cli_args
+		cmd = append_extra_cli_args(cmd, ctx.get('extra_cli_args') or [])
 
 	# Apply OpSec stealth
 	proxy_obj = Proxy.objects.first()
@@ -731,6 +734,9 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' --user-agent {user_agent}' if user_agent else ''
 	cmd += f' --workers {threads}' if threads else ''
 	cmd += f' --format json'
+	if ctx.get('singular_tool_run') and ctx.get('extra_cli_args'):
+		from reNgine.tool_args import append_extra_cli_args
+		cmd = append_extra_cli_args(cmd, ctx.get('extra_cli_args') or [])
 
 	results = []
 	for line in stream_command(

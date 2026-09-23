@@ -16,6 +16,7 @@
   - MCP notes: list/get for any MCP key; create/update for pentester/sys-admin keys (`TodoNote`); delete remains UI-only.
   - MCP detail tools: companion `r3ngine_get_*_detail` for scan (status-bucketed tasks + finding rollups), target, vulnerability, subdomain, endpoint, exposure, and subscan. Thin `list_*` / `get_*` unchanged. Sidecar bumped to **v1.0.2**.
   - MCP agent upgrade (sidecar **v1.0.3**): capability catalog, singular tool run, follow-up batch plans (propose/edit/approve/abort/retry), `suggested_followups` on detail payloads; OSINT staging list/verify with `agent_verified` badges and UI Clear all / Add verified / Clear false positive; `r3ngine-osint` handoff sub-agent.
+  - Singular tool UI + installed-arg cache: Subdomains tab **Run single tool** modal; `GET /api/action/tool/<tool>/args/` (and MCP twin) returns host-local schemas from binary `--help` with versioned DB cache; `tool_args` on run/follow-up steps; `InstalledExternalTool` live sync (`is_present` / version) + refreshed `fixtures/external_tools.yaml`; `manage.py sync_installed_tools` / `refresh_tool_arg_schemas`.
   - ScanActivity claim/initialize now stamps `subscan` when a subscan reuses a parent-scan row so subscan detail can resolve tasks.
   - `r3ngine-mcp` TypeScript sidecar (stdio + Streamable HTTP). nginx `/mcp` proxies to the sidecar; the container has no database or scan-result volumes.
   - HTTP sidecar rate-limits unauthorized clients (10 failures/IP/minute, `429 Retry-After`) before contacting r3ngine; invalid keys are remembered so Django is not re-probed.

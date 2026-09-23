@@ -12,6 +12,7 @@ from api.views.followups import (
     FollowupRetryAPIView,
     FollowupUpdateAPIView,
     ListCapabilitiesAPIView,
+    ToolArgsAPIView,
     ToolRunAPIView,
 )
 from mcp.views.base import McpDataView
@@ -26,6 +27,11 @@ class McpListCapabilitiesView(McpDataView):
 class McpGetEngineDetailView(McpDataView):
     def get(self, request, pk):
         return EngineDetailAPIView().get(request, pk)
+
+
+class McpGetToolArgsView(McpDataView):
+    def get(self, request, tool):
+        return ToolArgsAPIView().get(request, tool)
 
 
 class McpRunToolView(McpScanDispatchView):

@@ -84,6 +84,19 @@ def _normalize_step(raw: dict, index: int) -> dict:
             raise FollowupError(f'step[{index}]: asset_id or url required')
         if not step['scan_history_id'] and step['tool_kind'] == 'pipeline':
             raise FollowupError(f'step[{index}]: scan_history_id required for pipeline tools')
+        raw_args = raw.get('tool_args')
+        if raw_args is not None:
+            if not isinstance(raw_args, dict):
+                raise FollowupError(f'step[{index}]: tool_args must be an object')
+            if step['tool_kind'] == 'pipeline':
+                from reNgine.tool_args import ToolArgsError, validate_tool_args
+                try:
+                    validated = validate_tool_args(tool, raw_args)
+                except ToolArgsError as exc:
+                    raise FollowupError(f'step[{index}]: {exc}') from exc
+                step['tool_args'] = validated.get('sanitized') or {}
+            else:
+                step['tool_args'] = raw_args
 
     elif kind == 'start_subscan':
         subdomain_ids = raw.get('subdomain_ids') or []

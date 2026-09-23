@@ -39,6 +39,7 @@ PATH_TOOLS = (
     (re.compile(r'^/api/mcp/health/?$'), {'GET': 'r3ngine_get_system_health'}),
     (re.compile(r'^/api/mcp/tasks/retry/?$'), {'POST': 'r3ngine_retry_task'}),
     (re.compile(r'^/api/mcp/tools/run/?$'), {'POST': 'r3ngine_run_tool'}),
+    (re.compile(r'^/api/mcp/tools/[^/]+/args/?$'), {'GET': 'r3ngine_get_tool_args'}),
     (re.compile(r'^/api/mcp/followups/propose/?$'), {'POST': 'r3ngine_propose_followups'}),
     (re.compile(r'^/api/mcp/followups/metrics/?$'), {'GET': 'r3ngine_get_followup_metrics'}),
     (re.compile(r'^/api/mcp/followups/\d+/update/?$'), {'POST': 'r3ngine_update_followups'}),
