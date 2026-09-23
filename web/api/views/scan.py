@@ -810,13 +810,6 @@ class ScanTierRetryAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Same rule as the single-task view: a live scan owns its own rows.
-        if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
-            return Response(
-                {"status": False, "message": "Cannot retry a tier while the scan is running or paused"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         original_scan_status = scan.scan_status
 
         failed_rows = [
@@ -841,6 +834,9 @@ class ScanTierRetryAPIView(APIView):
             else:
                 retryable.append(activity)
 
+        # No-op before the running-scan guard so a second click while the first
+        # retry is already RUNNING returns no_op (nothing left FAILED) instead
+        # of a hard 400.
         if not retryable:
             return Response({
                 "status": True,
@@ -857,6 +853,13 @@ class ScanTierRetryAPIView(APIView):
                     f"No retryable failed tasks in tier {tier}; {len(skipped)} skipped"
                 ),
             })
+
+        # Same rule as the single-task view: a live scan owns its own rows.
+        if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
+            return Response(
+                {"status": False, "message": "Cannot retry a tier while the scan is running or paused"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         with transaction.atomic():
             # Reset the failed rows so the serializer counts them as pending and

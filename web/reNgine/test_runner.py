@@ -32,5 +32,14 @@ class RengineTestRunner(DiscoverRunner):
             # obvious if Django ever stops sharing them.
             settings.DATABASES[alias]['CONN_MAX_AGE'] = 0
             connections[alias].settings_dict['CONN_MAX_AGE'] = 0
+            # Production Postgres sets statement_timeout=5m. TransactionTestCase
+            # teardown TRUNCATE of a freshly migrated schema can exceed that on a
+            # busy host and cancel the flush mid-suite.
+            db_options = settings.DATABASES[alias].setdefault('OPTIONS', {})
+            existing = db_options.get('options', '')
+            if 'statement_timeout' not in existing:
+                extra = '-c statement_timeout=0'
+                db_options['options'] = f'{existing} {extra}'.strip()
+            connections[alias].settings_dict['OPTIONS'] = db_options
         connections.close_all()
         return super().setup_databases(**kwargs)

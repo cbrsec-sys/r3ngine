@@ -98,10 +98,16 @@ class TestHasGraphqlEndpointDbEvidence(TestCase):
     @patch('reNgine.common_func.requests.head')
     def test_dependency_file_does_not_count_as_evidence(self, mock_head):
         """Without the fix this returned True from the database, never probing."""
+        import requests as _requests
+
         self._endpoint(
             'https://host.example.test/node_modules/graphql/error/syntaxError.js'
         )
-        mock_head.side_effect = Exception('probe should decide, not the .js file')
+        # has_graphql_endpoint only swallows RequestException; a bare Exception
+        # would escape and look like a regression of the DB filter.
+        mock_head.side_effect = _requests.ConnectionError(
+            'probe should decide, not the .js file'
+        )
 
         self.assertFalse(
             has_graphql_endpoint(self.scan.id, 'https://host.example.test/')
