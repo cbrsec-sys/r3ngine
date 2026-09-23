@@ -597,7 +597,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # environments so their transitive dependencies cannot clash.
 #
 # Conflicts resolved by pipx isolation:
-#   dirsearch 0.4.3.post1 — requires requests>=2.27.0  (system: 2.25.1)
+#   dirsearch 0.5.x     — uses httpx; SOCKS needs socksio (see internal_tools.sh)
 #   maigret   0.6.1       — requires requests>=2.32.4, chardet>=5, idna>=3.4
 #   semgrep   1.165.0     — requires urllib3~=2.0       (system: 1.26.x)
 #
@@ -607,7 +607,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ---------------------------------------------------------------------------
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail && \
-    pip3 install --upgrade fierce dirsearch meson ninja arjun inql netlas holehe
+    pip3 install --upgrade fierce dirsearch socksio meson ninja arjun inql netlas holehe
 
 # emailfinder — email discovery from public sources (confirmed installable 2026-07-01)
 # LeakSearch is not on PyPI; no Dockerfile line added (binary unavailable, module degrades gracefully)

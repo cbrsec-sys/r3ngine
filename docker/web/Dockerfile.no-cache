@@ -434,7 +434,7 @@ RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_
 # environments so their transitive dependencies cannot clash.
 #
 # Conflicts resolved by pipx isolation:
-#   dirsearch 0.4.3.post1 — requires requests>=2.27.0  (system: 2.25.1)
+#   dirsearch 0.5.x     — uses httpx; SOCKS needs socksio (see internal_tools.sh)
 #   maigret   0.6.1       — requires requests>=2.32.4, chardet>=5, idna>=3.4
 #   semgrep   1.165.0     — requires urllib3~=2.0       (system: 1.26.x)
 #
@@ -443,7 +443,7 @@ RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_
 # container runtime without any additional PATH configuration.
 # ---------------------------------------------------------------------------
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail && \
-    pip3 install --no-cache-dir --upgrade fierce dirsearch meson ninja arjun inql netlas holehe
+    pip3 install --no-cache-dir --upgrade fierce dirsearch socksio meson ninja arjun inql netlas holehe
 
 # Ensure pipx is available and install baddns
 RUN python3 -m pip install --no-cache-dir pipx && \

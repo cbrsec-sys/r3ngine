@@ -207,8 +207,8 @@ class BackendOptimizationTest(TransactionTestCase):
         
         dirsearch_results = {
             "results": [
-                {"url": f"http://{self.domain_name}/admin", "status": 200, "content-length": 1234},
-                {"url": f"http://{self.domain_name}/new-page", "status": 200, "content-length": 888}
+                {"url": f"http://{self.domain_name}/admin", "status": 200, "contentLength": 1234},
+                {"url": f"http://{self.domain_name}/new-page", "status": 200, "contentLength": 888}
             ]
         }
         
@@ -221,6 +221,8 @@ class BackendOptimizationTest(TransactionTestCase):
         
         def run_side_effect(cmd, *args, **kwargs):
             if 'dirsearch' in cmd:
+                self.assertIn('--output-formats=json', cmd)
+                self.assertNotIn('--format=', cmd)
                 import re
                 match = re.search(r'-o\s+([^\s]+)', cmd)
                 if match:
