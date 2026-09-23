@@ -4,6 +4,12 @@
 
 #### Added
 
+- **Scan timeline failure UX (PR #113)**:
+  - `ScanActivity.target_host` so fan-out rows show which host a task ran against.
+  - `classify_failure()` maps exceptions to operator-facing categories with hints.
+  - Tier-level retry API and UI (`TimelineTierHeader`) when every failure in a tier looks environmental.
+  - Explicit Temporal `retry_policy` presets on every `execute_activity` (including Acunetix attempt caps).
+
 - **MCP Access**:
   - Dedicated `/api/mcp/` allowlist with hashed per-user API keys, sessions, and an append-only request/response audit chain.
   - Settings → MCP Access: transport (stdio / HTTP / both), named keys (secret shown once), connected agents, session revoke, audit drawer, inspect-only Replay overlay (stored request, agent, and response; never re-dispatches).
@@ -12,6 +18,7 @@
   - HTTP sidecar rate-limits unauthorized clients (10 failures/IP/minute, `429 Retry-After`) before contacting r3ngine; invalid keys are remembered so Django is not re-probed.
   - `scripts/install-mcp.mjs` clones `r3ngine-mcp` and runs its Node setup (`npm run setup` in that repo).
   - See `documents/mcp.md`.
+  - Compose: MCP sidecar is opt-in via `--profile mcp` so a missing sibling clone does not fail the default stack build; nginx resolves MCP/web upstreams per request.
 
 - **Mailbox verification (Reacher)**:
   - Replaced noisy `smtp-user-enum` VRFY spraying in built-in email security with Reacher `check-if-email-exists` mailbox verification (CLI default, optional self-hosted HTTP).
@@ -23,6 +30,14 @@
   - Replaces the `LLM_ENABLED` environment variable as the operator switch. Existing installs that already have an active provider are seeded on.
 
 #### Fixed
+
+- **Scan correctness and recovery (PR #113)**:
+  - Resume workflow ids count from the highest recorded run (no more `master-scan-<id>-run-0` collisions after manual resume).
+  - GraphQL endpoint detection requires the path to end at the graphql segment (no more `/node_modules/graphql/...` false positives).
+  - `inql` / `jwt_tool` / `graphql-cop` honor the processed-subdomain guard; `vigolium_discovery` is filed under Tier 2; Tier 5 analysis phases follow discovery evidence.
+  - Email security activity bound kept at **2 hours** (with matching budget constant) to stop restart loops on targets with many mail hosts.
+  - Hot-path DB indexes, scan_status N+1 fix, and timer-based tool-output persistence.
+  - Docker: log rotation, Redis memory policy, healthchecks, loopback port binds; nginx re-resolves web upstream after container recreate.
 
 - **AI Impact Assessment skip no longer fails the scan**:
   - When LLM was off, `generate_impact_assessment` skipped with `return False`, which Temporal treated as a hard failure, retried three times, and marked the whole scan failed.
