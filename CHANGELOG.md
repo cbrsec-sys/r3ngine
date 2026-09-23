@@ -4,6 +4,11 @@
 
 #### Added
 
+- **Stop in-progress subscans from history**:
+  - Per-row Stop on Sub Scan History, scan-detail Sub Scan History, and the Scan History drawer Tasks tab (INITIATED / RUNNING / PAUSED).
+  - Uses existing `/api/action/stop/scan/` with `subscan_ids` → Temporal `handle.cancel()` on each SubScan workflow id, then marks the row ABORTED.
+  - Redis `scan_stop_{scan_history_id}` kill switch is only armed when the parent master scan is not live, so stopping one subscan does not hard-kill tools still owned by `MasterScanWorkflow`.
+
 - **Scan timeline failure UX (PR #113)**:
   - `ScanActivity.target_host` so fan-out rows show which host a task ran against.
   - `classify_failure()` maps exceptions to operator-facing categories with hints.
@@ -42,6 +47,10 @@
   - Marketplace cards load each plugin icon from the public plugin repo (PNG then SVG) instead of a letter placeholder.
 
 #### Fixed
+
+- **Scan History drawer stop actions**:
+  - Tasks-tab Stop now posts `subscan_ids` (was a no-op); master-scan Stop posts `scan_ids` in the JSON body instead of an ignored `?scan_id=` query param.
+  - SubScan `bulk_stop` uses the same `abort_subscan` path as `/api/action/stop/scan/`.
 
 - **postleaksNg false-positive leaks**:
   - `run_postleaks` now retries failed runs, refuses to persist findings on non-zero exit, strips ANSI, and filters traceback / connection-error noise so tool failures are not stored as `SecretLeak` rows.
