@@ -126,8 +126,32 @@ def _normalize_step(raw: dict, index: int) -> dict:
     return step
 
 
+def _hostname_in_domain(hostname: str, domain_name: str) -> bool:
+    host = (hostname or '').lower().rstrip('.')
+    base = (domain_name or '').lower().rstrip('.')
+    if not host or not base:
+        return False
+    return host == base or host.endswith('.' + base)
+
+
+def _validate_url_against_domains(url: str, allowed_domain_names: set[str]) -> None:
+    from urllib.parse import urlparse
+
+    raw = (url or '').strip()
+    if not raw:
+        raise FollowupError('url is required for url/host asset steps')
+    parsed = urlparse(raw if '://' in raw else f'https://{raw}')
+    host = parsed.hostname or (raw if '://' not in raw else None)
+    if not host:
+        raise FollowupError(f'could not parse host from url: {url}')
+    if not any(_hostname_in_domain(host, name) for name in allowed_domain_names):
+        raise FollowupError(f'url host {host} is outside plan domain scope')
+
+
 def _validate_scope(steps: list[dict], project_slug: str, scan_id: Optional[int]) -> None:
     """Reject mixed out-of-scope assets across steps."""
+    from targetApp.models import Domain
+
     domain_ids = set()
     if scan_id:
         scan = ScanHistory.objects.select_related('domain').filter(pk=scan_id).first()
@@ -160,6 +184,19 @@ def _validate_scope(steps: list[dict], project_slug: str, scan_id: Optional[int]
                     if ep.target_domain.project.slug != project_slug:
                         raise FollowupError(f'endpoint {aid} outside project')
                     domain_ids.add(ep.target_domain_id)
+            if step.get('asset_type') in ('url', 'host') and step.get('url'):
+                if not domain_ids and not sid and not scan_id:
+                    raise FollowupError('url/host steps require scan_history_id or plan scan_id')
+                names = set(
+                    Domain.objects.filter(pk__in=domain_ids).values_list('name', flat=True)
+                )
+                if not names and sid:
+                    scan = ScanHistory.objects.select_related('domain').filter(pk=sid).first()
+                    if scan and scan.domain_id:
+                        names.add(scan.domain.name)
+                if not names:
+                    raise FollowupError('url/host steps require a scoped scan domain')
+                _validate_url_against_domains(step['url'], names)
         elif step['kind'] == 'start_subscan':
             for sid in step['subdomain_ids']:
                 sub = Subdomain.objects.select_related('target_domain__project').filter(pk=sid).first()
@@ -356,8 +393,14 @@ def abort_plan(plan: FollowupPlan, *, user=None) -> FollowupPlan:
 
 
 def _cancel_plan_workflows(plan: FollowupPlan) -> None:
+    """Cancel plan/step Temporal workflows only — never abort the parent ScanHistory.
+
+    Singular ``run_tool`` steps may temporarily flip a finished scan to RUNNING;
+    aborting the scan would mark a completed assessment ABORTED. Cancel the tool
+    workflows instead and restore SUCCESS when no master-scan activities remain.
+    """
+    from reNgine.definitions import SUCCESS_TASK
     from reNgine.temporal_client import TemporalClientProvider, run_and_close
-    from reNgine.utils.scan_cancellation import abort_scan_history
 
     async def _cancel_all():
         client = await TemporalClientProvider.get_client()
@@ -376,6 +419,14 @@ def _cancel_plan_workflows(plan: FollowupPlan) -> None:
                 await handle.cancel()
             except Exception:
                 logger.warning('Could not cancel step workflow %s', wid, exc_info=True)
+            for extra in step.get('workflow_ids') or []:
+                if not extra or extra == wid:
+                    continue
+                try:
+                    handle = client.get_workflow_handle(extra)
+                    await handle.cancel()
+                except Exception:
+                    logger.warning('Could not cancel step workflow %s', extra, exc_info=True)
 
     try:
         loop = asyncio.new_event_loop()
@@ -384,14 +435,23 @@ def _cancel_plan_workflows(plan: FollowupPlan) -> None:
     except Exception:
         logger.exception('Temporal cancel failed for plan %s', plan.id)
 
-    # Best-effort abort linked scan if singular tool flipped it to RUNNING
-    if plan.scan_id:
-        scan = ScanHistory.objects.filter(pk=plan.scan_id).first()
-        if scan and scan.scan_status == RUNNING_TASK:
-            try:
-                abort_scan_history(scan)
-            except Exception:
-                logger.exception('abort_scan_history failed for plan %s', plan.id)
+    if not plan.scan_id:
+        return
+    scan = ScanHistory.objects.filter(pk=plan.scan_id).first()
+    if not scan or scan.scan_status != RUNNING_TASK:
+        return
+    had_singular = any(s.get('kind') == 'run_tool' for s in (plan.steps or []))
+    if not had_singular:
+        return
+    # Leave a true master scan alone; only unwind singular-tool RUNNING flips.
+    live_master = ScanActivity.objects.filter(
+        scan_of_id=scan.id,
+        status=RUNNING_TASK,
+    ).exclude(title__endswith='(singular)').exists()
+    if live_master:
+        return
+    scan.scan_status = SUCCESS_TASK
+    scan.save(update_fields=['scan_status'])
 
 
 def retry_plan(

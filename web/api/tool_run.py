@@ -80,6 +80,8 @@ def _resolve_asset(
         if asset_type == ASSET_HOST and asset_id:
             subdomain = Subdomain.objects.filter(pk=asset_id).first()
             if subdomain:
+                if subdomain.target_domain_id and subdomain.target_domain_id != scan.domain_id:
+                    raise ToolRunError('Host/subdomain is outside this scan domain', 400)
                 subdomain_name = subdomain.name
                 http_url = subdomain.http_url or f'https://{subdomain.name}/'
             else:
@@ -90,6 +92,18 @@ def _resolve_asset(
             if url and '://' in url:
                 from urllib.parse import urlparse
                 subdomain_name = urlparse(url).hostname or url
+            elif url:
+                from urllib.parse import urlparse
+                subdomain_name = urlparse(f'https://{url}').hostname or url
+            # Free-form url/host must stay under the scan target domain.
+            domain_name = scan.domain.name if scan.domain_id else ''
+            host = (subdomain_name or '').lower().rstrip('.')
+            base = (domain_name or '').lower().rstrip('.')
+            if not base or not (host == base or host.endswith('.' + base)):
+                raise ToolRunError(
+                    f'url host {host or url} is outside scan domain {domain_name}',
+                    400,
+                )
     else:
         raise ToolRunError(f'Unsupported asset_type: {asset_type}')
 

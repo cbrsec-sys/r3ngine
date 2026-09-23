@@ -146,10 +146,38 @@ def followup_dispatch_step_activity(plan_id: int, step: dict) -> dict:
                 )
                 if not res.get('success'):
                     errors.append(res.get('error') or f'subscan failed for {sub_id}')
+                    # Cancel already-started siblings so a failed step does not leave orphans.
+                    if wf_ids:
+                        async def _cancel_started(ids=list(wf_ids)):
+                            client = await TemporalClientProvider.get_client()
+                            for wid in ids:
+                                if not wid:
+                                    continue
+                                try:
+                                    await client.get_workflow_handle(wid).cancel()
+                                except Exception:
+                                    logger.warning(
+                                        'Could not cancel orphan subscan workflow %s',
+                                        wid,
+                                        exc_info=True,
+                                    )
+
+                        try:
+                            loop = asyncio.new_event_loop()
+                            run_and_close(loop, _cancel_started())
+                        except Exception:
+                            logger.exception(
+                                'Failed cancelling orphan subscans for plan %s step %s',
+                                plan_id,
+                                step.get('id'),
+                            )
+                    return {
+                        'ok': False,
+                        'error': '; '.join(errors),
+                        'workflow_ids': wf_ids,
+                    }
                 else:
                     wf_ids.append(res.get('workflow_id'))
-            if errors:
-                return {'ok': False, 'error': '; '.join(errors)}
             return {
                 'ok': True,
                 'workflow_id': wf_ids[0] if wf_ids else None,

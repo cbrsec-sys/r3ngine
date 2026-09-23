@@ -102,6 +102,7 @@ class OsintStagingVerifyTests(TestCase):
     def test_mcp_verify_sets_flags(self):
         client = mcp_client_with_session(self.user)
         res = client.post('/api/mcp/osint-staging/verify/', {
+            'scan_id': self.scan.id,
             'updates': [
                 {'id': self.row_keep.id, 'agent_verified': True},
                 {'id': self.row_noise.id, 'agent_verified': False},
@@ -115,6 +116,46 @@ class OsintStagingVerifyTests(TestCase):
         self.assertIs(self.row_noise.agent_verified, False)
         self.assertIsNone(self.row_other.agent_verified)
         self.assertIsNotNone(self.row_keep.agent_verified_at)
+
+    def test_mcp_verify_requires_scan_id_and_scopes_rows(self):
+        other_domain = Domain.objects.create(
+            name='other-osint.example.com', project=self.project, insert_date=timezone.now(),
+        )
+        other_scan = ScanHistory.objects.create(
+            domain=other_domain,
+            scan_type=self.engine,
+            scan_status=SUCCESS_TASK,
+            start_scan_date=timezone.now(),
+            tasks=['osint'],
+        )
+        other_row = OsintStaging.objects.create(
+            scan_history=other_scan,
+            target_domain=other_domain,
+            osint_type='Employee',
+            content='Other Scan Person',
+            source='theHarvester',
+            confidence=70,
+            status='pending',
+        )
+        client = mcp_client_with_session(self.user)
+        missing = client.post('/api/mcp/osint-staging/verify/', {
+            'updates': [{'id': self.row_keep.id, 'agent_verified': True}],
+        }, format='json')
+        self.assertEqual(missing.status_code, 400, missing.content)
+
+        res = client.post('/api/mcp/osint-staging/verify/', {
+            'scan_id': self.scan.id,
+            'updates': [
+                {'id': self.row_keep.id, 'agent_verified': True},
+                {'id': other_row.id, 'agent_verified': True},
+            ],
+        }, format='json')
+        self.assertEqual(res.status_code, 200, res.content)
+        body = res.json()
+        self.assertEqual(body['updated_count'], 1)
+        self.assertEqual(body['updated'][0]['id'], self.row_keep.id)
+        other_row.refresh_from_db()
+        self.assertIsNone(other_row.agent_verified)
 
     def test_clear_all_pending(self):
         client = APIClient()

@@ -158,6 +158,67 @@ class FollowupPlanServiceTests(TestCase):
         self.assertEqual(plan.status, FollowupPlan.STATUS_RUNNING)
         self.assertEqual(plan.retry_count, 1)
 
+    def test_url_step_must_match_scan_domain(self):
+        from mcp.followups import _validate_scope
+
+        with self.assertRaises(FollowupError):
+            _validate_scope(
+                [
+                    {
+                        'kind': 'run_tool',
+                        'tool': 'nuclei_scan',
+                        'asset_type': 'url',
+                        'url': 'https://evil.example.net/admin',
+                        'scan_history_id': self.scan.id,
+                    }
+                ],
+                'fu-project',
+                self.scan.id,
+            )
+        # In-scope host is accepted
+        _validate_scope(
+            [
+                {
+                    'kind': 'run_tool',
+                    'tool': 'nuclei_scan',
+                    'asset_type': 'url',
+                    'url': 'https://api.fu.example.com/v1',
+                    'scan_history_id': self.scan.id,
+                }
+            ],
+            'fu-project',
+            self.scan.id,
+        )
+
+    @patch('reNgine.temporal_client.run_and_close')
+    @patch('reNgine.utils.scan_cancellation.abort_scan_history')
+    def test_abort_does_not_abort_parent_scan(self, mock_abort_scan, mock_run):
+        from reNgine.definitions import RUNNING_TASK
+        from mcp.followups import _cancel_plan_workflows
+
+        mock_run.side_effect = lambda loop, coro: None
+        self.scan.scan_status = RUNNING_TASK
+        self.scan.save(update_fields=['scan_status'])
+        plan = FollowupPlan.objects.create(
+            project_slug='fu-project',
+            scan_id=self.scan.id,
+            status=FollowupPlan.STATUS_RUNNING,
+            steps=[
+                {
+                    'id': 's1',
+                    'kind': 'run_tool',
+                    'status': 'running',
+                    'workflow_id': 'tool-wf-1',
+                }
+            ],
+            temporal_workflow_ids=['followup-plan-1'],
+            created_by=self.user,
+        )
+        _cancel_plan_workflows(plan)
+        mock_abort_scan.assert_not_called()
+        self.scan.refresh_from_db()
+        self.assertEqual(self.scan.scan_status, SUCCESS_TASK)
+
 
 class McpCapabilitiesApiTests(TestCase):
     def setUp(self):
