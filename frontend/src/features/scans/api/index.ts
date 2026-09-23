@@ -685,6 +685,70 @@ export const useBulkPromoteOsint = () => {
   });
 };
 
+const osintCsrfHeaders = () => ({
+  'Content-Type': 'application/json',
+  'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+});
+
+export const useClearAllOsintStaging = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (scanId: number) => {
+      const response = await fetch('/api/osintStaging/clear_all/', {
+        method: 'POST',
+        headers: osintCsrfHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ scan_id: scanId }),
+      });
+      if (!response.ok) throw new Error('Clear all failed');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+    },
+  });
+};
+
+export const useAddVerifiedOsintStaging = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (scanId: number) => {
+      const response = await fetch('/api/osintStaging/add_verified/', {
+        method: 'POST',
+        headers: osintCsrfHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ scan_id: scanId }),
+      });
+      if (!response.ok) throw new Error('Add verified failed');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+  });
+};
+
+export const useClearFalsePositiveOsintStaging = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (scanId: number) => {
+      const response = await fetch('/api/osintStaging/clear_false_positives/', {
+        method: 'POST',
+        headers: osintCsrfHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ scan_id: scanId }),
+      });
+      if (!response.ok) throw new Error('Clear false positives failed');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+    },
+  });
+};
+
 export const usePromoteOsint = (id: number) => {
   const queryClient = useQueryClient();
   return useMutation({

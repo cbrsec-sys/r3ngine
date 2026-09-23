@@ -627,12 +627,6 @@ class ScanActivityRetryAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if activity_obj.subscan_id is not None:
-            return Response(
-                {"status": False, "message": "Retrying subscan tasks is not yet supported"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         scan = activity_obj.scan_of
 
         if scan is None:
@@ -650,6 +644,8 @@ class ScanActivityRetryAPIView(APIView):
 
         # Single-task retry accepts FAILED and ABORTED. Tier retry stays
         # FAILED-only so a stop/cancel does not offer "Retry Tier".
+        # Subscan-linked activities are retryable with the same rules (parity
+        # with parent-scan rows); subdomain context is stamped into ctx below.
         if scan.scan_status != SUCCESS_TASK and activity_obj.status not in (
             FAILED_TASK, ABORTED_TASK,
         ):
@@ -694,6 +690,19 @@ class ScanActivityRetryAPIView(APIView):
             "tasks": [activity_obj.name],
             "original_scan_status": original_scan_status,
         }
+        if activity_obj.subscan_id is not None:
+            subscan = activity_obj.subscan
+            ctx["subscan_id"] = activity_obj.subscan_id
+            if subscan and subscan.subdomain_id:
+                ctx["subdomain_id"] = subscan.subdomain_id
+                ctx["subdomain_name"] = subscan.subdomain.name
+                ctx["subdomain_http_url"] = (
+                    subscan.subdomain.http_url
+                    or f"https://{subscan.subdomain.name}/"
+                )
+                ctx["hosts"] = [subscan.subdomain.name]
+                ctx["urls"] = [ctx["subdomain_http_url"]]
+                ctx["target_host"] = subscan.subdomain.name
         workflow_id = (
             f"retry-{activity_obj.name}-{scan.id}-{int(timezone.now().timestamp())}"
         )
@@ -741,6 +750,7 @@ RETRYABLE_TASK_NAMES = frozenset({
     'secret_scanning',
     'vigolium_analysis',
     'vulnerability_scan',
+    'dalfox_xss_scan',
     'waf_bypass',
     'post_crawl_osint',
     'http_crawl_bridge',

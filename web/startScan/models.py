@@ -1541,6 +1541,16 @@ class OsintStaging(models.Model):
 		('ignored', 'Ignored'),
 	), default='pending')
 	discovered_date = models.DateTimeField(auto_now_add=True)
+	# Agent triage: None = not reviewed, True = keep, False = false positive / noise
+	agent_verified = models.BooleanField(null=True, blank=True, default=None)
+	agent_verified_at = models.DateTimeField(null=True, blank=True)
+	agent_verified_by = models.ForeignKey(
+		User,
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name='osint_staging_verifications',
+	)
 
 	class Meta:
 		verbose_name_plural = "OSINT Staging"

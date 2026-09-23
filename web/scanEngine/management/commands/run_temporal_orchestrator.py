@@ -70,6 +70,7 @@ from reNgine.temporal_workflows import (
     HackerOneSyncBookmarkedWorkflow,
     ProxyFetchWorkflow,
     SingleTaskRetryWorkflow,
+    FollowupPlanWorkflow,
     # Phase 2 — rengine-ng standalone workflows
     UserHuntWorkflow,
     URLBypassWorkflow,
@@ -113,6 +114,14 @@ from reNgine.temporal.activities.evidence_activities import (
     collect_command_output_evidence_activity,
     enforce_evidence_retention_activity,
     verify_evidence_integrity_activity,
+)
+from reNgine.temporal.activities.followups import (
+    followup_load_plan_activity,
+    followup_update_step_activity,
+    followup_finalize_plan_activity,
+    followup_check_abort_activity,
+    followup_dispatch_step_activity,
+    followup_wait_workflow_activity,
 )
 
 # Activities (all Python-side activities are registered here)
@@ -665,6 +674,12 @@ class Command(BaseCommand):
                 collect_http_evidence_activity,
                 collect_command_output_evidence_activity,
                 enforce_evidence_retention_activity,
+                followup_load_plan_activity,
+                followup_update_step_activity,
+                followup_finalize_plan_activity,
+                followup_check_abort_activity,
+                followup_dispatch_step_activity,
+                followup_wait_workflow_activity,
                 verify_evidence_integrity_activity,
                 
                 # Plugin lifecycle
@@ -699,7 +714,7 @@ class Command(BaseCommand):
                                  URLVulnWorkflow, URLAuthExtractWorkflow, AssessmentWorkflow,
                                  DiscoveryWorkflow, EnumerationWorkflow, AnalysisWorkflow,
                                  ValidationWorkflow, ReportingWorkflow]
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow] + _p2_workflows + plugin_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow, FollowupPlanWorkflow] + _p2_workflows + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
                 logger.error(f"Failed to load dynamic plugin temporal exports: {e}")
@@ -710,7 +725,7 @@ class Command(BaseCommand):
                                  URLVulnWorkflow, URLAuthExtractWorkflow, AssessmentWorkflow,
                                  DiscoveryWorkflow, EnumerationWorkflow, AnalysisWorkflow,
                                  ValidationWorkflow, ReportingWorkflow]
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow] + _p2_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow, FollowupPlanWorkflow] + _p2_workflows
 
             # -------------------------------------------------------------------
             # Start the Temporal Worker
