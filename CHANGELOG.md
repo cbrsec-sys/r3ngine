@@ -40,6 +40,10 @@
 
 #### Fixed
 
+- **postleaksNg false-positive leaks**:
+  - `run_postleaks` now retries failed runs, refuses to persist findings on non-zero exit, strips ANSI, and filters traceback / connection-error noise so tool failures are not stored as `SecretLeak` rows.
+  - Scan summary scopes `secret_leaks` to the requested scan (not the whole target domain), so sibling-scan junk no longer appears on other scans' LEAKS tabs.
+
 - **Scan correctness and recovery (PR #113)**:
   - Resume workflow ids count from the highest recorded run (no more `master-scan-<id>-run-0` collisions after manual resume).
   - Auto-recovery now spends a `recovery_count` attempt instead of resetting the budget to 0 on every resume; manual UI resume still resets the budget.
