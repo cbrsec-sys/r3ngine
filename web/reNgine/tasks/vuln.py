@@ -243,8 +243,11 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		tech_tags = []
 		all_techs = set()
 		if self.scan:
-			# Get all technologies discovered for this scan
+			# Get technologies discovered for this scan — scope to subdomain on subscans.
 			subdomains = Subdomain.objects.filter(scan_history=self.scan)
+			_sub_id = ctx.get('subdomain_id') or getattr(self, 'subdomain_id', None)
+			if _sub_id:
+				subdomains = subdomains.filter(pk=_sub_id)
 			all_techs = set()
 			for sub in subdomains:
 				# assuming technologies is a many-to-many field with 'name' attribute
