@@ -1,6 +1,6 @@
 # Changelog
 
-### [v3.7.6] - 2026-09-19
+### [v3.7.6] - 2026-09-23
 
 #### Added
 
@@ -14,6 +14,8 @@
   - Dedicated `/api/mcp/` allowlist with hashed per-user API keys, sessions, and an append-only request/response audit chain.
   - Settings → MCP Access: transport (stdio / HTTP / both), named keys (secret shown once), connected agents, session revoke, audit drawer, inspect-only Replay overlay (stored request, agent, and response; never re-dispatches).
   - MCP notes: list/get for any MCP key; create/update for pentester/sys-admin keys (`TodoNote`); delete remains UI-only.
+  - MCP detail tools: companion `r3ngine_get_*_detail` for scan (status-bucketed tasks + finding rollups), target, vulnerability, subdomain, endpoint, exposure, and subscan. Thin `list_*` / `get_*` unchanged. Sidecar bumped to **v1.0.2**.
+  - ScanActivity claim/initialize now stamps `subscan` when a subscan reuses a parent-scan row so subscan detail can resolve tasks.
   - `r3ngine-mcp` TypeScript sidecar (stdio + Streamable HTTP). nginx `/mcp` proxies to the sidecar; the container has no database or scan-result volumes.
   - HTTP sidecar rate-limits unauthorized clients (10 failures/IP/minute, `429 Retry-After`) before contacting r3ngine; invalid keys are remembered so Django is not re-probed.
   - `scripts/install-mcp.mjs` clones `r3ngine-mcp` and runs its Node setup (`npm run setup` in that repo).
@@ -25,19 +27,54 @@
   - Confirmed addresses (`is_reachable=safe`) are stored on the scan; catch-all MX aborts enumeration. See `documents/email-verification.md`.
   - Scan detail timeline shows **Mailbox Verification** (`check_if_email_exists`) after port scan: pending at start, running while Reacher executes, then success/fail.
 
+- **Email security engine switch**:
+  - `email_security.enabled: false` in the scan engine config skips the email security activity and drops mailbox verification from the planned timeline. Absent config remains enabled so existing engines are unchanged.
+  - The skip is decided inside the activity (not the workflow) so in-flight scans keep Temporal replay safety.
+
 - **LLM master switch**:
   - Settings → AI Hub now has an **Enable LLM Features** toggle that controls impact assessment, GPT vulnerability reports, and other provider calls during scans.
   - Replaces the `LLM_ENABLED` environment variable as the operator switch. Existing installs that already have an active provider are seeded on.
+
+- **Plugin marketplace icons**:
+  - Marketplace cards load each plugin icon from the public plugin repo (PNG then SVG) instead of a letter placeholder.
 
 #### Fixed
 
 - **Scan correctness and recovery (PR #113)**:
   - Resume workflow ids count from the highest recorded run (no more `master-scan-<id>-run-0` collisions after manual resume).
+  - Auto-recovery now spends a `recovery_count` attempt instead of resetting the budget to 0 on every resume; manual UI resume still resets the budget.
   - GraphQL endpoint detection requires the path to end at the graphql segment (no more `/node_modules/graphql/...` false positives).
   - `inql` / `jwt_tool` / `graphql-cop` honor the processed-subdomain guard; `vigolium_discovery` is filed under Tier 2; Tier 5 analysis phases follow discovery evidence.
   - Email security activity bound kept at **2 hours** (with matching budget constant) to stop restart loops on targets with many mail hosts.
   - Hot-path DB indexes, scan_status N+1 fix, and timer-based tool-output persistence.
   - Docker: log rotation, Redis memory policy, healthchecks, loopback port binds; nginx re-resolves web upstream after container recreate.
+
+- **Tier retry, stop/abort, and timeline honesty**:
+  - Tier retry stays FAILED-only and is idempotent (`no_op` when no FAILED rows remain); ABORTED tiers show as not-run so stop/cancel no longer offers a no-op Retry Tier.
+  - Individual timeline retry accepts ABORTED rows on terminal scans; single-task and tier retry clear the Redis `scan_stop_{id}` kill-switch before resuming.
+  - Final status treats ABORTED like FAILED so retrying one aborted sibling cannot mark the whole scan SUCCESS while others stay cancelled.
+  - Stopped scans no longer stamp never-started later-tier rows as FAILED with “Activity task failed”; those tiers read DID NOT RUN instead.
+  - Scan history prefers currently RUNNING tiers over leftover FAILED higher-tier rows after crash recovery so progress is not misleading.
+  - Exploits tab lists vulnerabilities that have exploit URLs (matches scan-summary `exploitable_count`).
+
+- **Acunetix submit settings and retry**:
+  - `vulnerability_scan.acunetix` round-trips through engine YAML so live subdomain submission reaches the backend.
+  - `acunetix_submit` is retryable via tier/single-task retry workflows.
+
+- **Tool invocation correctness**:
+  - **dirsearch 0.5.0**: `--format` → `--output-formats`, camelCase JSON keys, and `socksio` so SOCKS proxies keep working.
+  - **wafw00f**: skip lines that are not `Name (Manufacturer)` entries and bound field lengths so a bad line cannot fail Tier 5 / the whole scan.
+  - **GQLSpection**: invoke as `gqlspection -u`, bake `click` into the image, treat a successful schema dump as the finding, and gate/dedupe like other GraphQL tools (it had never actually run).
+  - **grpcurl**: probe ports the port scan found (TLS vs plaintext by transport), skip hosts with nothing gRPC-shaped, cap probes per host, and give each probe a deadline — not plaintext `:443` from the URL alone.
+
+- **V3 Light / OpSec theme contrast**:
+  - Stop hardcoding white / translucent-white text on surfaces that are white in V3 Light (including the OpSec IDENTITY & TRAFFIC controls missed by the earlier pass).
+
+- **Post-deploy UI asset freshness**:
+  - nginx serves `/staticfiles/` with `Cache-Control: no-cache` so browsers revalidate unhashed Vite bundles after a deploy (theme and settings chunks no longer stick on stale cache).
+
+- **Web process database connection leak**:
+  - `CONN_MAX_AGE` is configurable via `DJANGO_CONN_MAX_AGE`; compose sets it to `0` for web (ASGI/uvicorn does not reuse connections) while the Temporal worker keeps persistent connections.
 
 - **AI Impact Assessment skip no longer fails the scan**:
   - When LLM was off, `generate_impact_assessment` skipped with `return False`, which Temporal treated as a hard failure, retried three times, and marked the whole scan failed.

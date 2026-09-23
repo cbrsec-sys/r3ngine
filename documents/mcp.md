@@ -78,4 +78,13 @@ Delete targets, vulns, users, or files. They cannot **delete** notes (create and
 
 Agents can queue allowed work including **subscans** (`r3ngine_start_subscan`) when the key’s role permits dispatch.
 
+## Detail tools
+
+`list_*` and thin `get_scan` / `get_target` stay lean for browsing. When an agent needs rollups, relations, or scan task status, use the companion detail tools:
+
+- `r3ngine_get_scan_detail` — finding counts, severity rollup, tasks grouped by status (initiated / running / success / failed / aborted)
+- `r3ngine_get_target_detail`, `r3ngine_get_vulnerability_detail`, `r3ngine_get_subdomain_detail`, `r3ngine_get_endpoint_detail`, `r3ngine_get_exposure_detail`, `r3ngine_get_subscan_detail` — primary record plus capped related lists
+
+Related lists are capped (20); scan activity buckets are capped (100 per status) with full counts in `task_summary`. Raw request/response, traceback, and `results_dir` stay omitted.
+
 See also the [r3ngine-mcp README](../r3ngine-mcp/README.md).
