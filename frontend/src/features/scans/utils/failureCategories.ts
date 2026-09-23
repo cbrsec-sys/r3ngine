@@ -48,12 +48,14 @@ export type TierStatus = 'FAILED' | 'NOT_RUN' | 'RUNNING' | 'PENDING' | 'COMPLET
 export interface TierSummary {
   status: TierStatus;
   total: number;
-  /** Rows that ran and failed. */
+  /** Rows that ran and failed (FAILED only — ABORTED is not tier-retryable). */
   failedCount: number;
   /**
-   * Rows marked failed without ever starting. When a scan stops, the finalizer
-   * flips every still-planned task to FAILED with the scan's own error message,
-   * so one real failure can leave a dozen tiers reporting failures of their own.
+   * Rows that did not complete as a real failure: finalizer-flipped FAILED
+   * without ever starting, or ABORTED on stop/cancel. When a scan stops, the
+   * finalizer flips every still-planned task to FAILED with the scan's own
+   * error message, so one real failure can leave a dozen tiers reporting
+   * failures of their own.
    */
   notRunCount: number;
   runningCount: number;
@@ -79,7 +81,10 @@ export const summariseTier = (activities: ScanActivity[]): TierSummary => {
   let transientFailures = 0;
 
   activities.forEach((activity) => {
-    if (activity.status === 'FAILED' || activity.status === 'ABORTED') {
+    // Retry Tier posts to ScanTierRetryAPIView, which only selects FAILED_TASK
+    // rows. ABORTED (operator stop / cancel) must not inflate failedCount or the
+    // header offers a retry that no-ops.
+    if (activity.status === 'FAILED') {
       if (neverStarted(activity)) {
         notRunCount += 1;
         return;
@@ -90,6 +95,11 @@ export const summariseTier = (activities: ScanActivity[]): TierSummary => {
         failureCategories.push(category);
       }
       if (isTransientFailureCategory(category)) transientFailures += 1;
+    } else if (activity.status === 'ABORTED') {
+      // Stopped mid-flight or cancelled before start — same operator message as
+      // never-started: the scan did not finish this work, but it is not retryable
+      // via the tier endpoint.
+      notRunCount += 1;
     } else if (activity.status === 'RUNNING') {
       runningCount += 1;
     } else if (activity.status === 'PENDING') {
@@ -101,8 +111,8 @@ export const summariseTier = (activities: ScanActivity[]): TierSummary => {
 
   // A single failed row makes the whole tier read as failed: that is the
   // question the operator opens the timeline with. A tier whose rows were only
-  // swept up by the finalizer reads as not run, so one real failure does not
-  // look like a dozen.
+  // swept up by the finalizer (or aborted on stop) reads as not run, so one
+  // real failure does not look like a dozen.
   const status: TierStatus = activities.length === 0
     ? 'EMPTY'
     : failedCount > 0
