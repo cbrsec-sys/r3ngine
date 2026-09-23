@@ -135,7 +135,7 @@ export const TimelineTierHeader: React.FC<TimelineTierHeaderProps> = ({
       )}
       {summary.status === 'NOT_RUN' && (
         <Typography sx={{ mt: 0.3, fontSize: '0.55rem', fontWeight: 700, color: 'text.disabled', wordBreak: 'break-word' }}>
-          {summary.notRunCount} task{summary.notRunCount === 1 ? '' : 's'} never started — the scan stopped before this tier
+          {summary.notRunCount} task{summary.notRunCount === 1 ? '' : 's'} did not finish — the scan stopped before this work completed
         </Typography>
       )}
     </Box>
