@@ -10,6 +10,8 @@ export interface VulnerabilityFilters {
   open_status?: string;
   source?: string;
   exclude_source?: string;
+  /** When true, only return vulns with a non-empty exploit_url. */
+  has_exploit?: boolean;
 }
 
 export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, targetId?: number, filters?: VulnerabilityFilters, pageSize = 10) => {
@@ -40,6 +42,9 @@ export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = 
         if (filters.open_status) url.searchParams.append('open_status', filters.open_status);
         if (filters.source) url.searchParams.append('source', filters.source);
         if (filters.exclude_source) url.searchParams.append('exclude_source', filters.exclude_source);
+        if (filters.has_exploit !== undefined) {
+          url.searchParams.append('has_exploit', filters.has_exploit ? 'true' : 'false');
+        }
       }
       
       url.searchParams.append('format', 'json');
