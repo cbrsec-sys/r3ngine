@@ -39,7 +39,7 @@ export const TodoSidebar: React.FC<TodoSidebarProps> = ({ activeFilter, setActiv
                 transition: 'all 0.3s ease'
               }}
             >
-              <ListItemIcon sx={{ minWidth: 40, color: activeFilter === item.id ? item.color : 'rgba(255,255,255,0.4)' }}>
+              <ListItemIcon sx={{ minWidth: 40, color: activeFilter === item.id ? item.color : 'text.secondary' }}>
                 <item.icon size={20} />
               </ListItemIcon>
               <ListItemText 
@@ -48,7 +48,7 @@ export const TodoSidebar: React.FC<TodoSidebarProps> = ({ activeFilter, setActiv
                     fontFamily: 'Orbitron', 
                     fontSize: '0.75rem', 
                     fontWeight: 800,
-                    color: activeFilter === item.id ? '#fff' : 'rgba(255,255,255,0.5)',
+                    color: activeFilter === item.id ? 'text.primary' : 'rgba(255,255,255,0.5)',
                     letterSpacing: 1
                   }}>
                     {item.label.toUpperCase()}

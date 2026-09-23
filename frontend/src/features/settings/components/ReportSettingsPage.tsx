@@ -431,7 +431,7 @@ export const ReportSettingsPage: React.FC = () => {
                       }}>
                         {item.tag}
                       </Typography>
-                      <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{item.desc}</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px' }}>{item.desc}</Typography>
                     </Box>
                   ))}
                 </Stack>
@@ -543,7 +543,7 @@ export const ReportSettingsPage: React.FC = () => {
                   placeholder="Footer text..."
                   value={form.footer_text}
                   onChange={(e) => setForm({ ...form, footer_text: e.target.value })}
-                  sx={{ mt: 1, '& .MuiOutlinedInput-root': { color: '#fff' } }}
+                  sx={{ mt: 1, '& .MuiOutlinedInput-root': { color: 'text.primary' } }}
                 />
               )}
             </Box>

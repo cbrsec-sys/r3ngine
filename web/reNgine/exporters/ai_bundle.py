@@ -619,6 +619,7 @@ class AiBundleBuilder:
             "status": activity.status,
             "status_label": self._status_label(activity.status),
             "tier": activity.tier,
+            "target_host": activity.target_host or "",
             "time_started": self._iso(activity.time_started),
             "time_ended": self._iso(activity.time_ended),
             "time": self._iso(activity.time),

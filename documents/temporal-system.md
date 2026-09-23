@@ -71,10 +71,20 @@ All workflows are defined in `web/reNgine/temporal_workflows.py`.
 
 ```python
 _RETRY_LONG_SCAN    # max 2 attempts, 1min initial, backoff 2x, max 10min
+_RETRY_SCANNER      # max 3 attempts, 2min initial, backoff 2x, max 10min
 _RETRY_NETWORK_SCAN # max 3 attempts, 30s initial, backoff 2x, max 5min
 _RETRY_INTERNAL     # max 5 attempts, 5s initial, backoff 1.5x, max 30s
 _RETRY_LLM          # max 3 attempts, 30s initial, backoff 2x, max 5min
 ```
+
+Every `execute_activity` call passes one of these explicitly. Temporal's implicit default is
+*unlimited* attempts with a 100s maximum interval, and scan tasks report failure by returning
+`False` (which `_run_task` raises), so an omitted policy retries a broken scanner forever —
+adding a `ScanActivity` row per attempt. Child workflows are the reverse: their default is a
+single attempt, so omitting the policy there is safe.
+
+The policy is captured by the server when the activity is scheduled, so redeploying a worker
+does not change the behaviour of an execution that is already retrying — cancel it instead.
 
 ### Workflow Registry
 

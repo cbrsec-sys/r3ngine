@@ -28,6 +28,85 @@ from startScan.models import *
 
 logger = get_module_logger(__name__)
 
+#: Ports where gRPC is plausibly served. Every probe costs a connect timeout, and
+#: gRPC has no convention of living on arbitrary ports, so the rest of what the
+#: port scan found is not worth the wait.
+_GRPC_CANDIDATE_PORTS = frozenset({443, 8443, 9443, 8080, 8081, 9090, 9091, 50051, 50052})
+
+#: Ports that speak TLS. grpcurl must not be told -plaintext for these.
+_GRPC_TLS_PORTS = frozenset({443, 8443, 9443})
+
+#: Service names that mark a port as worth probing, or as TLS, whatever its number.
+_GRPC_SERVICE_HINTS = ('grpc', 'http2', 'h2')
+_TLS_SERVICE_HINTS = ('https', 'ssl', 'tls')
+
+#: Upper bound on probes per host, so a host with many open ports cannot stall
+#: the task on connect timeouts alone.
+_GRPC_MAX_PORTS_PER_HOST = 5
+
+#: Seconds allowed for the connection itself.
+_GRPC_CONNECT_TIMEOUT = 3
+#: Seconds allowed for the whole call. Without it a host that completes the
+#: handshake and then ignores the reflection request holds grpcurl open with no
+#: deadline of any kind.
+_GRPC_MAX_TIME = 10
+#: Backstop at the subprocess level, in case grpcurl itself does not exit.
+#: run_command's default is 43200 seconds, which is no bound at this scale.
+_GRPC_COMMAND_TIMEOUT = 30
+
+
+def gqlspection_schema_dumped(return_code, output):
+	"""True when GQLSpection printed a schema.
+
+	The tool does not report whether introspection is enabled; it dumps the
+	schema *through* introspection, so a successful dump is itself the finding
+	and a failure means there was nothing to dump. The previous check looked for
+	the word "enabled" anywhere in the output, which appears only in the tool's
+	own help text.
+	"""
+	if return_code != 0:
+		return False
+	text = (output or '').strip()
+	if not text:
+		return False
+	return 'traceback' not in text.lower()
+
+
+def grpc_probe_targets(open_ports, url_port, url_is_https):
+	"""Decide which ports to try gRPC on for one host.
+
+	Args:
+		open_ports: (number, service_name) pairs the port scan found for the host.
+		url_port: the port carried by the host's URL, used only when the port scan
+			produced nothing — a scan without port_scan must not lose coverage.
+		url_is_https: whether that URL was https, which decides TLS for the fallback.
+
+	Returns:
+		list[tuple[int, bool]]: (port, use_tls) pairs, ordered and capped.
+	"""
+	def _is_tls(port, service):
+		lowered = (service or '').lower()
+		return port in _GRPC_TLS_PORTS or any(hint in lowered for hint in _TLS_SERVICE_HINTS)
+
+	candidates = {}
+	for number, service in open_ports:
+		lowered = (service or '').lower()
+		named = any(hint in lowered for hint in _GRPC_SERVICE_HINTS)
+		if number in _GRPC_CANDIDATE_PORTS or named:
+			candidates[number] = _is_tls(number, service)
+
+	if candidates:
+		ordered = sorted(candidates.items())[:_GRPC_MAX_PORTS_PER_HOST]
+		return ordered
+
+	if open_ports:
+		# The port scan ran and found nothing gRPC-shaped. Probing the web port
+		# anyway is what made every run report "Failed to dial" on 443.
+		return []
+
+	return [(url_port, url_is_https)]
+
+
 def fetch_url(self, urls=[], ctx={}, description=None):
 	"""Fetch URLs using different tools like gauplus, gau, gospider, waybackurls ...
 
@@ -565,6 +644,9 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	processed_paramspider_subdomains = set()
 	processed_arjun_subdomains = set()
 	processed_linkfinder_subdomains = set()
+	processed_inql_subdomains = set()
+	processed_jwt_subdomains = set()
+	processed_graphql_cop_subdomains = set()
 	# Gate-check caches: has_graphql_endpoint probes up to 6 network paths with a
 	# 5s timeout each, and has_jwt_tokens issues 2 DB queries — both return the
 	# same result for every URL sharing a subdomain.  Evaluate each gate once per
@@ -713,10 +795,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				logger.warning('[WEB_API] LinkFinder: output file missing for %s', subdomain_name)
 
 		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected).
+		# processed_inql_subdomains is the primary dedup guard so the tool runs at
+		# most once per subdomain regardless of how many URLs that subdomain has.
 		# _graphql_gate_cache[subdomain_name] is populated on first visit so that
 		# has_graphql_endpoint (which issues a DB iregex query + up to 6 network
 		# probes × 5 s each) is called at most once per subdomain, not per URL.
-		if 'inql' in uses_tools:
+		if 'inql' in uses_tools and subdomain_name not in processed_inql_subdomains:
+			processed_inql_subdomains.add(subdomain_name)
 			if subdomain_name not in _graphql_gate_cache:
 				logger.warning('[WEB_API] InQL: checking GraphQL gate for %s (first visit)', subdomain_name)
 				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
@@ -744,9 +829,12 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 					logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
 
 		# jwt_tool - JWT security testing (only when JWT tokens have been found).
+		# processed_jwt_subdomains is the primary dedup guard so the tool runs at
+		# most once per subdomain regardless of how many URLs that subdomain has.
 		# _jwt_gate_cache[subdomain_name] is populated on first visit so that
 		# has_jwt_tokens (2 DB queries per call) runs at most once per subdomain.
-		if JWT_TOOL in uses_tools:
+		if JWT_TOOL in uses_tools and subdomain_name not in processed_jwt_subdomains:
+			processed_jwt_subdomains.add(subdomain_name)
 			if subdomain_name not in _jwt_gate_cache:
 				logger.warning('[WEB_API] jwt_tool: checking JWT gate for %s (first visit)', subdomain_name)
 				_jwt_gate_cache[subdomain_name] = has_jwt_tokens(self.scan_id, subdomain=subdomain)
@@ -759,8 +847,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				logger.warning('[WEB_API] jwt_tool: no JWT tokens detected, skipping %s', subdomain_name)
 
 		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected).
+		# processed_graphql_cop_subdomains is the primary dedup guard so the tool runs
+		# at most once per subdomain regardless of how many URLs that subdomain has.
 		# Shares _graphql_gate_cache with InQL — no second round of probes needed.
-		if GRAPHQL_COP in uses_tools:
+		if GRAPHQL_COP in uses_tools and subdomain_name not in processed_graphql_cop_subdomains:
+			processed_graphql_cop_subdomains.add(subdomain_name)
 			if subdomain_name not in _graphql_gate_cache:
 				logger.warning('[WEB_API] graphql-cop: checking GraphQL gate for %s (first visit)', subdomain_name)
 				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
@@ -909,15 +1000,24 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				save_vulnerability(vuln_data, self.scan, self.domain)
 		logger.warning('[WEB_API] Sourcemapper: finished')
 
-	# GQLSpection
+	# GQLSpection — dumps a GraphQL schema through introspection. A successful
+	# dump is the finding; the tool has no "is introspection on?" mode.
 	if 'gqlspection' in uses_tools and urls:
 		from reNgine.tasks.parsers import parse_gqlspection_result
-		logger.warning('[WEB_API] GQLSpection: running on %d URLs', len(urls))
-		run_command("pipx inject gqlspection click", shell=True)
-		for url in urls:
-			cmd = f"GQLSpection -e {url}"
+		targets = [url for url in urls if is_graphql_endpoint_url(url)]
+		logger.warning(
+			'[WEB_API] GQLSpection: %d of %d URLs address a GraphQL endpoint',
+			len(targets), len(urls),
+		)
+		seen_hosts = set()
+		for url in targets:
+			hostname = urlparse(url).hostname
+			if not hostname or hostname in seen_hosts:
+				continue
+			seen_hosts.add(hostname)
+			cmd = f"gqlspection -u {url} -l all"
 			return_code, output = run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
-			if "Introspection is enabled" in output or "enabled" in output.lower():
+			if gqlspection_schema_dumped(return_code, output):
 				vuln_data = parse_gqlspection_result(url, output)
 				save_vulnerability(vuln_data, self.scan, self.domain)
 		logger.warning('[WEB_API] GQLSpection: finished')
@@ -927,33 +1027,69 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		from reNgine.tasks.parsers import parse_grpcurl_result
 		logger.warning('[WEB_API] grpcurl: evaluating %d URLs', len(urls))
 
-		target_map = {}
+		host_urls = {}
 		for url in urls:
 			parsed = urlparse(url)
 			if not parsed.hostname:
 				continue
-			port = parsed.port or (443 if parsed.scheme == 'https' else 80)
-			target = f"{parsed.hostname}:{port}"
-			if target not in target_map:
-				target_map[target] = url
+			if parsed.hostname not in host_urls:
+				host_urls[parsed.hostname] = (
+					url,
+					parsed.port or (443 if parsed.scheme == 'https' else 80),
+					parsed.scheme == 'https',
+				)
 
-		logger.warning('[WEB_API] grpcurl: probing %d unique target host(s)', len(target_map))
-		failed_targets = set()
+		# Ports the port scan actually found open, per host. Probing the web port
+		# the URL happens to carry is a guess; probing it with -plaintext when it
+		# is 443 is a guess that cannot come true whatever is listening there.
+		open_ports = {}
+		for name, number, service in Subdomain.objects.filter(
+			scan_history=self.scan, name__in=list(host_urls),
+		).values_list(
+			'name', 'ip_addresses__ports__number', 'ip_addresses__ports__service_name',
+		).distinct():
+			if number:
+				open_ports.setdefault(name, []).append((number, service))
 
-		for target, representative_url in target_map.items():
-			if target in failed_targets:
+		for hostname, (representative_url, url_port, url_is_https) in host_urls.items():
+			targets = grpc_probe_targets(
+				open_ports.get(hostname, []), url_port, url_is_https
+			)
+			if not targets:
+				logger.warning(
+					'[WEB_API] grpcurl: no plausible gRPC port for %s — skipping', hostname
+				)
 				continue
 
-			cmd = f"grpcurl -connect-timeout 3 -plaintext {target} list"
-			return_code, output = run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
+			for port, use_tls in targets:
+				transport = '-insecure' if use_tls else '-plaintext'
+				# -connect-timeout bounds the handshake only. A host that accepts
+				# the connection and then never answers the reflection request
+				# leaves grpcurl waiting forever — two such hosts spent four hours
+				# of a scan's Tier 3 budget, three times over. -max-time bounds the
+				# whole call, and run_command's own timeout backs it up in case the
+				# process ignores it.
+				cmd = (
+					f"grpcurl -connect-timeout {_GRPC_CONNECT_TIMEOUT} "
+					f"-max-time {_GRPC_MAX_TIME} {transport} {hostname}:{port} list"
+				)
+				return_code, output = run_command(
+					cmd, shell=True, cwd=results_dir,
+					scan_id=self.scan_id, activity_id=self.activity_id,
+					timeout=_GRPC_COMMAND_TIMEOUT,
+				)
 
-			if return_code == 0 and output.strip() and "Failed to dial" not in output:
-				vuln_data = parse_grpcurl_result(representative_url, output)
-				save_vulnerability(vuln_data, self.scan, self.domain)
-			else:
-				if "Failed to dial" in output or "context deadline exceeded" in output or return_code != 0:
-					logger.warning('[WEB_API] grpcurl: target %s dial/connection failed — skipping further attempts', target)
-					failed_targets.add(target)
+				if return_code == 0 and output.strip() and "Failed to dial" not in output:
+					vuln_data = parse_grpcurl_result(representative_url, output)
+					save_vulnerability(vuln_data, self.scan, self.domain)
+					break
+
+				if 'no such host' in output.lower():
+					logger.warning(
+						'[WEB_API] grpcurl: %s does not resolve — skipping its remaining ports',
+						hostname,
+					)
+					break
 
 		logger.warning('[WEB_API] grpcurl: finished')
 

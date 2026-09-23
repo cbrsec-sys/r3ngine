@@ -40,9 +40,12 @@ fi
 
 cd /usr/src/app
 
-# Collect static files (includes built frontend assets)
+# Collect static files (includes built frontend assets).
+# No --clear: it empties the static volume nginx is serving, so every restart
+# returned 404 for JS/CSS until collectstatic finished. Storage is plain
+# StaticFilesStorage (no hashed manifest), so overwriting in place is correct.
 echo "Collecting static files..."
-python3 manage.py collectstatic --noinput --clear
+python3 manage.py collectstatic --noinput
 
 # Only autogenerate migrations in development. In production this wrote
 # migration files that exist in the container but not in git, so the next

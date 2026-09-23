@@ -938,9 +938,37 @@ def retry_failed_tasks_temporal(scan, auto=False):
 #--------------------------#
 
 
+def _next_resume_workflow_id(scan) -> str:
+	"""Build the next `master-scan-<scan id>-run-<n>` workflow id for a resume.
+
+	`n` is one past the highest run number already recorded for this scan, so
+	every resume attempt — manual or automatic — gets a distinct workflow id and
+	never reuses the id of an earlier TemporalWorkflowExecution record.
+	"""
+	from startScan.models import TemporalWorkflowExecution
+
+	prefix = f"master-scan-{scan.id}-run-"
+	known_ids = list(scan.workflow_ids or [])
+	known_ids += list(
+		TemporalWorkflowExecution.objects
+		.filter(workflow_id__startswith=prefix)
+		.values_list('workflow_id', flat=True)
+	)
+
+	highest = -1
+	for workflow_id in known_ids:
+		if not workflow_id.startswith(prefix):
+			continue
+		suffix = workflow_id[len(prefix):]
+		if suffix.isdigit():
+			highest = max(highest, int(suffix))
+
+	return f"{prefix}{highest + 1}"
+
+
 def resume_scan_temporal(scan_id, auto=False):
 	"""Resume a scan from the last completed task.
-	
+
 	1. Identifies completed tasks by checking ScanActivity records.
 	2. Spawns MasterScanWorkflow with only the remaining pipeline tasks.
 
@@ -1034,8 +1062,8 @@ def resume_scan_temporal(scan_id, auto=False):
 		'resume_from_remaining': True,
 	}
 	
-	workflow_id = f"master-scan-{scan.id}-run-{scan.recovery_count}"
-	
+	workflow_id = _next_resume_workflow_id(scan)
+
 	# Append the new workflow ID to the scan
 	workflow_ids = scan.workflow_ids or []
 	workflow_ids.append(workflow_id)

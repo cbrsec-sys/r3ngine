@@ -22,6 +22,7 @@ Build a fast, accurate mental model without rescanning the whole repository.
 - `web/reNgine/tasks/`: task execution package — domain modules: `scan_init`, `subdomain`, `crawl`, `vuln`, `osint`, `port_scan`, `persistence`, `notifications`, `geo`, `llm`, `waf`, `screenshot`, `parsers`, `acunetix`, `proxies` (shim: `web/reNgine/tasks/__init__.py`)
 - `web/startScan/`: persistence
 - `web/apme/`: graph and attack-path logic
+- `docker/`: compose files and the multi-stage `web/Dockerfile` (the frontend bundle is built there, not in the running container) — drive them with the Makefile: `make up`, `make build-web`, `make restart-apps`, `make migrate`, `make logs`
 
 ## Working Heuristic
 Trace behavior as:
@@ -36,3 +37,5 @@ Trace behavior as:
 ## Validation
 - Prefer targeted checks over assuming the full stack can start.
 - Good defaults: `npx tsc -b`, `npm run lint`, targeted Django tests, and `python3 -m py_compile` for touched backend modules.
+- Run `tsc`/`npm` locally in `frontend/`, never inside `r3ngine-web-1` — `node_modules` there is masked by an anonymous volume.
+- Django tests need the container: `docker exec r3ngine-web-1 bash -c "cd /usr/src/app && python3 manage.py test <module> --keepdb --verbosity=2"`.

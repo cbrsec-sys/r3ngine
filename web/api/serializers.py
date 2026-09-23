@@ -1,6 +1,6 @@
 from dashboard.models import *
 from django.contrib.humanize.templatetags.humanize import (naturalday, naturaltime)
-from django.db.models import F, JSONField, Value, Q
+from django.db.models import F, JSONField, Value
 from django.forms.models import model_to_dict
 from recon_note.models import *
 from reNgine.common_func import *
@@ -436,10 +436,15 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 		depth = 1
 
 	def get_is_spiderfoot_running(self, obj):
-		return obj.scanactivity_set.filter(
-			Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
-			status=RUNNING_TASK
-		).exists()
+		# Read from the related manager rather than filtering in SQL, so a
+		# prefetch_related('scanactivity_set') on the caller's queryset serves
+		# this, get_tier_info and the task counts from one shared fetch.
+		return any(
+			a.status == RUNNING_TASK
+			and (a.name == 'spiderfoot_scan'
+				 or 'spiderfoot' in (a.title or '').lower())
+			for a in obj.scanactivity_set.all()
+		)
 
 	def _get_cached_task_counts(self, obj):
 		cache_attr = f'_task_counts_{obj.pk}'
@@ -456,6 +461,43 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 
 	def get_total_task_count(self, obj):
 		return self._get_cached_task_counts(obj)[2]
+
+	@staticmethod
+	def _latest_activities_by_name(acts):
+		"""Collapse retry/resume duplicates to the latest row per task name.
+
+		Later timestamps always win. Equal/missing timestamps prefer RUNNING
+		over a non-running peer so a live attempt is not masked by a same-time
+		FAILED placeholder — but an older RUNNING never overrides a newer
+		terminal row.
+		"""
+		latest = {}
+		for activity in acts:
+			prev = latest.get(activity.name)
+			if prev is None:
+				latest[activity.name] = activity
+				continue
+			prev_time = prev.time or prev.time_started
+			curr_time = activity.time or activity.time_started
+			if curr_time and prev_time:
+				if curr_time > prev_time:
+					latest[activity.name] = activity
+				elif (
+					curr_time == prev_time
+					and activity.status == RUNNING_TASK
+					and prev.status != RUNNING_TASK
+				):
+					latest[activity.name] = activity
+			elif curr_time and not prev_time:
+				latest[activity.name] = activity
+			elif (
+				not curr_time
+				and not prev_time
+				and activity.status == RUNNING_TASK
+				and prev.status != RUNNING_TASK
+			):
+				latest[activity.name] = activity
+		return list(latest.values())
 
 	def get_tier_info(self, obj):
 		cache_attr = f'_tier_info_{obj.pk}'
@@ -475,23 +517,39 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			return info
 
 		total_tiers = max(a.tier for a in tiered_activities)
+		terminal = {SUCCESS_TASK, FAILED_TASK, ABORTED_TASK}
 
 		started_tiers = set()
 		completed_tiers = set()
-
+		running_tiers = set()
 		tier_activities = {}
+		effective_by_tier = {}
+
 		for a in tiered_activities:
 			tier_activities.setdefault(a.tier, []).append(a)
-			if a.status in [RUNNING_TASK, SUCCESS_TASK, FAILED_TASK]:
-				started_tiers.add(a.tier)
 
+		# Derive tier state from the latest row per task name so orphaned
+		# RUNNING duplicates from retries cannot pin current_tier.
 		for tier, acts in tier_activities.items():
-			if all(a.status in [SUCCESS_TASK, FAILED_TASK] for a in acts):
+			effective = self._latest_activities_by_name(acts)
+			effective_by_tier[tier] = effective
+			if not effective:
+				continue
+			if any(a.status == RUNNING_TASK for a in effective):
+				running_tiers.add(tier)
+				started_tiers.add(tier)
+			elif any(a.status in terminal for a in effective):
+				started_tiers.add(tier)
+			if all(a.status in terminal for a in effective):
 				completed_tiers.add(tier)
 
-		active_tier = 1
+		# Prefer tiers that are actually RUNNING. After crash recovery / resume,
+		# higher tiers can still have leftover FAILED+INITIATED rows while work
+		# has restarted on an earlier tier — max(uncompleted) would mis-report.
 		uncompleted_started = [t for t in started_tiers if t not in completed_tiers]
-		if uncompleted_started:
+		if running_tiers:
+			active_tier = max(running_tiers)
+		elif uncompleted_started:
 			active_tier = max(uncompleted_started)
 		elif completed_tiers:
 			active_tier = min(max(completed_tiers) + 1, total_tiers)
@@ -501,9 +559,9 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			active_tier = 0
 
 		current_tier_progress = 0
-		if active_tier in tier_activities:
-			acts = tier_activities[active_tier]
-			completed_acts = sum(1 for a in acts if a.status in [SUCCESS_TASK, FAILED_TASK])
+		if active_tier in effective_by_tier:
+			acts = effective_by_tier[active_tier]
+			completed_acts = sum(1 for a in acts if a.status in terminal)
 			current_tier_progress = round((completed_acts / len(acts)) * 100, 2)
 
 		info = {
@@ -523,19 +581,26 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	def get_current_tier_progress(self, obj):
 		return self.get_tier_info(obj)['current_tier_progress']
 
+	SEVERITY_NAMES = {
+		4: 'critical',
+		3: 'high',
+		2: 'medium',
+		1: 'low',
+		0: 'info',
+		-1: 'unknown',
+	}
+
 	def get_max_severity(self, scan_history):
+		if hasattr(scan_history, 'max_severity_ann'):
+			severity = scan_history.max_severity_ann
+			if severity is None:
+				return 'none'
+			return self.SEVERITY_NAMES.get(severity, 'unknown')
+
 		from startScan.models import Vulnerability
 		max_vuln = Vulnerability.objects.filter(scan_history=scan_history).order_by('-severity').first()
 		if max_vuln:
-			severity_map = {
-				4: 'critical',
-				3: 'high',
-				2: 'medium',
-				1: 'low',
-				0: 'info',
-				-1: 'unknown'
-			}
-			return severity_map.get(max_vuln.severity, 'unknown')
+			return self.SEVERITY_NAMES.get(max_vuln.severity, 'unknown')
 		return 'none'
 
 	def get_engine_name(self, scan_history):
@@ -543,17 +608,20 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			return scan_history.scan_type.engine_name
 		return 'Standard'
 
+	# The three counts below prefer an annotation supplied by the caller's
+	# queryset and fall back to the per-row query. Several views share this
+	# serializer without annotating, so the fallback is load-bearing.
 	def get_subdomain_count(self, scan_history):
-		if scan_history.get_subdomain_count:
-			return scan_history.get_subdomain_count()
+		count = getattr(scan_history, 'subdomain_count_ann', None)
+		return count if count is not None else scan_history.get_subdomain_count()
 
 	def get_endpoint_count(self, scan_history):
-		if scan_history.get_endpoint_count:
-			return scan_history.get_endpoint_count()
+		count = getattr(scan_history, 'endpoint_count_ann', None)
+		return count if count is not None else scan_history.get_endpoint_count()
 
 	def get_vulnerability_count(self, scan_history):
-		if scan_history.get_vulnerability_count:
-			return scan_history.get_vulnerability_count()
+		count = getattr(scan_history, 'vulnerability_count_ann', None)
+		return count if count is not None else scan_history.get_vulnerability_count()
 
 	def get_progress(self, scan_history):
 		return scan_history.get_progress()
@@ -568,7 +636,10 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 		return scan_history.get_completed_ago()
 
 	def get_organizations(self, scan_history):
-		return [org.name for org in scan_history.domain.get_organization()]
+		# Domain.get_organization() builds a fresh Organization queryset, which
+		# no prefetch can serve. The reverse accessor returns the same set and
+		# is satisfied by prefetch_related('domain__domains').
+		return [org.name for org in scan_history.domain.domains.all()]
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -1509,7 +1580,7 @@ class ScanActivitySerializer(serializers.ModelSerializer):
 		fields = [
 			'id', 'task_uid', 'title', 'name',
 			'time', 'time_started', 'time_ended',
-			'tier', 'status', 'error_message',
+			'tier', 'status', 'error_message', 'target_host',
 			'domain', 'completed_ago',
 		]
 

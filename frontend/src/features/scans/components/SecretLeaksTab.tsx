@@ -123,7 +123,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
       case 'verified': return '#00ff62';
       case 'unverified': return '#ff9f00';
       case 'false_positive': return '#ff003c';
-      default: return '#fff';
+      default: return tokens.text.primary;
     }
   };
 

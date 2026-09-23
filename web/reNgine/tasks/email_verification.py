@@ -25,10 +25,11 @@ SENTINEL_COUNT = 2
 HTTP_BODY_CAP = 64 * 1024
 # CLI run_command timeout is cfg timeout plus this pad (process teardown / overrun).
 CLI_TIMEOUT_PAD_SECONDS = 5
-# RunEmailSecurityActivity start_to_close is 90 minutes. When remaining time is
-# unknown, reserve SPF/DMARC/DKIM + swaks/certs. The activity passes elapsed
-# remaining_seconds so a long SMTP sweep cannot still run a 75-minute loop.
-ACTIVITY_START_TO_CLOSE_SECONDS = 90 * 60
+# RunEmailSecurityActivity start_to_close is 2 hours (MasterScanWorkflow and
+# SingleTaskRetry). When remaining time is unknown, reserve SPF/DMARC/DKIM +
+# swaks/certs. The activity passes elapsed remaining_seconds so a long SMTP
+# sweep cannot still run a full-budget loop after shared work.
+ACTIVITY_START_TO_CLOSE_SECONDS = 120 * 60
 SHARED_WORK_RESERVE_SECONDS = 15 * 60
 PERSIST_SLACK_SECONDS = 60
 ACTIVITY_BUDGET_SECONDS = ACTIVITY_START_TO_CLOSE_SECONDS - SHARED_WORK_RESERVE_SECONDS

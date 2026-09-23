@@ -164,7 +164,7 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
               </Typography>
             </Box>
           </Box>
-          <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>
+          <Typography sx={{ fontSize: '10px', color: 'text.disabled', fontFamily: 'monospace' }}>
             CLICK THUMBNAIL TO EXPAND
           </Typography>
         </Box>
@@ -209,14 +209,14 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
               <Camera size={40} color="rgba(255,255,255,0.1)" />
               <Typography sx={{
                 mt: 2,
-                color: 'rgba(255,255,255,0.2)',
+                color: 'text.secondary',
                 fontFamily: 'Orbitron',
                 fontSize: '0.75rem',
                 fontWeight: 700,
               }}>
                 NO SCREENSHOTS CAPTURED
               </Typography>
-              <Typography sx={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', mt: 1 }}>
+              <Typography sx={{ color: 'text.disabled', fontSize: '0.65rem', mt: 1 }}>
                 Playwright screenshot capture produced no results for this scan, or the task has not completed yet.
               </Typography>
             </Box>

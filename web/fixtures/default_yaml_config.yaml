@@ -115,6 +115,11 @@ vulnerability_scan: {
   'run_crlfuzz': false,
   'run_s3scanner': true,
   'run_acunetix': true,
+  'acunetix': {
+    'submit_live_subdomains': false,
+    'resubmit_after_days': 3,
+    'start_scan_on_submit': false,
+  },
   'run_wpscan': true,
   'run_wptaint_scan': true,
   'run_smugglex': true,

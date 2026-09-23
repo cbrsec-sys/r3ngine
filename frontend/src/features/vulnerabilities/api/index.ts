@@ -10,6 +10,8 @@ export interface VulnerabilityFilters {
   open_status?: string;
   source?: string;
   exclude_source?: string;
+  /** When true, only return vulns with a non-empty exploit_url. */
+  has_exploit?: boolean;
 }
 
 export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, targetId?: number, filters?: VulnerabilityFilters, pageSize = 10) => {
@@ -40,6 +42,9 @@ export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = 
         if (filters.open_status) url.searchParams.append('open_status', filters.open_status);
         if (filters.source) url.searchParams.append('source', filters.source);
         if (filters.exclude_source) url.searchParams.append('exclude_source', filters.exclude_source);
+        if (filters.has_exploit !== undefined) {
+          url.searchParams.append('has_exploit', filters.has_exploit ? 'true' : 'false');
+        }
       }
       
       url.searchParams.append('format', 'json');
@@ -182,6 +187,7 @@ export const useUpdateVulnerabilityValidationStatus = () => {
 };
 
 export const useGenerateImpact = (projectSlug: string) => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (vulnId: number) => {
       const response = await fetch(`/${projectSlug}/api/impact/vulnerability/${vulnId}/generate/`, {
@@ -195,6 +201,12 @@ export const useGenerateImpact = (projectSlug: string) => {
         throw new Error('Failed to trigger impact generation');
       }
       return response.json();
+    },
+    onSuccess: (_data, vulnId) => {
+      // Generation runs in a backend thread with no job status endpoint. Resetting the
+      // assessment query zeroes its success and error counters, which re-opens the
+      // bounded polling window in useImpactAssessment for this generation run.
+      queryClient.resetQueries({ queryKey: ['impact-assessment', projectSlug, vulnId] });
     }
   });
 };
@@ -235,6 +247,13 @@ export interface ImpactAssessmentResponse {
   is_ai_generated?: boolean;
 }
 
+const IMPACT_ASSESSMENT_POLL_MS = 5000;
+// 24 polls at 5s = a two-minute window, comfortably above a single LLM generation run.
+const IMPACT_ASSESSMENT_MAX_POLLS = 24;
+// A failing endpoint gets far fewer cycles: each one already includes the client's
+// `retry` attempts, and an outage will not resolve itself inside the polling window.
+const IMPACT_ASSESSMENT_MAX_FAILED_POLLS = 3;
+
 export const useImpactAssessment = (projectSlug: string, vulnId: number | null) => {
   return useQuery<ImpactAssessmentResponse>({
     queryKey: ['impact-assessment', projectSlug, vulnId],
@@ -249,8 +268,19 @@ export const useImpactAssessment = (projectSlug: string, vulnId: number | null) 
     },
     enabled: !!projectSlug && !!vulnId,
     refetchInterval: (query) => {
-      if (!query.state.data || query.state.data.status === false) return 5000;
-      return false;
+      // `status === false` means no assessment row exists yet. That is also the steady
+      // state for a vulnerability nobody asked to assess, so cap the polling window
+      // instead of polling forever. useGenerateImpact resets the query (and both
+      // counters) when a new generation run is started.
+      //
+      // The interval keeps firing on an errored query, and `dataUpdateCount` only moves
+      // on success, so the error path needs its own bound. `errorUpdateCount` advances
+      // once per failed fetch cycle (after retries); `fetchFailureCount` does not fit,
+      // as query-core zeroes it at the start of every fetch.
+      if (query.state.data?.status) return false;
+      if (query.state.errorUpdateCount >= IMPACT_ASSESSMENT_MAX_FAILED_POLLS) return false;
+      if (query.state.dataUpdateCount >= IMPACT_ASSESSMENT_MAX_POLLS) return false;
+      return IMPACT_ASSESSMENT_POLL_MS;
     }
   });
 };

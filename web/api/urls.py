@@ -15,6 +15,8 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
     throttle_classes = [AuthRateThrottle]
 
 from .views import *
+# Not re-exported by api.views (which lists its scan-view imports explicitly).
+from .views.scan import ScanTierRetryAPIView
 from .dashboard_views import DashboardAPIView, CWEInfoAPIView
 from .target_summary_views import TargetSummaryAPIView
 from .scan_summary_views import ScanSummaryAPIView, ScanAiExportAPIView
@@ -418,6 +420,10 @@ urlpatterns = [
         'action/retry/task/<int:pk>/',
         ScanActivityRetryAPIView.as_view(),
         name='retry_task'),
+    path(
+        'action/retry/tier/<int:scan_id>/<int:tier>/',
+        ScanTierRetryAPIView.as_view(),
+        name='retry_tier'),
     path(
         'action/initiate/scan/',
         InitiateScan.as_view(),

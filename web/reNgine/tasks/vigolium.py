@@ -20,6 +20,7 @@ from reNgine.definitions import (
     VIGOLIUM_AUDIT_TIMEOUT,
     VIGOLIUM_AUDIT_USE_AI,
     VIGOLIUM_CONCURRENCY,
+    VIGOLIUM_DISCOVERY,
     VIGOLIUM_HARVEST,
     VIGOLIUM_MODULES,
     VIGOLIUM_RATE_LIMIT,
@@ -171,6 +172,67 @@ def parse_vigolium_http_record(task_instance, record_data):
         is_default=False,
         http_status=record_data.get('status_code') or 0,
     )
+
+
+def _discovery_output_file(scan_results_dir: str) -> str:
+    """Return the JSONL path the earlier vigolium discovery pass writes for a scan."""
+    return f"{scan_results_dir}/vigolium/discovery/discovery.jsonl"
+
+
+def _discovery_produced_results(scan_results_dir: str) -> bool:
+    """Return True when the earlier vigolium discovery pass left usable output.
+
+    This is the evidence that the pass actually ran against this scan's targets —
+    not merely that it was enabled in the engine config. It is False when the pass
+    was disabled, crashed before writing, returned early because the scan had no
+    targets, or was blocked and wrote nothing, and in every one of those cases the
+    Tier 5 analysis has to run `discovery` itself or the scan loses that coverage.
+
+    `_has_records` is reused so the two places that judge a vigolium output file
+    agree: a file counts once it holds a finding, http_record or scan record.
+    A scan record with no http_record means discovery probed the same subdomain
+    roots and found nothing to add — repeating it in Tier 5 would find nothing
+    either, so that still counts as "it ran".
+
+    Args:
+        scan_results_dir: `ScanHistory.results_dir` for the current scan.
+
+    Returns:
+        bool: True if the discovery output file holds at least one record.
+    """
+    return _has_records(_discovery_output_file(scan_results_dir))
+
+
+def _analysis_phases(skip_spidering: bool, discovery_already_ran: bool) -> str:
+    """Build the --only phase list for the Tier 5 analysis pass.
+
+    Two phases are deliberately absent from it:
+
+    - `external-harvest` is skipped by vigolium itself in `--stateless` mode, which
+      every r3ngine invocation uses, because it needs a database session to ingest
+      passive sources. Asking for it only lengthened the flag.
+    - `discovery` is the same phase, over the same subdomain roots, that
+      `vigolium_discovery` ran earlier in the scan, and whose endpoints are already
+      in the database. It is dropped only when that earlier pass demonstrably
+      produced output for this scan (see `_discovery_produced_results`); a pass that
+      was disabled, failed or found no targets leaves it in the list, so no scan
+      loses that coverage.
+
+    Args:
+        skip_spidering: Engine config — run without the browser crawl.
+        discovery_already_ran: Whether the earlier vigolium discovery pass actually
+            ran and produced results for this scan.
+
+    Returns:
+        str: Comma-separated phase list for `--only`.
+    """
+    phases = []
+    if not skip_spidering:
+        phases.append('spidering')
+    if not discovery_already_ran:
+        phases.append('discovery')
+    phases += ['known-issue-scan', 'dynamic-assessment']
+    return ','.join(phases)
 
 
 def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_records=False, proxy=None):
@@ -484,11 +546,12 @@ def vigolium_harvest(self, ctx={}, description=None):
 
 
 def vigolium_discovery(self, ctx={}, description=None):
-    """Run vigolium active discovery at Tier 1.
+    """Run vigolium active discovery against all known targets.
 
-    Executes vigolium's discovery phase (active probing / crawling) against all
-    known targets. Runs in Tier 1 in parallel with subdomain enumeration so that
-    vigolium-discovered endpoints are available to http_crawl in Tier 2.
+    Executes vigolium's discovery phase (active probing / crawling). The workflow
+    schedules it in Tier 2 — after subdomain enumeration has finished, so it sees
+    every enumerated subdomain — concurrently with http_crawl and port_scan, and
+    `task_plan._TASK_TIER` labels it tier 2 to match.
 
     Falls back to the root domain if no subdomains have been enumerated yet,
     ensuring the task is never a no-op early in a full scan.
@@ -496,7 +559,7 @@ def vigolium_discovery(self, ctx={}, description=None):
     """
     logger.info("Starting Vigolium Discovery")
 
-    discovery_config = self.yaml_configuration.get('vigolium_discovery', {})
+    discovery_config = self.yaml_configuration.get(VIGOLIUM_DISCOVERY, {})
     vuln_vig = self.yaml_configuration.get(VULNERABILITY_SCAN, {}).get(VIGOLIUM, {})
     if not discovery_config.get(RUN_VIGOLIUM_DISCOVERY, True):
         logger.info("Vigolium discovery disabled in configuration. Skipping.")
@@ -529,7 +592,7 @@ def vigolium_discovery(self, ctx={}, description=None):
         for host in target_hosts:
             f.write(f"{host}\n")
 
-    output_file = f"{results_dir}/discovery.jsonl"
+    output_file = _discovery_output_file(self.scan.results_dir)
 
     cmd = (
         f"cat {targets_file} | vigolium scan"
@@ -593,7 +656,18 @@ def vigolium_analysis(self, ctx={}, description=None):
 
     output_file = f"{results_dir}/analysis.jsonl"
 
-    only_phases = "external-harvest,discovery,known-issue-scan,dynamic-assessment" if skip_spidering else "external-harvest,spidering,discovery,known-issue-scan,dynamic-assessment"
+    discovery_already_ran = _discovery_produced_results(self.scan.results_dir)
+    if not discovery_already_ran:
+        logger.info(
+            "Vigolium analysis: no usable output from the earlier discovery pass at %s — "
+            "running the discovery phase here.",
+            _discovery_output_file(self.scan.results_dir),
+        )
+
+    only_phases = _analysis_phases(
+        skip_spidering=skip_spidering,
+        discovery_already_ran=discovery_already_ran,
+    )
 
     cmd = (
         f"cat {targets_file} | vigolium scan"

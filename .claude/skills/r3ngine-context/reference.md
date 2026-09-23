@@ -29,7 +29,9 @@ Loaded on demand when detailed stack or module information is needed.
 - Django dev server (development), Gunicorn (production)
 - All `manage.py` commands must run inside the container (`r3ngine-web-1`)
 - Use `python3` (not `python`) inside the container
-- Frontend build: `npm run build` run **locally** in `frontend/` (NOT inside the container)
+- Frontend build: `npm run build` run **locally** in `frontend/` (NOT inside the container — `node_modules` there is masked by an anonymous volume)
+- Compose files live in `docker/`; drive them through the Makefile (`make up`, `make build-web`, `make restart-apps`, `make migrate`, `make logs`)
+- `web/` is mounted into the containers, so Python changes need only a restart; a frontend change needs `make build-web && make up`, because the bundle is compiled in the Dockerfile's `frontend-builder` stage
 
 ### Quality & Tooling
 - **flake8**: lint; **black**: format
@@ -54,6 +56,7 @@ Temporal Server
   - Shim: `temporal_activities.py` re-exports everything for backward compatibility
 - **Go executor** (`executor/main.go`): subprocess management for 30+ security tools
 - **Temporal UI**: `http://localhost:8080`
+- **Retry policies**: every `execute_activity` call passes an explicit `retry_policy` (`_RETRY_SCANNER`, `_RETRY_LONG_SCAN`, `_RETRY_NETWORK_SCAN`, `_RETRY_INTERNAL`, `_RETRY_LLM`, defined at the top of the workflows module). The Temporal default is unlimited attempts, and each retry adds a `ScanActivity` row, so an omitted policy floods the scan timeline. The policy is fixed when the activity is scheduled — redeploying does not change an execution already retrying.
 
 ## Key Modules
 
@@ -122,7 +125,7 @@ Temporal Server
 | `EndPoint` | HTTP endpoints (URL + method + parameters) |
 | `Vulnerability` | Findings with severity, status, correlation state |
 | `Parameter` | Extracted form/query parameters |
-| `ScanActivity` | Granular activity log per scan step |
+| `ScanActivity` | Granular activity log per scan step: `tier`, `status`, `target_host` (which host it ran against), `error_message`, `traceback`, `execution_id` |
 | `EngineType` | YAML-based scan configuration templates |
 | `TemporalWorkflowExecution` | FK from ScanHistory to running workflow ID |
 
