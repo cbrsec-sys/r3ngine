@@ -18,7 +18,7 @@
   - ScanActivity claim/initialize now stamps `subscan` when a subscan reuses a parent-scan row so subscan detail can resolve tasks.
   - `r3ngine-mcp` TypeScript sidecar (stdio + Streamable HTTP). nginx `/mcp` proxies to the sidecar; the container has no database or scan-result volumes.
   - HTTP sidecar rate-limits unauthorized clients (10 failures/IP/minute, `429 Retry-After`) before contacting r3ngine; invalid keys are remembered so Django is not re-probed.
-  - `scripts/install-mcp.mjs` clones `r3ngine-mcp` and runs its Node setup (`npm run setup` in that repo).
+  - `scripts/install-mcp.mjs` clones `r3ngine-mcp` and runs its Node setup (`npm run setup` in that repo). `--update` pulls the checkout, rebuilds the local sidecar, and when an MCP container already exists rebuilds the image (recreates it only if it was running). `--no-docker` skips the container step.
   - See `documents/mcp.md`.
   - Compose: MCP sidecar is opt-in via `--profile mcp` so a missing sibling clone does not fail the default stack build; nginx resolves MCP/web upstreams per request.
 

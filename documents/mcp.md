@@ -52,11 +52,16 @@ node scripts/install-mcp.mjs --url https://<this-host> --key r3n_mcp_… --yes -
 
 Windows: `.\scripts\install-mcp.ps1 --url https://<this-host> --key r3n_mcp_… --yes`
 
-To pull the latest sidecar, rebuild, and restart a detached HTTP process (uses existing `.env`):
+To pull the latest sidecar, rebuild the local process, and refresh the Docker MCP
+image/container when one already exists for this stack:
 
 ```bash
 node scripts/install-mcp.mjs --update
 ```
+
+Docker is skipped when no `r3ngine-mcp` container exists (stdio-only installs). Pass
+`--no-docker` to force a local-only update. A running container is rebuilt and
+recreated; a stopped one only gets a new image (left stopped).
 
 From a checkout of r3ngine-mcp:
 
