@@ -1383,9 +1383,10 @@ def create_proxy_list_activity(ctx: dict) -> str:
     scan_id = ctx.get('scan_history_id')
     logger.log_line("[TEMPORAL]", "START", f"task=create_proxy_list scan_id={scan_id}")
 
+    # Write the full pool (HTTP + SOCKS). Nuclei accepts socks5:// and http://
+    # entries in a -proxy list file. Stripping SOCKS previously left a single
+    # HTTP proxy on SOCKS-heavy pools and caused "all proxies are dead" timeouts.
     proxies = get_proxy_list()
-    # Socks proxies are routed through proxychains, not passed as per-tool --proxy flags.
-    proxies = [p for p in proxies if not p.startswith('socks')]
     if not proxies:
         logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=no_proxies")
         return None
@@ -1406,7 +1407,7 @@ def create_proxy_list_activity(ctx: dict) -> str:
         )
 
     activity.logger.info(f"[CreateProxyListActivity] scan_id={scan_id} wrote {len(proxies)} proxies to {file_path}")
-    logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=created")
+    logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=created count={len(proxies)}")
     return file_path
 
 @activity.defn(name="CheckTargetBlockingActivity")

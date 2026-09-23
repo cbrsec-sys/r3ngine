@@ -37,10 +37,14 @@ def _nuclei_line_is_proxy_dead(line) -> bool:
 def _refresh_nuclei_proxy_file(proxies_file_path: str) -> bool:
 	"""Rewrite the nuclei proxy file from the current pool.
 
+	Writes the full pool (HTTP + SOCKS). Nuclei accepts both schemes in a
+	-proxy list file; filtering SOCKS left SOCKS-heavy pools with one dead
+	HTTP entry and triggered "all proxies are dead" fatal exits.
+
 	Returns:
-		bool: True when the file was rewritten with at least one HTTP proxy.
+		bool: True when the file was rewritten with at least one proxy.
 	"""
-	proxies = [p for p in get_proxy_list() if not p.startswith('socks')]
+	proxies = get_proxy_list()
 	if not proxies:
 		return False
 	with open(proxies_file_path, 'w') as f:
@@ -50,6 +54,32 @@ def _refresh_nuclei_proxy_file(proxies_file_path: str) -> bool:
 	except OSError:
 		pass
 	return True
+
+
+def _resolve_scoped_http_targets(self, urls, ctx):
+	"""Resolve HTTP targets, preferring explicit urls then subdomain-scoped DB URLs.
+
+	Subscans must never fall back to the apex domain when a subdomain is in ctx.
+	"""
+	if urls:
+		return list(urls)
+	targets = get_http_urls(is_alive=False, ignore_files=True, ctx=ctx) or []
+	if targets:
+		return targets
+	subdomain = getattr(self, 'subdomain', None)
+	name = (
+		(getattr(subdomain, 'name', None) or '').strip()
+		or (ctx.get('subdomain_name') or '').strip()
+	)
+	http_url = (ctx.get('subdomain_http_url') or '').strip()
+	if http_url:
+		return [http_url]
+	if name:
+		return [f'https://{name}']
+	domain = getattr(self, 'domain', None)
+	if domain and getattr(domain, 'name', None):
+		return [f'https://{domain.name}']
+	return []
 
 
 # Merged second-order config — covers takeover, CDN, JS, parameter, and title detection.
@@ -1120,6 +1150,20 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	# But to be robust, we'll download files ourselves if the directory is empty
 	SENSITIVE_EXTENSIONS = ('.js', '.env', '.php', '.asp', '.aspx', '.jsp', '.jspx', '.txt', '.log', '.conf', '.config', '.bak', '.old', '.json', '.yaml', '.yml', '.html', '.htm')
 
+	# Subscan / singular runs must only pull URLs for the scoped host.
+	subdomain_id = ctx.get('subdomain_id')
+	subdomain_name = (ctx.get('subdomain_name') or '').lower().rstrip('.')
+	if not subdomain_name and getattr(self, 'subdomain', None):
+		subdomain_name = (self.subdomain.name or '').lower().rstrip('.')
+		if not subdomain_id:
+			subdomain_id = self.subdomain.id
+
+	def _url_in_subdomain_scope(url_str):
+		if not subdomain_name:
+			return True
+		host = (urlparse(url_str).hostname or '').lower().rstrip('.')
+		return host == subdomain_name or host.endswith('.' + subdomain_name)
+
 	# Load URLs from fetch_url output files and tool-specific files
 	urls_from_files = set()
 	if os.path.exists(results_dir):
@@ -1130,15 +1174,20 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 					with open(fpath, 'r', encoding='utf-8', errors='ignore') as f_in:
 						for line in f_in:
 							url_str = line.strip()
-							if url_str:
+							if url_str and _url_in_subdomain_scope(url_str):
 								urls_from_files.add(url_str)
 					logger.warning("[SEMGREP] Loaded %d URLs from file: %s", len(urls_from_files), fpath)
 				except Exception as e:
 					logger.error("[SEMGREP] Failed to read file %s: %s", fpath, e)
 
 	endpoints = EndPoint.objects.filter(scan_history_id=scan_id)
+	if subdomain_id:
+		endpoints = endpoints.filter(subdomain_id=subdomain_id)
 	endpoint_urls = set(e.http_url for e in endpoints if e.http_url)
-	logger.warning("[SEMGREP] Sources: %d endpoint URLs from DB, %d URLs from result files", len(endpoint_urls), len(urls_from_files))
+	logger.warning(
+		"[SEMGREP] Sources: %d endpoint URLs from DB, %d URLs from result files (subdomain_id=%s)",
+		len(endpoint_urls), len(urls_from_files), subdomain_id,
+	)
 	all_urls = endpoint_urls | urls_from_files
 	logger.warning("[SEMGREP] Total combined URLs before extension filter: %d", len(all_urls))
 
@@ -1497,7 +1546,10 @@ def second_order_scan(self, urls=[], ctx={}, description=None):
 	with open(config_path, 'w') as fh:
 		json.dump(_SECOND_ORDER_MERGED_CONFIG, fh)
 
-	targets = urls or ["https://%s" % self.domain.name]
+	targets = _resolve_scoped_http_targets(self, urls, ctx)
+	if not targets:
+		logger.warning('second_order: no scoped targets to scan, skipping.')
+		return
 	out_dir = "%s/second_order_out" % self.results_dir
 	os.makedirs(out_dir, exist_ok=True)
 

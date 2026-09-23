@@ -39,7 +39,10 @@ class TestNucleiProxyDeadHelpers(TestCase):
 
     def test_refresh_rewrites_proxy_file(self):
         Proxy.objects.all().delete()
-        Proxy.objects.create(use_proxy=True, proxies='127.0.0.1:8080\n127.0.0.1:8081')
+        Proxy.objects.create(
+            use_proxy=True,
+            proxies='127.0.0.1:8080\nsocks5://127.0.0.1:1080\n127.0.0.1:8081',
+        )
         fd, path = tempfile.mkstemp(suffix='.txt')
         os.write(fd, b'http://old.example:1\n')
         os.close(fd)
@@ -48,6 +51,7 @@ class TestNucleiProxyDeadHelpers(TestCase):
             with open(path) as f:
                 body = f.read()
             self.assertIn('http://127.0.0.1:8080', body)
+            self.assertIn('socks5://127.0.0.1:1080', body)
             self.assertIn('http://127.0.0.1:8081', body)
             self.assertNotIn('old.example', body)
         finally:
