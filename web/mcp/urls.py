@@ -26,6 +26,8 @@ from mcp.views.detail import (
     McpGetTargetDetailView,
     McpGetVulnerabilityDetailView,
 )
+from mcp.views.notes import McpNoteDetailView, McpNotesListCreateView
+from mcp.views.osint_verify import McpVerifyOsintStagingView
 from mcp.views.read import (
     McpAttackPathsView,
     McpDashboardView,
@@ -37,6 +39,7 @@ from mcp.views.read import (
     McpListEndpointsView,
     McpListEnginesView,
     McpListExposuresView,
+    McpListOsintStagingView,
     McpListProjectsView,
     McpListScansView,
     McpListSubdomainsView,
@@ -46,13 +49,26 @@ from mcp.views.read import (
     McpScanStatusView,
     McpSearchView,
 )
-from mcp.views.notes import McpNoteDetailView, McpNotesListCreateView
 from mcp.views.sessions import (
     McpAgentDeleteView,
     McpSessionEndView,
     McpSessionHeartbeatView,
     McpSessionListCreateView,
     McpSessionRevokeView,
+)
+from mcp.views.capabilities import (
+    McpAbortFollowupsView,
+    McpApproveFollowupsView,
+    McpFollowupMetricsView,
+    McpGetEngineDetailView,
+    McpGetFollowupPlanView,
+    McpListCapabilitiesView,
+    McpListFollowupsView,
+    McpProposeFollowupsView,
+    McpRetryFollowupsView,
+    McpRunToolView,
+    McpGetToolArgsView,
+    McpUpdateFollowupsView,
 )
 from mcp.views.settings import McpSettingsView
 
@@ -88,10 +104,14 @@ urlpatterns = [
     path('exposures/', McpListExposuresView.as_view()),
     path('emails/', McpListEmailsView.as_view()),
     path('employees/', McpListEmployeesView.as_view()),
+    path('osint-staging/verify/', McpVerifyOsintStagingView.as_view()),
+    path('osint-staging/', McpListOsintStagingView.as_view()),
     path('search/', McpSearchView.as_view()),
     path('dashboard/', McpDashboardView.as_view()),
     path('attack-paths/', McpAttackPathsView.as_view()),
+    path('engines/<int:pk>/', McpGetEngineDetailView.as_view()),
     path('engines/', McpListEnginesView.as_view()),
+    path('capabilities/', McpListCapabilitiesView.as_view()),
     path('health/', McpHealthView.as_view()),
     path('notes/', McpNotesListCreateView.as_view()),
     path('notes/<int:pk>/', McpNoteDetailView.as_view()),
@@ -101,6 +121,16 @@ urlpatterns = [
     path('scans/stop/', McpStopScanView.as_view()),
     path('subscans/start/', McpStartSubscanView.as_view()),
     path('tasks/retry/', McpRetryTaskView.as_view()),
+    path('tools/run/', McpRunToolView.as_view()),
+    path('tools/<str:tool>/args/', McpGetToolArgsView.as_view()),
+    path('followups/', McpListFollowupsView.as_view()),
+    path('followups/propose/', McpProposeFollowupsView.as_view()),
+    path('followups/metrics/', McpFollowupMetricsView.as_view()),
+    path('followups/<int:pk>/', McpGetFollowupPlanView.as_view()),
+    path('followups/<int:pk>/update/', McpUpdateFollowupsView.as_view()),
+    path('followups/<int:pk>/approve/', McpApproveFollowupsView.as_view()),
+    path('followups/<int:pk>/abort/', McpAbortFollowupsView.as_view()),
+    path('followups/<int:pk>/retry/', McpRetryFollowupsView.as_view()),
     path('email-discovery/start/', McpStartEmailDiscoveryView.as_view()),
     path('email-discovery/stop/', McpStopEmailDiscoveryView.as_view()),
     path('employee-intel/start/', McpStartEmployeeIntelView.as_view()),
