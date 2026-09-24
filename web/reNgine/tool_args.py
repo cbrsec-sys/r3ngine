@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from reNgine.tool_inventory import (
     _EXTRA_PATH_DIRS,
+    ensure_db_connection,
     probe_version,
     resolve_binary_path,
     sync_installed_tools,
@@ -67,6 +68,7 @@ _FLAG_DENYLIST = frozenset({
     'w', 'wordlist',  # path injection for fuzzers — use engine yaml
     'proxy-file',
     'system-resolvers',
+    'help', 'h',  # meta flags / cobra command index noise
 })
 
 # Long-form denylist (normalized without leading dashes)
@@ -77,6 +79,7 @@ _LONG_DENYLIST = frozenset({
     'store-response', 'store-resp-dir', 'env-vars', 'secret-file',
     'resume', 'templates', 'template-url', 'wordlist', 'proxy-file',
     'input', 'input-file',
+    'help',
 })
 
 _TARGETISH = frozenset({
@@ -266,9 +269,21 @@ def parse_help_text(help_text: str) -> list[dict[str, Any]]:
     return out
 
 
-def _run_help(binary_path: str) -> tuple[str, str]:
+def _run_help(binary_path: str, *, tool_name: str = '') -> tuple[str, str]:
+    """Local --help fallback when a plain filesystem path is available."""
+    from reNgine.tool_workers import help_subcommands_for
+
     env = {**os.environ, 'PATH': os.pathsep.join([*_EXTRA_PATH_DIRS, os.environ.get('PATH', '')])}
-    for args in ([binary_path, '--help'], [binary_path, '-h'], [binary_path, 'help']):
+    attempts: list[list[str]] = []
+    for sub in help_subcommands_for(tool_name or os.path.basename(binary_path)):
+        attempts.append([binary_path, sub, '--help'])
+        attempts.append([binary_path, sub, '-h'])
+    attempts.extend([
+        [binary_path, '--help'],
+        [binary_path, '-h'],
+        [binary_path, 'help'],
+    ])
+    for args in attempts:
         try:
             proc = subprocess.run(
                 args, capture_output=True, text=True, timeout=HELP_TIMEOUT_SEC,
@@ -276,10 +291,49 @@ def _run_help(binary_path: str) -> tuple[str, str]:
             )
             text = (proc.stdout or '') + '\n' + (proc.stderr or '')
             if text.strip():
-                return text, args[-1]
+                return text, ' '.join(args[1:])
         except Exception:
             continue
     return '', ''
+
+
+def _probe_help_text(
+    *,
+    primary: str,
+    encoded_or_local_path: Optional[str],
+) -> tuple[str, str, Optional[str]]:
+    """Fetch --help from go/python workers first; local path only as last resort.
+
+    Returns (help_text, flag_used, resolved_encoded_or_local_path).
+    """
+    from reNgine.tool_inventory import _candidate_binaries
+    from reNgine.tool_workers import decode_worker_path, run_help_on_workers
+
+    candidates = _candidate_binaries(primary)
+    help_text, flag, encoded = run_help_on_workers(
+        tool_name=primary,
+        candidates=candidates,
+        encoded_path=encoded_or_local_path,
+        timeout=HELP_TIMEOUT_SEC,
+    )
+    if help_text.strip():
+        return help_text, flag, encoded or encoded_or_local_path
+
+    role, path = decode_worker_path(encoded_or_local_path)
+    if not role and path and os.path.isfile(path):
+        text, used = _run_help(path, tool_name=primary)
+        return text, used, path
+    return '', '', encoded_or_local_path
+
+
+def _path_is_present(path: Optional[str]) -> bool:
+    if not path:
+        return False
+    from reNgine.tool_workers import decode_worker_path
+    role, remote = decode_worker_path(path)
+    if role and remote:
+        return True
+    return os.path.isfile(path)
 
 
 def _help_hash(text: str) -> str:
@@ -352,12 +406,13 @@ def get_or_refresh_schema(
     version = None
     if row and row.detected_version:
         version = row.detected_version
-    elif binary_path and os.path.isfile(binary_path):
+    elif binary_path and _path_is_present(binary_path):
         version, _ = probe_version(
             resolved_path=binary_path,
             version_lookup_command=row.version_lookup_command if row else None,
             version_match_regex=row.version_match_regex if row else None,
         )
+        ensure_db_connection()
 
     cache = ToolArgSchemaCache.objects.filter(
         pipeline_tool=pipeline_tool, binary_name=primary,
@@ -368,7 +423,11 @@ def get_or_refresh_schema(
         force
         or cache is None
         or (version_fp and cache.version_fingerprint and cache.version_fingerprint != version_fp)
-        or (cache and cache.source == ToolArgSchemaCache.SOURCE_SEED and binary_path and os.path.isfile(binary_path))
+        or (
+            cache
+            and cache.source == ToolArgSchemaCache.SOURCE_SEED
+            and _path_is_present(binary_path)
+        )
     )
 
     rate_key = f'{pipeline_tool}:{primary}'
@@ -382,18 +441,22 @@ def get_or_refresh_schema(
         schema: list[dict[str, Any]]
         source = ToolArgSchemaCache.SOURCE_SEED
         help_hash = ''
-        if binary_path and os.path.isfile(binary_path):
-            help_text, _ = _run_help(binary_path)
-            parsed = parse_help_text(help_text) if help_text else []
-            if parsed:
-                schema = parsed
-                source = ToolArgSchemaCache.SOURCE_HELP
-                help_hash = _help_hash(help_text)
-            else:
-                schema = _seed_schema(pipeline_tool)
+        help_text, _, resolved = _probe_help_text(
+            primary=primary,
+            encoded_or_local_path=binary_path,
+        )
+        if resolved:
+            binary_path = resolved
+        parsed = parse_help_text(help_text) if help_text else []
+        if parsed:
+            schema = parsed
+            source = ToolArgSchemaCache.SOURCE_HELP
+            help_hash = _help_hash(help_text)
         else:
             schema = _seed_schema(pipeline_tool)
 
+        # Worker docker exec can drop the idle DB handle; reconnect only if needed.
+        ensure_db_connection()
         cache, _ = ToolArgSchemaCache.objects.update_or_create(
             pipeline_tool=pipeline_tool,
             binary_name=primary,
@@ -416,7 +479,7 @@ def get_or_refresh_schema(
         'binary_name': cache.binary_name,
         'binary_path': cache.binary_path,
         'version': cache.version_fingerprint or None,
-        'is_present': bool(binary_path),
+        'is_present': _path_is_present(binary_path or cache.binary_path),
         'cached': True,
         'source': cache.source,
         'fetched_at': cache.fetched_at.isoformat() if cache.fetched_at else None,
@@ -614,9 +677,10 @@ def append_extra_cli_args(cmd: list[str] | str, extra: list[str]) -> list[str] |
     return (cmd.rstrip() + ' ' + ' '.join(shlex.quote(t) for t in cleaned)).strip()
 
 
-def refresh_all_present_schemas() -> dict[str, Any]:
+def refresh_all_present_schemas(*, probe_versions: bool = True) -> dict[str, Any]:
     """Sync inventory then refresh schemas for present pipeline binaries."""
-    sync_result = sync_installed_tools(probe_versions=True)
+    sync_result = sync_installed_tools(probe_versions=probe_versions)
+    ensure_db_connection()
     refreshed = []
     errors = []
     for tool in PIPELINE_BINARIES:
@@ -625,4 +689,5 @@ def refresh_all_present_schemas() -> dict[str, Any]:
             refreshed.append(tool)
         except Exception as exc:
             errors.append({'tool': tool, 'error': str(exc)})
+            ensure_db_connection()
     return {'sync': sync_result, 'refreshed': refreshed, 'errors': errors}

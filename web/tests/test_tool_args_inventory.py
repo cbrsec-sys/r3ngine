@@ -1,6 +1,8 @@
 """Tests for tool inventory sync, arg schema cache, and validation."""
+import json
+import os
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rolepermissions.roles import assign_role
@@ -252,3 +254,255 @@ class ToolArgsApiTests(TestCase):
             help_mock.assert_not_called()
         self.assertEqual(payload['version'], '9.9.9')
         self.assertEqual(payload['schema'][0]['name'], 'threads')
+
+
+class ExternalToolsFixtureArgCacheTests(TransactionTestCase):
+    """Load fixtures/external_tools.yaml and populate ToolArgSchemaCache by
+    probing *real* binaries on go-executor / python-orchestrator via docker
+    (no help mocks; kr and friends stay on workers — not the web image).
+
+    TransactionTestCase: long docker probes would trip Postgres
+    idle-in-transaction timeouts under a wrapping TestCase atomic block.
+    """
+
+    # Secondaries not required in the fixture (primary still covers the cache key).
+    _OPTIONAL_BINARIES = frozenset({'nmap', 'dirsearch', 'wafw00f'})
+
+    # Flags that must never appear in a cached schema (retarget / filesystem / update).
+    _DENIED_NAMES = frozenset({
+        'url', 'urls', 'u', 'target', 'targets', 'host', 'hosts', 'domain', 'domains',
+        'list', 'l', 'update', 'output', 'o', 'json-export', 'templates', 't', 'wordlist', 'w',
+        'help', 'h',
+    })
+
+    def setUp(self):
+        from django.core.management import call_command
+        from reNgine.tool_args import _last_refresh_at
+        from reNgine.tool_workers import clear_resolve_cache
+
+        clear_resolve_cache()
+        call_command('loaddata', 'external_tools', verbosity=0)
+        self.assertGreater(
+            InstalledExternalTool.objects.count(),
+            20,
+            'external_tools fixture should load a full inventory',
+        )
+        # Avoid cooldown from a prior refresh in the same process.
+        _last_refresh_at.clear()
+
+    def test_fixture_covers_pipeline_primary_binaries(self):
+        from reNgine.tool_args import PIPELINE_BINARIES, _tool_row
+
+        missing = []
+        for pipeline_tool, binaries in PIPELINE_BINARIES.items():
+            if not binaries:
+                continue
+            primary = binaries[0]
+            if primary in self._OPTIONAL_BINARIES:
+                continue
+            if _tool_row(primary) is None:
+                missing.append(f'{pipeline_tool}:{primary}')
+        self.assertEqual(
+            missing,
+            [],
+            'PIPELINE_BINARIES primaries must exist in fixtures/external_tools.yaml',
+        )
+
+    def test_populate_arg_cache_from_real_installed_binaries(self):
+        from reNgine.tool_args import (
+            PIPELINE_BINARIES,
+            _SEED_SCHEMAS,
+            refresh_all_present_schemas,
+            resolve_binary_path,
+            validate_tool_args,
+        )
+        from reNgine.tool_workers import decode_worker_path, worker_probe_summary
+
+        workers = worker_probe_summary()
+        self.assertTrue(
+            workers.get('docker_available'),
+            'docker socket/SDK required to probe go/python worker tools',
+        )
+        self.assertGreaterEqual(
+            len(workers.get('workers') or []),
+            2,
+            f'expected go-executor + python-orchestrator running; got {workers}',
+        )
+
+        # One pass: sync (resolve on workers) + help refresh. Skip version probes —
+        # they add docker round-trips without improving schema coverage.
+        result = refresh_all_present_schemas(probe_versions=False)
+        sync_result = result.get('sync') or {}
+        self.assertIsInstance(sync_result, dict)
+        self.assertEqual(result.get('errors'), [], result)
+        self.assertEqual(
+            sorted(result.get('refreshed') or []),
+            sorted(PIPELINE_BINARIES.keys()),
+        )
+
+        present_primaries = []
+        missing_primaries = []
+        for pipeline_tool, binaries in PIPELINE_BINARIES.items():
+            if not binaries:
+                continue
+            primary = binaries[0]
+            row = InstalledExternalTool.objects.filter(name__iexact=primary).first()
+            path = (row.resolved_path if row and row.is_present else None) or resolve_binary_path(primary)
+            role, remote = decode_worker_path(path)
+            if role and remote:
+                present_primaries.append(f'{pipeline_tool}:{primary}@{role}:{remote}')
+            elif path and os.path.isfile(path):
+                present_primaries.append(f'{pipeline_tool}:{primary}@local:{path}')
+            else:
+                missing_primaries.append(f'{pipeline_tool}:{primary}')
+
+        self.assertGreaterEqual(
+            len(present_primaries),
+            8,
+            'expected most pipeline primaries on go/python workers; '
+            f'present={present_primaries} missing={missing_primaries}',
+        )
+        # kiterunner/kr must resolve on a worker — never require it on web.
+        kr_path = resolve_binary_path('kiterunner')
+        kr_role, kr_remote = decode_worker_path(kr_path)
+        self.assertTrue(
+            kr_role and kr_remote,
+            f'kiterunner/kr must resolve on go/python workers, got {kr_path!r}',
+        )
+
+        dump = []
+        help_sourced = 0
+        for pipeline_tool, binaries in sorted(PIPELINE_BINARIES.items()):
+            if not binaries:
+                payload = get_or_refresh_schema(pipeline_tool, force=False)
+                self.assertEqual(payload['source'], 'seed')
+                self.assertTrue(payload['schema'])
+                dump.append({
+                    'pipeline_tool': pipeline_tool,
+                    'binary_name': '',
+                    'source': payload['source'],
+                    'flag_count': len(payload['schema']),
+                    'flags': [e.get('name') for e in payload['schema']],
+                })
+                continue
+
+            primary = binaries[0]
+            row = InstalledExternalTool.objects.filter(name__iexact=primary).first()
+            path = (row.resolved_path if row and row.is_present else None) or resolve_binary_path(primary)
+            role, remote = decode_worker_path(path)
+            installed = bool(role and remote) or bool(path and os.path.isfile(path))
+
+            cache = ToolArgSchemaCache.objects.filter(
+                pipeline_tool=pipeline_tool, binary_name=primary,
+            ).first()
+            self.assertIsNotNone(
+                cache,
+                f'missing ToolArgSchemaCache for {pipeline_tool}/{primary}',
+            )
+
+            names = [entry.get('name') for entry in (cache.schema or [])]
+            name_set = set(names)
+            dump.append({
+                'pipeline_tool': pipeline_tool,
+                'binary_name': primary,
+                'binary_path': cache.binary_path,
+                'version': cache.version_fingerprint,
+                'source': cache.source,
+                'installed': installed,
+                'flag_count': len(names),
+                'flags': names,
+            })
+
+            leaked = name_set & self._DENIED_NAMES
+            self.assertFalse(
+                leaked,
+                f'denied flags leaked into {pipeline_tool} schema: {leaked}',
+            )
+
+            for entry in cache.schema or []:
+                self.assertIn('name', entry)
+                self.assertIn('type', entry)
+                self.assertIn('takes_value', entry)
+                self.assertIn(entry['type'], ('string', 'int', 'float', 'bool'))
+
+            if installed:
+                self.assertEqual(
+                    cache.source,
+                    ToolArgSchemaCache.SOURCE_HELP,
+                    f'{pipeline_tool}/{primary} is installed but cache source is '
+                    f'{cache.source!r} (worker help parse likely failed). '
+                    f'path={cache.binary_path!r} flags={names}',
+                )
+                seed_names = {e['name'] for e in (_SEED_SCHEMAS.get(pipeline_tool) or [])}
+                self.assertGreaterEqual(
+                    len(names),
+                    5,
+                    f'{pipeline_tool}/{primary} help schema too thin ({len(names)}): {names}',
+                )
+                self.assertTrue(
+                    set(names) - seed_names or len(names) > len(seed_names),
+                    f'{pipeline_tool}/{primary} looks like seed-only, not real help: {names}',
+                )
+                help_sourced += 1
+
+                sample = next(
+                    (
+                        e for e in cache.schema
+                        if e.get('type') == 'int' and e.get('takes_value')
+                    ),
+                    None,
+                )
+                if sample is None:
+                    sample = next(
+                        (
+                            e for e in cache.schema
+                            if e.get('type') == 'string' and e.get('takes_value')
+                        ),
+                        None,
+                    )
+                if sample:
+                    raw = 3 if sample['type'] == 'int' else 'safe-value'
+                    validated = validate_tool_args(
+                        pipeline_tool,
+                        {sample['name']: raw},
+                        schema_payload={'schema': cache.schema},
+                    )
+                    self.assertEqual(validated['sanitized'][sample['name']], raw)
+                    self.assertTrue(
+                        validated['extra_cli_args'] or validated['yaml_overlay'],
+                    )
+
+                with self.assertRaises(ToolArgsError):
+                    validate_tool_args(
+                        pipeline_tool,
+                        {'url': 'https://evil.example'},
+                        schema_payload={'schema': cache.schema},
+                    )
+            else:
+                self.assertTrue(cache.schema, f'empty schema for missing {pipeline_tool}')
+
+        self.assertGreaterEqual(
+            help_sourced,
+            8,
+            f'expected >=8 help-sourced schemas from worker tools; dump={dump}',
+        )
+
+        print('\n=== REAL ToolArgSchemaCache (from go/python workers) ===')
+        for row in dump:
+            print(
+                f"  {row['pipeline_tool']:22} {row.get('binary_name') or '-':12} "
+                f"source={row['source']:14} path={row.get('binary_path')!s:40} "
+                f"flags={row['flag_count']:3} "
+                f"{row['flags'][:12]}{'…' if row['flag_count'] > 12 else ''}"
+            )
+        out_path = os.environ.get(
+            'TOOL_ARG_CACHE_DUMP',
+            '/tmp/tool_arg_schema_cache_real.json',
+        )
+        with open(out_path, 'w', encoding='utf-8') as fh:
+            json.dump(
+                {'sync': sync_result, 'workers': workers, 'refresh': result, 'cache': dump},
+                fh,
+                indent=2,
+            )
+        print(f'Wrote full cache dump to {out_path}')
