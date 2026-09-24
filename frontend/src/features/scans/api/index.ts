@@ -196,6 +196,35 @@ export const useBulkStopSubScans = (projectSlug: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscans', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
+    },
+  });
+};
+
+/** Stop a single in-progress SubScan via Temporal workflow cancellation. */
+export const useStopSubScan = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch('/api/action/stop/scan/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ subscan_ids: [id] }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to stop subscan');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscans', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
     },
   });
 };
@@ -480,17 +509,21 @@ export const useStopScanAction = (projectSlug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/action/stop/scan/?scan_id=${id}`, {
+      const response = await fetch('/api/action/stop/scan/', {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
         },
         credentials: 'include',
+        body: JSON.stringify({ scan_ids: [id] }),
       });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
     }
   });
 };

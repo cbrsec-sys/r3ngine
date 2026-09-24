@@ -67,6 +67,7 @@ from mcp.views.capabilities import (
     McpProposeFollowupsView,
     McpRetryFollowupsView,
     McpRunToolView,
+    McpGetToolArgsView,
     McpUpdateFollowupsView,
 )
 from mcp.views.settings import McpSettingsView
@@ -121,6 +122,7 @@ urlpatterns = [
     path('subscans/start/', McpStartSubscanView.as_view()),
     path('tasks/retry/', McpRetryTaskView.as_view()),
     path('tools/run/', McpRunToolView.as_view()),
+    path('tools/<str:tool>/args/', McpGetToolArgsView.as_view()),
     path('followups/', McpListFollowupsView.as_view()),
     path('followups/propose/', McpProposeFollowupsView.as_view()),
     path('followups/metrics/', McpFollowupMetricsView.as_view()),

@@ -126,6 +126,7 @@ def followup_dispatch_step_activity(plan_id: int, step: dict) -> dict:
                 scan_id=int(step['scan_history_id']),
                 asset_id=step.get('asset_id'),
                 url=step.get('url'),
+                tool_args=step.get('tool_args'),
             )
             return {
                 'ok': True,

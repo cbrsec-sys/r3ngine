@@ -453,6 +453,9 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += ' -ac' if auto_calibration else ''
 		if not auto_calibration and mc:
 			ffuf_base_cmd += f' -mc {mc}'
+		if ctx and ctx.get('singular_tool_run') and ctx.get('extra_cli_args'):
+			from reNgine.tool_args import append_extra_cli_args
+			ffuf_base_cmd = append_extra_cli_args(ffuf_base_cmd, ctx.get('extra_cli_args') or [])
 
 		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
 		if not has_ua:

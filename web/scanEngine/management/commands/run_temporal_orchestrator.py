@@ -406,6 +406,17 @@ class Command(BaseCommand):
         except Exception as tool_err:
             logger.error(f"Plugin tool installation failed at startup: {tool_err}")
 
+        # Reconcile InstalledExternalTool presence/version for singular-tool arg cache.
+        try:
+            from reNgine.tool_inventory import sync_installed_tools
+            sync_result = sync_installed_tools(probe_versions=True)
+            self.stdout.write(self.style.SUCCESS(
+                f"Installed tools sync: present={sync_result.get('present')} "
+                f"missing={sync_result.get('missing')}"
+            ))
+        except Exception as sync_err:
+            logger.error(f"Installed tools sync failed at startup: {sync_err}")
+
         # Clear needs_restart flags synchronously before entering the async event loop.
         try:
             from django.core.cache import cache

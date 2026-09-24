@@ -1081,7 +1081,11 @@ class NucleiPlannerWorkflow:
 
         if vuln_config.get('run_nuclei', True):
             nuclei_specific_config = vuln_config.get('nuclei', {})
-            severities = nuclei_specific_config.get('severity') or NUCLEI_DEFAULT_SEVERITIES
+            severities = (
+                nuclei_specific_config.get('severities')
+                or nuclei_specific_config.get('severity')
+                or NUCLEI_DEFAULT_SEVERITIES
+            )
             workflow.logger.info(
                 "[NUCLEI] PLAN | scan_id=%s severities=%s — all severities go in a "
                 "single -severity flag, so expect one run per tag batch",
@@ -3789,7 +3793,13 @@ class SingleTaskRetryWorkflow:
         # back to SUCCESS so a failed re-run cannot reopen a completed scan.
         final_status = await workflow.execute_activity(
             "GetScanFinalStatusActivity",
-            args=[scan_id, task_succeeded, ctx.get("retry_batch_names") or [], task_name],
+            args=[
+                scan_id,
+                task_succeeded,
+                ctx.get("retry_batch_names") or [],
+                task_name,
+                ctx.get("activity_id"),
+            ],
             start_to_close_timeout=timedelta(minutes=2),
             retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue",

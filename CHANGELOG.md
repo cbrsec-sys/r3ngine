@@ -4,6 +4,11 @@
 
 #### Added
 
+- **Stop in-progress subscans from history**:
+  - Per-row Stop on Sub Scan History, scan-detail Sub Scan History, and the Scan History drawer Tasks tab (INITIATED / RUNNING / PAUSED).
+  - Uses existing `/api/action/stop/scan/` with `subscan_ids` → Temporal `handle.cancel()` on each SubScan workflow id, then marks the row ABORTED.
+  - Redis `scan_stop_{scan_history_id}` kill switch is only armed when the parent master scan is not live, so stopping one subscan does not hard-kill tools still owned by `MasterScanWorkflow`.
+
 - **Scan timeline failure UX (PR #113)**:
   - `ScanActivity.target_host` so fan-out rows show which host a task ran against.
   - `classify_failure()` maps exceptions to operator-facing categories with hints.
@@ -13,9 +18,11 @@
 - **MCP Access**:
   - Dedicated `/api/mcp/` allowlist with hashed per-user API keys, sessions, and an append-only request/response audit chain.
   - Settings → MCP Access: transport (stdio / HTTP / both), named keys (secret shown once), connected agents, session revoke, audit drawer, inspect-only Replay overlay (stored request, agent, and response; never re-dispatches).
-  - MCP notes: list/get for any MCP key; create/update for pentester/sys-admin keys (`TodoNote`); delete remains UI-only.
+  - MCP notes (sidecar **v1.0.3**): list/get for any MCP key; create/update for pentester/sys-admin keys (`TodoNote`); delete remains UI-only.
   - MCP detail tools: companion `r3ngine_get_*_detail` for scan (status-bucketed tasks + finding rollups), target, vulnerability, subdomain, endpoint, exposure, and subscan. Thin `list_*` / `get_*` unchanged. Sidecar bumped to **v1.0.2**.
-  - MCP agent upgrade (sidecar **v1.0.3**): capability catalog, singular tool run, follow-up batch plans (propose/edit/approve/abort/retry), `suggested_followups` on detail payloads; OSINT staging list/verify with `agent_verified` badges and UI Clear all / Add verified / Clear false positive; `r3ngine-osint` handoff sub-agent.
+  - MCP agent upgrade (sidecar **v1.1.0**): capability catalog, singular tool run, follow-up batch plans (propose/edit/approve/abort/retry), `suggested_followups` on detail payloads; OSINT staging list/verify with `agent_verified` badges and UI Clear all / Add verified / Clear false positive; `r3ngine-osint` handoff sub-agent.
+  - Singular tool UI + installed-arg cache: Subdomains tab **Run single tool** modal; `GET /api/action/tool/<tool>/args/` (and MCP `r3ngine_get_tool_args`) returns host-local schemas from binary `--help` with versioned `ToolArgSchemaCache`; optional `tool_args` on run/follow-up steps (validated, denylisted, no free-form shell); `InstalledExternalTool` live sync (`is_present` / version) + refreshed `fixtures/external_tools.yaml`; `manage.py sync_installed_tools` / `refresh_tool_arg_schemas`.
+  - Singular runs namespace timeline rows as `single_tool_<task>` so they never claim, tier-retry, or finalize pipeline `ScanActivity` rows; host scope (`subdomain_id` / urls) is honored for port scan, crawl, nuclei, screenshot, OSINT, secrets, and WAF paths; timeline retry restores args from `singular_meta_*.json`.
   - ScanActivity claim/initialize now stamps `subscan` when a subscan reuses a parent-scan row so subscan detail can resolve tasks.
   - `r3ngine-mcp` TypeScript sidecar (stdio + Streamable HTTP). nginx `/mcp` proxies to the sidecar; the container has no database or scan-result volumes.
   - HTTP sidecar rate-limits unauthorized clients (10 failures/IP/minute, `429 Retry-After`) before contacting r3ngine; invalid keys are remembered so Django is not re-probed.
@@ -40,6 +47,10 @@
   - Marketplace cards load each plugin icon from the public plugin repo (PNG then SVG) instead of a letter placeholder.
 
 #### Fixed
+
+- **Scan History drawer stop actions**:
+  - Tasks-tab Stop now posts `subscan_ids` (was a no-op); master-scan Stop posts `scan_ids` in the JSON body instead of an ignored `?scan_id=` query param.
+  - SubScan `bulk_stop` uses the same `abort_subscan` path as `/api/action/stop/scan/`.
 
 - **postleaksNg false-positive leaks**:
   - `run_postleaks` now retries failed runs, refuses to persist findings on non-zero exit, strips ANSI, and filters traceback / connection-error noise so tool failures are not stored as `SecretLeak` rows.

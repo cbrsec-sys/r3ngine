@@ -69,6 +69,7 @@ class ToolRunAPIView(APIView):
                     scan_id=int(scan_id),
                     asset_id=data.get('asset_id'),
                     url=data.get('url'),
+                    tool_args=data.get('tool_args'),
                     user=request.user,
                 )
             elif get_workflow_tool(tool):
@@ -91,6 +92,21 @@ class ToolRunAPIView(APIView):
             )
         return Response({'status': True, **result})
 
+
+class ToolArgsAPIView(APIView):
+    """Return cached CLI/schema args for a pipeline tool (from installed binary help)."""
+
+    permission_classes = [IsPenetrationTester]
+
+    def get(self, request, tool: str):
+        from reNgine.tool_args import ToolArgsError, get_or_refresh_schema
+
+        force = str(request.query_params.get('refresh') or '').lower() in ('1', 'true', 'yes')
+        try:
+            payload = get_or_refresh_schema(tool, force=force, sync_first=False)
+        except ToolArgsError as exc:
+            return Response({'error': str(exc)}, status=exc.status)
+        return Response(payload)
 
 def _followup_error_response(exc: FollowupError):
     return Response({'status': False, 'error': str(exc)}, status=exc.status)

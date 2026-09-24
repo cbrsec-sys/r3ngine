@@ -99,4 +99,16 @@ Agents can queue allowed work including **subscans** (`r3ngine_start_subscan`) w
 
 Related lists are capped (20); scan activity buckets are capped (100 per status) with full counts in `task_summary`. Raw request/response, traceback, and `results_dir` stay omitted.
 
+## Capabilities, singular tools, and follow-ups
+
+Agents (and the Subdomains tab **Run single tool** modal) can:
+
+1. **`r3ngine_list_capabilities` / `r3ngine_get_engine_detail`** — which pipeline tools and workflows are allowed for an asset kind / engine.
+2. **`r3ngine_get_tool_args`** — host-local CLI schema for a tool (installed binary `--help`, versioned DB cache; seed fallback when the binary is missing). Call this before inventing flags.
+3. **`r3ngine_run_tool`** — start one pipeline tool on a subdomain, endpoint, or URL. Optional `tool_args` must match the schema (denylisted retargeting / filesystem flags; no free-form shell). Timeline rows are namespaced `single_tool_<task>` so they never collide with master-scan claim / tier-retry / resume.
+4. **Follow-up plans** — `propose` → optional `update` → operator `approve` / `abort` / `retry`; detail payloads may include capped `suggested_followups`.
+5. **OSINT staging** — `r3ngine_list_osint_staging` / `r3ngine_verify_osint_staging` with `agent_verified` badges in the UI.
+
+Operators manage keys, sessions, and the audit chain in **Settings → MCP Access**. Sync installed binaries and refresh arg schemas on the web container with `manage.py sync_installed_tools` and `manage.py refresh_tool_arg_schemas` when tools are updated.
+
 See also the [r3ngine-mcp README](../r3ngine-mcp/README.md).
