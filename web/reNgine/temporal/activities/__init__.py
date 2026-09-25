@@ -218,11 +218,15 @@ class TemporalTaskProxy:
                     activity_row.time = now
                     activity_row.execution_id = execution_id
                     activity_row.target_host = self.target_host
-                    activity_row.save(
-                        update_fields=[
-                            'status', 'time_started', 'time', 'execution_id', 'target_host',
-                        ]
-                    )
+                    update_fields = [
+                        'status', 'time_started', 'time', 'execution_id', 'target_host',
+                    ]
+                    # Stamp subscan when claiming a parent-scan row so subscan
+                    # detail tools can find the activity.
+                    if self.subscan and activity_row.subscan_id is None:
+                        activity_row.subscan = self.subscan
+                        update_fields.append('subscan')
+                    activity_row.save(update_fields=update_fields)
                     self.activity = activity_row
                     self.activity_id = activity_row.id
                 else:
@@ -235,6 +239,7 @@ class TemporalTaskProxy:
                         title=self.description,
                         target_host=self.target_host,
                         tier=get_task_tier(self.task_name),
+                        subscan=self.subscan,
                         status=RUNNING_TASK,
                         time=now,
                         time_started=now,
@@ -573,9 +578,17 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
             name=entry['name'],
         ).first()
         if existing:
+            updates = []
             if existing.tier != entry['tier']:
                 existing.tier = entry['tier']
-                existing.save(update_fields=['tier'])
+                updates.append('tier')
+            # When a subscan reuses a parent-scan row, attach the subscan FK
+            # so detail tools can scope activities to this subscan.
+            if subscan and existing.subscan_id is None:
+                existing.subscan = subscan
+                updates.append('subscan')
+            if updates:
+                existing.save(update_fields=updates)
             existing_count += 1
         else:
             ScanActivity.objects.create(
@@ -4261,14 +4274,16 @@ def get_scan_final_status_activity(
     If other names in this retry batch are still INITIATED/RUNNING, keep the
     scan RUNNING so a parallel sibling retry cannot mark SUCCESS early.
     Otherwise SUCCESS when this task succeeded and no other activities truly
-    failed; FAILED otherwise.
+    failed or remain aborted; FAILED otherwise.
 
     When this retry failed before the activity claimed its row, flip that
     INITIATED row back to FAILED so the timeline and retry button recover.
     """
     from django.utils import timezone as _tz
     from startScan.models import ScanActivity
-    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, INITIATED_TASK
+    from reNgine.definitions import (
+        SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, INITIATED_TASK, ABORTED_TASK,
+    )
 
     pending_names = [n for n in (in_flight_names or []) if n]
     if failed_task_name:
@@ -4300,10 +4315,12 @@ def get_scan_final_status_activity(
     if not task_succeeded:
         return FAILED_TASK
 
-    failed_names = set(
+    # ABORTED counts as unsuccessful the same way FAILED does: a stop left
+    # sibling rows cancelled, and a single successful retry must not erase that.
+    unsuccessful_names = set(
         ScanActivity.objects.filter(
             scan_of_id=scan_id,
-            status=FAILED_TASK,
+            status__in=[FAILED_TASK, ABORTED_TASK],
             time_started__isnull=False,
         ).values_list("name", flat=True)
     )
@@ -4313,7 +4330,7 @@ def get_scan_final_status_activity(
             status=SUCCESS_TASK,
         ).values_list("name", flat=True)
     )
-    true_failures = failed_names - success_names
+    true_failures = unsuccessful_names - success_names
     return FAILED_TASK if true_failures else SUCCESS_TASK
 
 

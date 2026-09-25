@@ -14,14 +14,33 @@ import unittest
 import yaml
 from django.test import SimpleTestCase, override_settings
 
-COMPOSE_FILE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '..', '..', 'docker', 'docker-compose.yml',
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_COMPOSE_CANDIDATES = (
+    # Host / full-repo layout: <repo>/web/tests -> <repo>/docker/...
+    os.path.join(_TESTS_DIR, '..', '..', 'docker', 'docker-compose.yml'),
+    # Web container only mounts web/ at /usr/src/app; compose may be bind-mounted
+    # beside it as /usr/src/docker/...
+    os.path.join(_TESTS_DIR, '..', '..', '..', 'docker', 'docker-compose.yml'),
+    '/usr/src/docker/docker-compose.yml',
 )
 
 
+def _compose_file() -> str | None:
+    for path in _COMPOSE_CANDIDATES:
+        resolved = os.path.normpath(path)
+        if os.path.isfile(resolved):
+            return resolved
+    return None
+
+
 def _service_env(service: str) -> dict:
-    with open(COMPOSE_FILE, encoding='utf-8') as handle:
+    compose_file = _compose_file()
+    if compose_file is None:
+        raise unittest.SkipTest(
+            'docker-compose.yml not available in this runtime '
+            '(web image mounts web/ only)'
+        )
+    with open(compose_file, encoding='utf-8') as handle:
         compose = yaml.safe_load(handle)
     entries = compose['services'][service].get('environment') or []
     env = {}

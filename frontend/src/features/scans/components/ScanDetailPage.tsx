@@ -108,6 +108,7 @@ import { StartScanModal } from './StartScanModal';
 import { OsintTab } from './OsintTab';
 import { AttackPathsTab } from './AttackPathsTab';
 import { AiExportModal } from './AiExportModal';
+import { ExploitsTab } from './ExploitsTab';
 import { ExposureList } from '../../exposures/components/ExposureList';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import PluginComponent from '../../plugins/components/PluginComponent';
@@ -1023,7 +1024,7 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
               • Click to view details <ChevronRight size={10} />
             </Typography>
           </Stack>
-          {isTerminal && (activity.status === 'FAILED' || allowRetryAny) && activity.name !== 'raw_scan_history' && onRetry && (
+          {isTerminal && (activity.status === 'FAILED' || activity.status === 'ABORTED' || allowRetryAny) && activity.name !== 'raw_scan_history' && onRetry && (
             <MuiTooltip title="Retry Task" placement="top">
               <IconButton 
                 size="small" 
@@ -2301,24 +2302,11 @@ export const ScanDetailPage = () => {
   );
 
   const renderExploits = () => (
-    <TacticalPanel title="Potential Exploits & Payloads" icon={<Zap size={14} />}>
-      <TableContainer>
-        <Table size="small">
-          <TableHead sx={{ bgcolor: 'action.hover' }}>
-            <TableRow>
-              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900 }}>TARGET</TableCell>
-              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900 }}>EXPLOIT TYPE</TableCell>
-              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900 }}>PAYLOAD</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            <TableRow>
-              <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.disabled' }}>NO POTENTIAL EXPLOITS IDENTIFIED</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </TacticalPanel>
+    <ExploitsTab
+      projectSlug={projectSlug}
+      targetId={data.target_info?.id || 0}
+      scanId={parseInt(scanId)}
+    />
   );
 
   const renderSubdomains = () => (

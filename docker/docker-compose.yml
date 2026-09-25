@@ -103,7 +103,7 @@ services:
   web:
     build:
       context: ../
-      dockerfile: docker/web/Dockerfile
+      dockerfile: docker/web/${WEB_DOCKERFILE:-Dockerfile}
     entrypoint: /usr/src/app/entrypoint.sh
     restart: always
     logging: *default-logging

@@ -641,16 +641,20 @@ class ScanActivityRetryAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        from reNgine.definitions import PAUSED_TASK
+        from reNgine.definitions import PAUSED_TASK, ABORTED_TASK
         if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
             return Response(
                 {"status": False, "message": "Cannot retry a task while the scan is running or paused"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if scan.scan_status != SUCCESS_TASK and activity_obj.status != FAILED_TASK:
+        # Single-task retry accepts FAILED and ABORTED. Tier retry stays
+        # FAILED-only so a stop/cancel does not offer "Retry Tier".
+        if scan.scan_status != SUCCESS_TASK and activity_obj.status not in (
+            FAILED_TASK, ABORTED_TASK,
+        ):
             return Response(
-                {"status": False, "message": "Task is not in a failed state"},
+                {"status": False, "message": "Task is not in a failed or aborted state"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -673,6 +677,12 @@ class ScanActivityRetryAPIView(APIView):
             scan.error_message = None
             scan.stop_scan_date = None
             scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
+
+        # abort_scan_history leaves Redis scan_stop_{id} set; clear it the same
+        # way resume / retry_failed_tasks_temporal do, or the Go executor will
+        # kill the retry process group within seconds.
+        from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
+        set_scan_stop_kill_switch(scan.id, enabled=False)
 
         yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "")
         ctx = {
@@ -735,6 +745,7 @@ RETRYABLE_TASK_NAMES = frozenset({
     'post_crawl_osint',
     'http_crawl_bridge',
     'run_acunetix',
+    'acunetix_submit',
     # Tier 7 post-processing — dispatchable on its own since the upstream merge.
     'correlate_vulnerabilities',
     'calculate_risk_scores',
@@ -810,13 +821,6 @@ class ScanTierRetryAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Same rule as the single-task view: a live scan owns its own rows.
-        if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
-            return Response(
-                {"status": False, "message": "Cannot retry a tier while the scan is running or paused"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         original_scan_status = scan.scan_status
 
         failed_rows = [
@@ -841,6 +845,9 @@ class ScanTierRetryAPIView(APIView):
             else:
                 retryable.append(activity)
 
+        # No-op before the running-scan guard so a second click while the first
+        # retry is already RUNNING returns no_op (nothing left FAILED) instead
+        # of a hard 400.
         if not retryable:
             return Response({
                 "status": True,
@@ -857,6 +864,13 @@ class ScanTierRetryAPIView(APIView):
                     f"No retryable failed tasks in tier {tier}; {len(skipped)} skipped"
                 ),
             })
+
+        # Same rule as the single-task view: a live scan owns its own rows.
+        if scan.scan_status in (RUNNING_TASK, PAUSED_TASK):
+            return Response(
+                {"status": False, "message": "Cannot retry a tier while the scan is running or paused"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         with transaction.atomic():
             # Reset the failed rows so the serializer counts them as pending and
@@ -875,6 +889,9 @@ class ScanTierRetryAPIView(APIView):
             scan.error_message = None
             scan.stop_scan_date = None
             scan.save(update_fields=["scan_status", "error_message", "stop_scan_date"])
+
+        from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
+        set_scan_stop_kill_switch(scan.id, enabled=False)
 
         yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration or "") or {}
 
