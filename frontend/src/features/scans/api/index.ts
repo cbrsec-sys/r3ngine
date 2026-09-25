@@ -56,7 +56,17 @@ export const useScans = (projectSlug: string) => {
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!projectSlug,
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const rows = query.state.data ?? [];
+      const live = rows.some(
+        (s) =>
+          s.scan_status === -1 ||
+          s.scan_status === 1 ||
+          s.scan_status === 5 ||
+          s.is_spiderfoot_running
+      );
+      return live ? 5000 : 30000;
+    },
   });
 };
 
@@ -175,7 +185,11 @@ export const useSubScans = (projectSlug: string) => {
       return Array.isArray(data) ? data : data.results || [];
     },
     enabled: !!projectSlug,
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const rows = query.state.data ?? [];
+      const live = rows.some((s) => s.status === -1 || s.status === 1 || s.status === 5);
+      return live ? 5000 : 30000;
+    },
   });
 };
 
@@ -264,7 +278,17 @@ export const useScansHistory = (project: string) => {
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!project,
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const rows = query.state.data ?? [];
+      const live = rows.some(
+        (s) =>
+          s.scan_status === -1 ||
+          s.scan_status === 1 ||
+          s.scan_status === 5 ||
+          s.is_spiderfoot_running
+      );
+      return live ? 5000 : 30000;
+    },
   });
 };
 
