@@ -258,7 +258,7 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
           sx: {
             width: 450,
             bgcolor: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(5, 5, 10, 0.98)',
-            backdropFilter: 'blur(25px)',
+            backdropFilter: 'blur(12px)',
             borderLeft: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.08)' : `${tokens.accent.primary}33`}`,
             color: 'text.primary',
             boxShadow: isLight ? '0 4px 20px rgba(0, 0, 0, 0.05)' : '-10px 0 40px rgba(0,0,0,0.9)'

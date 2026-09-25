@@ -409,11 +409,11 @@ const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRun
           fontFamily: 'Orbitron',
           animation: 'pulse-spider 2s infinite ease-in-out',
           textShadow: isLight ? 'none' : `0 0 10px ${tokens.accent.secondary}40`,
-          boxShadow: `inset 0 0 10px ${tokens.accent.secondary}10`,
+          boxShadow: `inset 0 0 10px ${tokens.accent.secondary}10, 0 0 8px ${tokens.accent.secondary}`,
           '@keyframes pulse-spider': {
-            '0%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${tokens.accent.secondary})` },
-            '50%': { transform: 'scale(1.05)', filter: `drop-shadow(0 0 8px ${tokens.accent.secondary})` },
-            '100%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${tokens.accent.secondary})` },
+            '0%': { transform: 'scale(1)', opacity: 1 },
+            '50%': { transform: 'scale(1.05)', opacity: 0.85 },
+            '100%': { transform: 'scale(1)', opacity: 1 },
           }
         }}>
           <Bug size={compact ? 12 : 18} />
@@ -2403,10 +2403,11 @@ export const ScanDetailPage = () => {
                     color: tokens.accent.primary,
                     '@keyframes spiderPulse': {
                       '0%': { transform: 'scale(1)', opacity: 0.6 },
-                      '50%': { transform: 'scale(1.15)', opacity: 1, filter: `drop-shadow(0 0 6px ${tokens.accent.primary})` },
+                      '50%': { transform: 'scale(1.15)', opacity: 1 },
                       '100%': { transform: 'scale(1)', opacity: 0.6 },
                     },
-                    animation: 'spiderPulse 2s infinite ease-in-out'
+                    animation: 'spiderPulse 2s infinite ease-in-out',
+                    filter: `drop-shadow(0 0 6px ${tokens.accent.primary})`,
                   }}>
                     <Bug size={20} />
                   </Box>

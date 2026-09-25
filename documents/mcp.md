@@ -53,15 +53,16 @@ node scripts/install-mcp.mjs --url https://<this-host> --key r3n_mcp_… --yes -
 Windows: `.\scripts\install-mcp.ps1 --url https://<this-host> --key r3n_mcp_… --yes`
 
 To pull the latest sidecar, rebuild the local process, and refresh the Docker MCP
-image/container when one already exists for this stack:
+image/container for this stack:
 
 ```bash
 node scripts/install-mcp.mjs --update
 ```
 
-Docker is skipped when no `r3ngine-mcp` container exists (stdio-only installs). Pass
-`--no-docker` to force a local-only update. A running container is rebuilt and
-recreated; a stopped one only gets a new image (left stopped).
+Install and `--update` both **build and start** the `r3ngine-mcp` compose service
+(using `--profile mcp` on prod compose). If the container never existed, it is
+created from the running stack’s compose project (or `docker/docker-compose.yml`).
+Pass `--no-docker` to force a local/stdio-only setup.
 
 From a checkout of r3ngine-mcp:
 
