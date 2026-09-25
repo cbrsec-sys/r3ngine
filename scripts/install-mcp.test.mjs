@@ -5,9 +5,17 @@ import {
   nodeBin,
   usesCmdShell,
   findMcpComposeService,
+  findStackComposeService,
+  resolveMcpComposeTarget,
+  ensureMcpDockerContainer,
   updateMcpDockerContainer,
   resolveDockerCompose,
+  COMPOSE_MCP_CONTEXT,
 } from './install-mcp.mjs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('wrapper flags stop at first setup argument', () => {
   const opts = parseWrapperArgs(['--update', '--url', 'https://h', '--yes']);
@@ -40,6 +48,10 @@ test('nodeBin uses NODE from env, not an absolute install path', () => {
   assert.equal(usesCmdShell('C:\\Program Files\\nodejs\\node.exe', 'win32'), false);
   assert.equal(usesCmdShell('npm.cmd', 'win32'), true);
   assert.equal(usesCmdShell('npm.cmd', 'linux'), false);
+});
+
+test('compose MCP context is r3ngine/r3ngine-mcp (compose ../ from docker/)', () => {
+  assert.equal(COMPOSE_MCP_CONTEXT, path.join(ROOT, 'r3ngine-mcp'));
 });
 
 test('findMcpComposeService returns null when no container', () => {
@@ -80,6 +92,95 @@ test('findMcpComposeService reads compose labels', () => {
   ]);
 });
 
+test('findStackComposeService prefers web when MCP missing', () => {
+  const labels = {
+    'com.docker.compose.project': 'r3ngine',
+    'com.docker.compose.project.config_files': '/repo/docker/docker-compose.yml',
+    'com.docker.compose.project.working_dir': '/repo/docker',
+    'com.docker.compose.service': 'web',
+  };
+  const exec = (cmd, args) => {
+    if (args[0] === 'ps') {
+      return {
+        status: 0,
+        stdout: 'w1\tr3ngine-web-1\tUp\np1\tr3ngine-proxy-1\tUp\n',
+        error: null,
+      };
+    }
+    if (args[0] === 'inspect' && args.includes('w1')) {
+      return { status: 0, stdout: JSON.stringify(labels), error: null };
+    }
+    throw new Error(`unexpected ${cmd} ${args.join(' ')}`);
+  };
+  const info = findStackComposeService({ exec, root: '/repo' });
+  assert.equal(info.from, 'r3ngine-web-1');
+  assert.equal(info.service, 'r3ngine-mcp');
+  assert.equal(info.cwd, '/repo/docker');
+  assert.ok(info.composeArgs.includes('--profile'));
+  assert.ok(info.composeArgs.includes('mcp'));
+});
+
+test('resolveMcpComposeTarget falls back to stack then defaults', () => {
+  const noMcp = (cmd, args) => {
+    if (args[0] === 'ps' && args.includes('name=r3ngine-mcp')) {
+      return { status: 0, stdout: '', error: null };
+    }
+    if (args[0] === 'ps' && args.includes('name=r3ngine')) {
+      return { status: 0, stdout: '', error: null };
+    }
+    throw new Error(`unexpected ${args.join(' ')}`);
+  };
+  const defaults = resolveMcpComposeTarget({ exec: noMcp, root: ROOT });
+  assert.equal(defaults.source, 'defaults');
+  assert.equal(defaults.service, 'r3ngine-mcp');
+  assert.ok(defaults.composeArgs.includes('-f'));
+  assert.ok(defaults.composeArgs.includes('--profile'));
+});
+
+test('ensureMcpDockerContainer builds and starts when container missing', () => {
+  const labels = {
+    'com.docker.compose.project': 'r3ngine',
+    'com.docker.compose.project.config_files': '/repo/docker/docker-compose.yml',
+    'com.docker.compose.project.working_dir': '/repo',
+    'com.docker.compose.service': 'web',
+  };
+  const exec = (cmd, args) => {
+    if (cmd === 'docker' && args[0] === 'version') {
+      return { status: 0, stdout: 'ok', error: null };
+    }
+    if (cmd === 'docker' && args[0] === 'compose' && args[1] === 'version') {
+      return { status: 0, stdout: 'Docker Compose version v2', error: null };
+    }
+    if (cmd === 'docker' && args[0] === 'ps' && args.includes('name=r3ngine-mcp')) {
+      return { status: 0, stdout: '', error: null };
+    }
+    if (cmd === 'docker' && args[0] === 'ps' && args.includes('name=r3ngine')) {
+      return { status: 0, stdout: 'w1\tr3ngine-web-1\tUp\n', error: null };
+    }
+    if (cmd === 'docker' && args[0] === 'inspect') {
+      return { status: 0, stdout: JSON.stringify(labels), error: null };
+    }
+    throw new Error(`unexpected exec ${cmd} ${args.join(' ')}`);
+  };
+  const calls = [];
+  const result = ensureMcpDockerContainer({
+    exec,
+    root: '/repo',
+    runFn: (command, args, cwd) => calls.push({ command, args, cwd }),
+  });
+  assert.equal(result.updated, true);
+  assert.equal(result.started, true);
+  assert.equal(result.source, 'stack');
+  assert.equal(calls.length, 2);
+  assert.ok(calls[0].args.includes('build'));
+  assert.ok(calls[0].args.includes('r3ngine-mcp'));
+  assert.ok(calls[0].args.includes('--profile'));
+  assert.ok(calls[1].args.includes('up'));
+  assert.ok(calls[1].args.includes('-d'));
+  assert.ok(!calls[1].args.includes('--force-recreate'));
+  assert.equal(calls[1].cwd, '/repo');
+});
+
 test('updateMcpDockerContainer builds and recreates when running', () => {
   const labels = {
     'com.docker.compose.project': 'r3ngine',
@@ -88,6 +189,9 @@ test('updateMcpDockerContainer builds and recreates when running', () => {
     'com.docker.compose.service': 'r3ngine-mcp',
   };
   const exec = (cmd, args) => {
+    if (cmd === 'docker' && args[0] === 'version') {
+      return { status: 0, stdout: 'ok', error: null };
+    }
     if (cmd === 'docker' && args[0] === 'compose' && args[1] === 'version') {
       return { status: 0, stdout: 'Docker Compose version v2', error: null };
     }
@@ -105,7 +209,7 @@ test('updateMcpDockerContainer builds and recreates when running', () => {
   };
   const result = updateMcpDockerContainer({ exec, root: '/repo', runFn });
   assert.equal(result.updated, true);
-  assert.equal(result.recreated, true);
+  assert.equal(result.started, true);
   assert.equal(calls.length, 2);
   assert.equal(calls[0].command, 'docker');
   assert.ok(calls[0].args.includes('build'));
@@ -115,13 +219,16 @@ test('updateMcpDockerContainer builds and recreates when running', () => {
   assert.equal(calls[1].cwd, '/repo');
 });
 
-test('updateMcpDockerContainer builds only when container stopped', () => {
+test('ensureMcpDockerContainer starts a previously stopped container', () => {
   const labels = {
     'com.docker.compose.project.config_files': '/repo/docker/docker-compose.dev.yml',
     'com.docker.compose.project.working_dir': '/repo',
     'com.docker.compose.service': 'r3ngine-mcp',
   };
   const exec = (cmd, args) => {
+    if (cmd === 'docker' && args[0] === 'version') {
+      return { status: 0, stdout: 'ok', error: null };
+    }
     if (cmd === 'docker' && args[0] === 'compose' && args[1] === 'version') {
       return { status: 0, stdout: 'ok', error: null };
     }
@@ -134,15 +241,16 @@ test('updateMcpDockerContainer builds only when container stopped', () => {
     throw new Error(`unexpected ${cmd} ${args.join(' ')}`);
   };
   const calls = [];
-  const result = updateMcpDockerContainer({
+  const result = ensureMcpDockerContainer({
     exec,
     root: '/repo',
     runFn: (command, args) => calls.push({ command, args }),
   });
   assert.equal(result.updated, true);
-  assert.equal(result.recreated, false);
-  assert.equal(calls.length, 1);
+  assert.equal(result.started, true);
+  assert.equal(calls.length, 2);
   assert.ok(calls[0].args.includes('build'));
+  assert.ok(calls[1].args.includes('up'));
 });
 
 test('resolveDockerCompose falls back to docker-compose', () => {

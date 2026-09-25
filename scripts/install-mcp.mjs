@@ -13,8 +13,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_REPO = 'https://github.com/whiterabb17/r3ngine-mcp.git';
 const DEFAULT_DIR = path.join(ROOT, 'r3ngine-mcp');
-/** Compose build context for docker compose files (context: ../r3ngine-mcp). */
-export const COMPOSE_MCP_CONTEXT = path.resolve(ROOT, '..', 'r3ngine-mcp');
+/** Compose build context: docker/docker-compose*.yml uses `context: ../r3ngine-mcp`. */
+export const COMPOSE_MCP_CONTEXT = path.join(ROOT, 'r3ngine-mcp');
+const MCP_SERVICE = 'r3ngine-mcp';
+const MCP_PROFILE = 'mcp';
 
 function log(message) {
   process.stderr.write(`${message}\n`);
@@ -101,8 +103,8 @@ Wrapper:
   --repo <url>   git remote (default ${DEFAULT_REPO})
   --dir <path>   checkout path (default ./r3ngine-mcp)
   --update       git pull, rebuild local MCP, and rebuild/recreate the Docker MCP
-                 container when one already exists for this stack
-  --no-docker    with --update, skip Docker image/container refresh
+                 sidecar (creates and starts it if missing; uses --profile mcp)
+  --no-docker    skip Docker image/container ensure (local/stdio only)
 
 Setup options are forwarded to r3ngine-mcp/scripts/install.mjs
   (e.g. --url --key --transport --yes --write-cursor --detach --stop --restart --update)
@@ -146,6 +148,56 @@ export function resolveDockerCompose(exec = spawnSync) {
   return { command: 'docker-compose', argsPrefix: [] };
 }
 
+function parseComposeLabels(raw) {
+  try {
+    return JSON.parse(String(raw || '{}'));
+  } catch {
+    return {};
+  }
+}
+
+/** Build compose CLI args from labels and/or default compose files under root. */
+export function buildComposeArgs(root, {
+  project,
+  configFiles = [],
+  includeProfile = true,
+} = {}) {
+  const composeArgs = [];
+  if (project) composeArgs.push('-p', project);
+  const envFile = path.join(root, '.env');
+  if (fs.existsSync(envFile)) composeArgs.push('--env-file', envFile);
+  if (configFiles.length) {
+    for (const file of configFiles) composeArgs.push('-f', file);
+  } else {
+    const prod = path.join(root, 'docker', 'docker-compose.yml');
+    const dev = path.join(root, 'docker', 'docker-compose.dev.yml');
+    if (fs.existsSync(prod)) composeArgs.push('-f', prod);
+    else if (fs.existsSync(dev)) composeArgs.push('-f', dev);
+  }
+  // Prod compose gates the service behind profiles: ["mcp"]; harmless on files without it.
+  if (includeProfile) composeArgs.push('--profile', MCP_PROFILE);
+  return composeArgs;
+}
+
+function labelsToComposeTarget(labels, { root, id = null, name = null, status = '' } = {}) {
+  const configFiles = String(labels['com.docker.compose.project.config_files'] || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const project = labels['com.docker.compose.project'] || undefined;
+  const workingDir = labels['com.docker.compose.project.working_dir'] || root;
+  return {
+    id,
+    name,
+    running: /^\s*Up\b/i.test(status || ''),
+    service: MCP_SERVICE,
+    cwd: workingDir,
+    composeArgs: buildComposeArgs(root, { project, configFiles }),
+    configFiles,
+    project,
+  };
+}
+
 /**
  * Locate an existing r3ngine-mcp container and the compose invocation that owns it.
  * Returns null when Docker is unavailable or no MCP container exists.
@@ -161,51 +213,82 @@ export function findMcpComposeService({ exec = spawnSync, root = ROOT } = {}) {
   if (!line) return null;
   const [id, name, status = ''] = line.split('\t');
   if (!id || !name) return null;
-  const running = /^\s*Up\b/i.test(status);
 
   const insp = exec('docker', ['inspect', '-f', '{{json .Config.Labels}}', id], {
     encoding: 'utf8',
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  let labels = {};
-  try {
-    labels = JSON.parse(String(insp.stdout || '{}'));
-  } catch {
-    labels = {};
+  if (insp.error || insp.status !== 0) return null;
+  return labelsToComposeTarget(parseComposeLabels(insp.stdout), { root, id, name, status });
+}
+
+/**
+ * Infer compose project/files from a running stack container (web/proxy) when MCP
+ * has never been created (prod profile keeps it off `make up`).
+ */
+export function findStackComposeService({ exec = spawnSync, root = ROOT } = {}) {
+  const list = exec(
+    'docker',
+    ['ps', '-a', '--filter', 'name=r3ngine', '--format', '{{.ID}}\t{{.Names}}\t{{.Status}}'],
+    { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  if (list.error || list.status !== 0) return null;
+  const lines = String(list.stdout || '').trim().split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return null;
+
+  const rank = (names) => {
+    const n = String(names || '').toLowerCase();
+    if (n.includes('r3ngine-mcp')) return 99;
+    if (n.includes('-web-') || n.endsWith('-web') || n.includes('_web_')) return 0;
+    if (n.includes('-proxy-') || n.includes('_proxy_')) return 1;
+    return 5;
+  };
+  const ranked = lines
+    .map((line) => {
+      const [id, name, status = ''] = line.split('\t');
+      return { id, name, status, rank: rank(name) };
+    })
+    .filter((row) => row.id && row.name && row.rank < 99)
+    .sort((a, b) => a.rank - b.rank);
+  for (const row of ranked) {
+    const insp = exec('docker', ['inspect', '-f', '{{json .Config.Labels}}', row.id], {
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (insp.error || insp.status !== 0) continue;
+    const labels = parseComposeLabels(insp.stdout);
+    if (!labels['com.docker.compose.project'] && !labels['com.docker.compose.project.config_files']) {
+      continue;
+    }
+    const target = labelsToComposeTarget(labels, {
+      root,
+      id: null,
+      name: null,
+      status: '',
+    });
+    target.from = row.name;
+    return target;
   }
+  return null;
+}
 
-  const configFiles = String(labels['com.docker.compose.project.config_files'] || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const project = labels['com.docker.compose.project'] || undefined;
-  const workingDir = labels['com.docker.compose.project.working_dir'] || root;
-  const service = labels['com.docker.compose.service'] || 'r3ngine-mcp';
-
-  const composeArgs = [];
-  if (project) composeArgs.push('-p', project);
-  const envFile = path.join(root, '.env');
-  if (fs.existsSync(envFile)) composeArgs.push('--env-file', envFile);
-  if (configFiles.length) {
-    for (const file of configFiles) composeArgs.push('-f', file);
-  } else {
-    const prod = path.join(root, 'docker', 'docker-compose.yml');
-    const dev = path.join(root, 'docker', 'docker-compose.dev.yml');
-    if (fs.existsSync(prod)) composeArgs.push('-f', prod);
-    else if (fs.existsSync(dev)) composeArgs.push('-f', dev);
-  }
-  // Prod compose gates the service behind profiles: ["mcp"]; harmless on files without it.
-  composeArgs.push('--profile', 'mcp');
-
+/** Resolve compose target for MCP: existing container, else stack labels, else defaults. */
+export function resolveMcpComposeTarget({ exec = spawnSync, root = ROOT } = {}) {
+  const existing = findMcpComposeService({ exec, root });
+  if (existing) return { ...existing, source: 'mcp-container' };
+  const stack = findStackComposeService({ exec, root });
+  if (stack) return { ...stack, source: 'stack' };
   return {
-    id,
-    name,
-    running,
-    service,
-    cwd: workingDir,
-    composeArgs,
-    configFiles,
+    id: null,
+    name: null,
+    running: false,
+    service: MCP_SERVICE,
+    cwd: root,
+    composeArgs: buildComposeArgs(root, {}),
+    configFiles: [],
+    source: 'defaults',
   };
 }
 
@@ -217,43 +300,68 @@ export function pullMcpCheckout(dir) {
   return true;
 }
 
+function dockerAvailable(exec = spawnSync) {
+  const probe = exec('docker', ['version'], {
+    encoding: 'utf8',
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return !probe.error && probe.status === 0;
+}
+
 /**
- * Rebuild the MCP image when a container already exists; recreate only if it was running.
+ * Build and start the MCP compose service (creates it when missing).
+ * Uses --profile mcp so prod stacks that gate the service still get a container.
  */
-export function updateMcpDockerContainer({
+export function ensureMcpDockerContainer({
   exec = spawnSync,
   root = ROOT,
   runFn = run,
+  forceRecreate = false,
 } = {}) {
-  const info = findMcpComposeService({ exec, root });
-  if (!info) {
-    log('No r3ngine-mcp Docker container found; skipping image rebuild.');
-    return { updated: false, recreated: false, reason: 'not-found' };
+  if (!dockerAvailable(exec)) {
+    log('Docker is not available; skipping r3ngine-mcp container ensure.');
+    return { updated: false, started: false, reason: 'no-docker' };
+  }
+
+  const info = resolveMcpComposeTarget({ exec, root });
+  const hasComposeFile = info.composeArgs.includes('-f');
+  if (!hasComposeFile) {
+    log('No docker-compose.yml found under docker/; skipping MCP container ensure.');
+    return { updated: false, started: false, reason: 'no-compose' };
   }
 
   const dc = resolveDockerCompose(exec);
   const buildArgs = [...dc.argsPrefix, ...info.composeArgs, 'build', info.service];
-  log(`Building Docker image for ${info.service} (${info.name})…`);
+  const label = info.name || info.from || info.source;
+  log(`Building Docker image for ${info.service} (${label})…`);
   runFn(dc.command, buildArgs, info.cwd);
-
-  if (!info.running) {
-    log('MCP image rebuilt (container was not running; left stopped).');
-    return { updated: true, recreated: false, name: info.name };
-  }
 
   const upArgs = [
     ...dc.argsPrefix,
     ...info.composeArgs,
     'up',
     '-d',
-    '--force-recreate',
     '--no-deps',
-    info.service,
   ];
-  log(`Recreating MCP container ${info.name}…`);
+  if (forceRecreate || info.running) upArgs.push('--force-recreate');
+  upArgs.push(info.service);
+
+  log(`Starting MCP container (${info.service})…`);
   runFn(dc.command, upArgs, info.cwd);
-  log('MCP container rebuilt and recreated.');
-  return { updated: true, recreated: true, name: info.name };
+  log('MCP container is up.');
+  return {
+    updated: true,
+    started: true,
+    recreated: Boolean(forceRecreate || info.running),
+    name: info.name,
+    source: info.source,
+  };
+}
+
+/** @deprecated Prefer ensureMcpDockerContainer — kept for older callers/tests. */
+export function updateMcpDockerContainer(opts = {}) {
+  return ensureMcpDockerContainer({ ...opts, forceRecreate: true });
 }
 
 export function main(argv = process.argv.slice(2)) {
@@ -274,13 +382,21 @@ export function main(argv = process.argv.slice(2)) {
     setupArgs.unshift('--update');
   }
 
-  if (opts.update && !opts.noDocker) {
-    // Compose builds from ../r3ngine-mcp (sibling). Pull that tree when it differs from --dir.
+  if (!opts.noDocker) {
     const composeCtx = COMPOSE_MCP_CONTEXT;
-    if (path.resolve(composeCtx) !== path.resolve(dir) && isMcpCheckout(composeCtx)) {
+    if (opts.update && path.resolve(composeCtx) !== path.resolve(dir) && isMcpCheckout(composeCtx)) {
       pullMcpCheckout(composeCtx);
     }
-    updateMcpDockerContainer({ root: ROOT });
+    if (!isMcpCheckout(composeCtx) && path.resolve(composeCtx) !== path.resolve(dir)) {
+      log(
+        `Warning: compose build context ${composeCtx} is missing; `
+        + `docker will use whatever path docker-compose.yml references.`,
+      );
+    }
+    ensureMcpDockerContainer({
+      root: ROOT,
+      forceRecreate: Boolean(opts.update),
+    });
   }
 
   log(`Running ${installer}`);
