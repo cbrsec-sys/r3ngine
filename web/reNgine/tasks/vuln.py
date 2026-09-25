@@ -12,7 +12,13 @@ from reNgine.definitions import *
 from reNgine.utils.opsec import OpSecManager, ProxychainsWrapper, get_opsec_manager
 from reNgine.utils.task import run_command, run_command_with_retry, stream_command, activity_heartbeat_safe, save_endpoint, save_subdomain
 from reNgine.tech_mapping import get_nuclei_tags_from_techs
-from reNgine.tasks.parsers import parse_nuclei_result, parse_dalfox_result, parse_crlfuzz_result, parse_s3scanner_result
+from reNgine.tasks.parsers import (
+	is_nuclei_finding,
+	parse_nuclei_result,
+	parse_dalfox_result,
+	parse_crlfuzz_result,
+	parse_s3scanner_result,
+)
 from reNgine.tasks.llm import get_vulnerability_gpt_report, add_gpt_description_db
 from reNgine.tasks.crawl import parse_curl_output
 from reNgine.tasks.notifications import send_hackerone_report
@@ -500,11 +506,16 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 				continue
 			if not isinstance(line, dict):
 				continue
+			# Go-executor buffers nuclei stdout (incl. -stats JSON). Skip those.
+			if not is_nuclei_finding(line):
+				continue
 
 			results.append(line)
 
 			# Gather nuclei results
 			vuln_data = parse_nuclei_result(line)
+			if not vuln_data:
+				continue
 
 			# Get corresponding subdomain
 			http_url = sanitize_url(line.get('matched-at'))
@@ -514,7 +525,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			if not subdomain:
 				continue
 
-			severity_value = line['info'].get('severity', 'unknown')
+			severity_value = (line.get('info') or {}).get('severity', 'unknown')
 
 			# Get or create EndPoint object
 			response = line.get('response')
@@ -532,7 +543,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 					endpoint.save()
 
 			# Register Auth Candidate if Nuclei flagged it as login or auth
-			tags_list = line.get('info', {}).get('tags', []) or []
+			tags_list = (line.get('info') or {}).get('tags', []) or []
 			if any(tag in tags_list for tag in ['login', 'auth', 'admin', 'default-login', 'bruteforce', 'panel']):
 				from reNgine.utilities import save_auth_candidate
 				save_auth_candidate(
@@ -1589,7 +1600,7 @@ def nuclei_dast_scan(self, urls=[], ctx={}, description=None):
 	"""Nuclei DAST Scan"""
 	from reNgine.common_func import save_vulnerability, get_http_urls, sanitize_url, get_subdomain_from_url
 	from reNgine.utils.task import stream_command, save_subdomain, save_endpoint
-	from reNgine.tasks.parsers import parse_nuclei_result
+	from reNgine.tasks.parsers import is_nuclei_finding, parse_nuclei_result
 	import os
 
 	logger.info('Nuclei DAST scan started')
@@ -1633,8 +1644,11 @@ def nuclei_dast_scan(self, urls=[], ctx={}, description=None):
 			history_file=self.history_file,
 			scan_id=self.scan_id,
 			activity_id=self.activity_id):
-		if not isinstance(line, dict): continue
+		if not is_nuclei_finding(line):
+			continue
 		vuln_data = parse_nuclei_result(line)
+		if not vuln_data:
+			continue
 		http_url = sanitize_url(line.get('matched-at'))
 		subdomain_name = get_subdomain_from_url(http_url)
 		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
