@@ -179,16 +179,18 @@ h6 {
   animation: spin 2s linear infinite;
 }
 
-/* Compositor-friendly shimmer: translateX stripe over a static bar */
+/* Shimmer stripe for non-MUI progress tracks (wrappers).
+   Do NOT apply to `.MuiLinearProgress-bar` — that bar is position:absolute
+   and sized via transform; relative/overflow collapse the fill. */
 @keyframes progress-shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(200%); }
 }
 
 .progress-bar-flow {
-  position: relative !important;
-  overflow: hidden !important;
-  background: color-mix(in srgb, var(--r3-accent-primary) 85%, transparent) !important;
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--r3-accent-primary) 85%, transparent);
 }
 
 .progress-bar-flow::after {

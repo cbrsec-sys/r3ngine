@@ -513,20 +513,16 @@ export const ScanHistoryPage: React.FC = () => {
                             borderRadius: 0,
                             bgcolor: 'action.hover',
                             '& .MuiLinearProgress-bar': {
+                              // Do not set position/overflow here — MUI sizes the bar with
+                              // absolute positioning + transform; overriding collapses the fill.
                               bgcolor: (scan.scan_status === 0 || scan.scan_status === 3) ? '#ff003c' : scan.scan_status === 5 ? '#ffab00' : tokens.accent.primary,
                               boxShadow: `0 0 10px ${(scan.scan_status === 0 || scan.scan_status === 3) ? 'rgba(255, 0, 60, 0.5)' : scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.5)' : `${tokens.accent.primary}80`}`,
                               ...((scan.scan_status === 1 || scan.scan_status === -1) && {
-                                position: 'relative',
-                                overflow: 'hidden',
-                                background: `linear-gradient(90deg, #00f3ff 0%, #00a8ff 50%, ${tokens.accent.primary} 100%)`,
-                                '&::after': {
-                                  content: '""',
-                                  position: 'absolute',
-                                  inset: 0,
-                                  width: '40%',
-                                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%)',
-                                  animation: 'progress-shimmer 2s linear infinite',
-                                  pointerEvents: 'none',
+                                backgroundImage: `linear-gradient(90deg, #00f3ff 0%, #00a8ff 50%, ${tokens.accent.primary} 100%)`,
+                                animation: 'progress-bar-pulse 2s ease-in-out infinite',
+                                '@keyframes progress-bar-pulse': {
+                                  '0%, 100%': { opacity: 1 },
+                                  '50%': { opacity: 0.72 },
                                 },
                               })
                             }
