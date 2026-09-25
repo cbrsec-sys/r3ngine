@@ -120,6 +120,14 @@
   - Retry now keeps the activity visible, claims INITIATED rows, and restores FAILED status if the retry workflow fails before the task starts — including post-completion retries that keep the parent scan SUCCESS.
   - `retry_failed_tasks_temporal` no longer runs Django ORM inside `asyncio.run()`, which made orchestrator startup recovery fail with `SynchronousOnlyOperation`.
 
+#### Enhanced
+
+- **Frontend GPU / resource cost**:
+  - Replace live SVG `feTurbulence` cyber-noise and `background-attachment: fixed` with a static tiled noise asset and scroll attachment; cap glass `backdrop-filter` at 12px across theme, Shell, and TacticalPanel.
+  - Scan History / Detail: pulse chips and progress bars animate only `transform` / `opacity` (no animated `filter: drop-shadow`); scan list polling is 5s while pending/running/paused/SpiderFoot and 30s when idle.
+  - Cytoscape graphs skip animated initial layout and pause when the tab is hidden; GeoMap pulses only the top five countries; login static overlay no longer uses a per-frame canvas.
+  - Exposures use server-side pagination; Shell proxy polling no longer runs in background tabs; idle vuln-table text glows move to hover.
+
 ### [v3.7.4] - 2026-07-24
 
 #### Enhanced
