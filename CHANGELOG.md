@@ -1,6 +1,6 @@
 # Changelog
 
-### [v3.7.6] - 2026-09-23
+### [v3.7.6] - 2026-09-25
 
 #### Added
 
@@ -21,7 +21,8 @@
   - MCP notes (sidecar **v1.0.3**): list/get for any MCP key; create/update for pentester/sys-admin keys (`TodoNote`); delete remains UI-only.
   - MCP detail tools: companion `r3ngine_get_*_detail` for scan (status-bucketed tasks + finding rollups), target, vulnerability, subdomain, endpoint, exposure, and subscan. Thin `list_*` / `get_*` unchanged. Sidecar bumped to **v1.0.2**.
   - MCP agent upgrade (sidecar **v1.1.0**): capability catalog, singular tool run, follow-up batch plans (propose/edit/approve/abort/retry), `suggested_followups` on detail payloads; OSINT staging list/verify with `agent_verified` badges and UI Clear all / Add verified / Clear false positive; `r3ngine-osint` handoff sub-agent.
-  - Singular tool UI + installed-arg cache: Subdomains tab **Run single tool** modal; `GET /api/action/tool/<tool>/args/` (and MCP `r3ngine_get_tool_args`) returns host-local schemas from binary `--help` with versioned `ToolArgSchemaCache`; optional `tool_args` on run/follow-up steps (validated, denylisted, no free-form shell); `InstalledExternalTool` live sync (`is_present` / version) + refreshed `fixtures/external_tools.yaml`; `manage.py sync_installed_tools` / `refresh_tool_arg_schemas`.
+  - Singular tool UI + installed-arg cache: Subdomains tab **Run single tool** modal; `GET /api/action/tool/<tool>/args/` (and MCP `r3ngine_get_tool_args`) returns schemas from binary `--help` with versioned `ToolArgSchemaCache`; optional `tool_args` on run/follow-up steps (validated, denylisted, no free-form shell); `InstalledExternalTool` live sync (`is_present` / version) + refreshed `fixtures/external_tools.yaml`; `manage.py sync_installed_tools` / `refresh_tool_arg_schemas`.
+  - Tool-arg / presence probes prefer Temporal worker containers (`temporal-go-executor` / `temporal-python-orchestrator`) via `docker exec`, so entrypoint binaries that live only on workers (e.g. `kr`) still populate schemas; paths stay worker-encoded.
   - Singular runs namespace timeline rows as `single_tool_<task>` so they never claim, tier-retry, or finalize pipeline `ScanActivity` rows; host scope (`subdomain_id` / urls) is honored for port scan, crawl, nuclei, screenshot, OSINT, secrets, and WAF paths; timeline retry restores args from `singular_meta_*.json`.
   - ScanActivity claim/initialize now stamps `subscan` when a subscan reuses a parent-scan row so subscan detail can resolve tasks.
   - `r3ngine-mcp` TypeScript sidecar (stdio + Streamable HTTP). nginx `/mcp` proxies to the sidecar; the container has no database or scan-result volumes.
@@ -51,6 +52,21 @@
 - **Scan History drawer stop actions**:
   - Tasks-tab Stop now posts `subscan_ids` (was a no-op); master-scan Stop posts `scan_ids` in the JSON body instead of an ignored `?scan_id=` query param.
   - SubScan `bulk_stop` uses the same `abort_subscan` path as `/api/action/stop/scan/`.
+
+- **Nuclei / go-executor parsing and proxies**:
+  - Skip nuclei `-stats` (and other non-finding) JSON from go-executor stdout so `parse_nuclei_result` no longer raises `KeyError('info')` and fails `RunNucleiActivity`.
+  - Detect nuclei’s FTL “all proxies are dead” exit, refresh the proxy list, and retry up to three times before skipping that severity/tag slice.
+  - Keep SOCKS entries in the nuclei proxy file (HTTP-only filtering left SOCKS-heavy pools with one dead HTTP entry).
+  - Singular / subscan nuclei tech tags and vuln target resolution stay on the subdomain in ctx (no apex-wide tech pull or apex host fallback); vigolium / second_order / related vuln tools honor the same scoped targets.
+
+- **dirsearch / ffuf httpx proxy schemes**:
+  - Centralize `resolve_httpx_compatible_proxy()` so dirsearch 0.5 (httpx) and ffuf never receive `socks4://` (`Unknown scheme for proxy URL`); draw http(s)/socks5 replacements from the pool or continue without a proxy. Dirsearch also retries on that scheme error, not only the classic proxy-error string.
+
+- **Orphan Temporal tool workflows after completed scans**:
+  - `recover_stuck_scans` cancels leftover child go-exec workflows for scans already SUCCESS/ABORTED so a worker restart does not keep burning CPU on dead work.
+
+- **MCP follow-up / OSINT verify hardening**:
+  - Aborting a follow-up plan no longer stops the parent master scan; require `scan_id` for OSINT staging verify; cancel orphan subscans on partial follow-up failure; reject out-of-scope url/host tool steps.
 
 - **postleaksNg false-positive leaks**:
   - `run_postleaks` now retries failed runs, refuses to persist findings on non-zero exit, strips ANSI, and filters traceback / connection-error noise so tool failures are not stored as `SecretLeak` rows.
