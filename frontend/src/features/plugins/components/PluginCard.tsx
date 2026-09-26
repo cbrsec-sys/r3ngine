@@ -54,10 +54,9 @@ import {
 } from '../api/pluginsApi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import mermaid from 'mermaid';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
-// ── Mermaid diagram renderer ───────────────────────────────────────────────────
+// ── Mermaid diagram renderer (lazy — keeps mermaid out of the critical path) ─
 
 let mermaidInitialized = false;
 
@@ -67,18 +66,22 @@ const MermaidBlock: React.FC<{ chart: string }> = ({ chart }) => {
 
   useEffect(() => {
     let cancelled = false;
-    if (!mermaidInitialized) {
-      mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
-      mermaidInitialized = true;
-    }
-    const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
-    mermaid.render(id, chart)
-      .then(({ svg }) => {
+    (async () => {
+      try {
+        const mermaid = (await import('mermaid')).default;
+        if (!mermaidInitialized) {
+          mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+          mermaidInitialized = true;
+        }
+        const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
+        const { svg } = await mermaid.render(id, chart);
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
         }
-      })
-      .catch(() => { if (!cancelled) setRenderError(true); });
+      } catch {
+        if (!cancelled) setRenderError(true);
+      }
+    })();
     return () => { cancelled = true; };
   }, [chart]);
 
