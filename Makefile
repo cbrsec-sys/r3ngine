@@ -19,7 +19,7 @@ $(info Using: $(shell echo "$(DOCKER_COMPOSE)"))
 
 # --------------------------
 
-.PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade erase install-mcp
+.PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade erase install-mcp update-mcp backup restore
 
 certs:		    ## Generate certificates.
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} --env-file .env -f docker/docker-compose.setup.yml run --rm certs
@@ -29,6 +29,9 @@ setup:			## Generate certificates.
 
 install-mcp:		## Clone r3ngine-mcp (if needed) and run its Node setup script.
 	node scripts/install-mcp.mjs $(MCP_INSTALL_ARGS)
+
+update-mcp:		## Pull latest r3ngine-mcp and re-run setup (--update).
+	node scripts/install-mcp.mjs --update $(MCP_INSTALL_ARGS)
 
 up:				## Build and start all services in production mode.
 	DEBUG=0 ${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d --build ${SERVICES}
@@ -259,6 +262,25 @@ fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (includes auto
 	@echo "  Database backup: ./backups/"
 	@echo "============================================================"
 	@echo ""
+
+backup:			## Full backup: PostgreSQL dump + compressed scan_results -> ./backups/full_<timestamp>/
+	@echo ""
+	@POSTGRES_USER=${POSTGRES_USER} \
+	  POSTGRES_DB=${POSTGRES_DB} \
+	  DOCKER_COMPOSE_CMD="${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES}" \
+	  SCAN_RESULTS_VOLUME=r3ngine_scan_results \
+	  bash scripts/full_backup.sh
+
+restore:		## Restore a full backup. Usage: make restore BACKUP=./backups/full_YYYYMMDD_HHMMSS
+ifndef BACKUP
+	$(error BACKUP is required. Example: make restore BACKUP=./backups/full_20260327_120000)
+endif
+	@POSTGRES_USER=${POSTGRES_USER} \
+	  POSTGRES_DB=${POSTGRES_DB} \
+	  DOCKER_COMPOSE_CMD="${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES}" \
+	  SCAN_RESULTS_VOLUME=r3ngine_scan_results \
+	  BACKUP="$(BACKUP)" \
+	  bash scripts/full_restore.sh
 
 help:			## Show this help.
 	@echo "Make application Docker images and manage containers using Docker Compose files."
