@@ -91,6 +91,61 @@ Delete targets, vulns, users, or files. They cannot **delete** notes (create and
 
 Agents can queue allowed work including **subscans** (`r3ngine_start_subscan`) when the key’s role permits dispatch.
 
+## Plugin-gated tools
+
+MCP never opens `/api/plugins/{slug}/` to the sidecar. Thin `/api/mcp/` wrappers call plugin backends only when the plugin is **installed and enabled**.
+
+1. **`r3ngine_list_plugins` / `r3ngine_get_plugin`** — always registered. Returns enabled plugins and each plugin’s `mcp_tools` from `manifest.yaml` (`mcp.tools`).
+2. **`r3ngine_list_capabilities`** — includes a `plugins` array with the same enabled catalog.
+3. **Plugin tools** (first wave: Active Directory) are registered by the sidecar **only after** session open discovers the slug. Host views still return `404` with `reason: plugin_not_installed | plugin_disabled | plugin_backend_missing` if the plugin is absent.
+
+### Active Directory / BloodHound (plugin: `active_directory`)
+
+BloodHound CE / SharpHound are **not** run by the platform. Agents use:
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_list_ad_assessments` / `r3ngine_get_ad_assessment` | Browse assessments |
+| `r3ngine_start_ad_assessment` | Create + start ldapdomaindump/Certipy workflow phases |
+| `r3ngine_ingest_ad_data` | Ingest BloodHound/SharpHound JSON or LDAP export (`content_base64` / `content`) |
+| `r3ngine_list_ad_findings` | Findings (optional trusts/exposures via `include`) |
+| `r3ngine_get_ad_attack_paths` | AD graph paths (`category`: da_paths, kerberoastable, …) — **not** APME |
+| `r3ngine_get_ad_report` | Comprehensive JSON report for agents |
+
+`r3ngine_get_attack_paths` remains **APME** (web-recon). Prefer `r3ngine_get_ad_attack_paths` for AD identity paths.
+
+### Credential Intelligence (plugin: `credential_intelligence`)
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_list_credential_tasks` / `r3ngine_get_credential_task` | Browse auth-testing tasks |
+| `r3ngine_start_credential_task` | Create + run kerbrute/netexec/brutus/hashcat jobs |
+| `r3ngine_list_discovered_credentials` | Credentials with **secrets redacted** |
+| `r3ngine_list_hash_cracking` / `r3ngine_get_hash_cracking` / `r3ngine_start_hash_cracking` | Hashcat jobs (plaintext redacted) |
+
+### Compliance Assessment (plugin: `compliance_assessment`)
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_list_compliance_assessments` / `r3ngine_get_compliance_assessment` | Browse assessments |
+| `r3ngine_list_compliance_controls` | Control results for an assessment |
+| `r3ngine_get_compliance_report` | Attestation JSON when present |
+| `r3ngine_enrich_compliance_control` | AI remediation for a control |
+
+### Burp Suite Integration (plugin: `burpsuite_integration`)
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_list_burp_issues` / `r3ngine_get_burp_issue` | Imported Burp findings |
+| `r3ngine_get_burp_metrics` | Severity / unmatched rollup |
+| `r3ngine_list_burp_sync_logs` | Sync history |
+| `r3ngine_get_burp_health` | Live Burp API connectivity |
+| `r3ngine_start_burp_sync` | Start import+correlate workflow |
+
+**Not exposed via MCP:** `metasploit_integration`, `active_exploitation` (offensive craft), `email_security` / `exploit_readiness_layer` (no dedicated plugin HTTP surface for agents).
+
+Other plugins can declare `mcp.tools` in their manifest and add matching `/api/mcp/` host views + sidecar registrars using the same gate.
+
 ## Detail tools
 
 `list_*` and thin `get_scan` / `get_target` stay lean for browsing. When an agent needs rollups, relations, or scan task status, use the companion detail tools:

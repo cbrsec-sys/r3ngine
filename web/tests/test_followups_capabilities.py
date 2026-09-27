@@ -52,6 +52,8 @@ class CapabilitiesTests(TestCase):
         caps = list_capabilities()
         self.assertIn('pipeline_tasks', caps)
         self.assertIn('workflows', caps)
+        self.assertIn('plugins', caps)
+        self.assertIsInstance(caps['plugins'], list)
         self.assertEqual(caps['max_followup_steps'], 5)
         names = {t['name'] for t in caps['pipeline_tasks']}
         self.assertIn('port_scan', names)

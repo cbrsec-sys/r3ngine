@@ -280,17 +280,37 @@ class VigoliumTaskGatingTest(TestCase):
              patch('builtins.open', mock_open()), \
              patch('reNgine.tasks.vigolium.Subdomain'):
             vigolium_scan(task, urls=['https://example.com'])
-            # Phase A (spidering+discovery) and Phase B (known-issue-scan+
+            # Phase A (spidering) and Phase B (known-issue-scan+
             # dynamic-assessment) are separate runs so a Phase B timeout cannot
-            # restart Phase A. Both default to enabled.
+            # restart Phase A. Discovery is not part of the Tier 6 scan.
+            # Both phases default to enabled.
             self.assertEqual(mock_run.call_count, 2)
             commands = [call[0][1] for call in mock_run.call_args_list]
             for cmd in commands:
                 self.assertIn('--stateless', cmd)
                 self.assertIn('--skip-dependency-check', cmd)
                 self.assertIn('--omit-response', cmd)
-            self.assertIn('--only spidering,discovery', commands[0])
+            self.assertIn('--only spidering', commands[0])
+            self.assertNotIn('discovery', commands[0])
             self.assertIn('--only known-issue-scan,dynamic-assessment', commands[1])
+
+    def test_vigolium_scan_skip_spidering_skips_phase_a(self):
+        from reNgine.tasks.vigolium import vigolium_scan
+        task = self._make_task(vuln_enabled=True)
+        task.yaml_configuration['vulnerability_scan']['vigolium'] = {
+            'skip_spidering': True,
+        }
+        with patch('reNgine.tasks.vigolium._run_vigolium_phase') as mock_run, \
+             patch('os.makedirs'), \
+             patch('builtins.open', mock_open()), \
+             patch('reNgine.tasks.vigolium.Subdomain'):
+            vigolium_scan(task, urls=['https://example.com'])
+            # Phase A has nothing left once discovery is removed and spidering
+            # is skipped — only Phase B should run.
+            self.assertEqual(mock_run.call_count, 1)
+            cmd = mock_run.call_args_list[0][0][1]
+            self.assertIn('--only known-issue-scan,dynamic-assessment', cmd)
+            self.assertNotIn('discovery', cmd)
 
     def test_vigolium_scan_passes_subdomain_scope_to_url_collector(self):
         from reNgine.tasks.vigolium import vigolium_scan
