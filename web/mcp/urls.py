@@ -77,6 +77,16 @@ from mcp.views.capabilities import (
     McpGetToolArgsView,
     McpUpdateFollowupsView,
 )
+from mcp.views.plugins import McpGetPluginView, McpListPluginsView
+from mcp.views.ad_plugin import (
+    McpAdAttackPathsView,
+    McpAdFindingsView,
+    McpAdGetAssessmentView,
+    McpAdIngestView,
+    McpAdListAssessmentsView,
+    McpAdReportView,
+    McpAdStartAssessmentView,
+)
 from mcp.views.settings import McpSettingsView
 
 urlpatterns = [
@@ -124,6 +134,15 @@ urlpatterns = [
     path('engines/<int:pk>/', McpGetEngineDetailView.as_view()),
     path('engines/', McpListEnginesView.as_view()),
     path('capabilities/', McpListCapabilitiesView.as_view()),
+    path('plugins/<slug:slug>/', McpGetPluginView.as_view()),
+    path('plugins/', McpListPluginsView.as_view()),
+    path('ad/assessments/start/', McpAdStartAssessmentView.as_view()),
+    path('ad/assessments/<int:pk>/ingest/', McpAdIngestView.as_view()),
+    path('ad/assessments/<int:pk>/findings/', McpAdFindingsView.as_view()),
+    path('ad/assessments/<int:pk>/attack-paths/', McpAdAttackPathsView.as_view()),
+    path('ad/assessments/<int:pk>/report/', McpAdReportView.as_view()),
+    path('ad/assessments/<int:pk>/', McpAdGetAssessmentView.as_view()),
+    path('ad/assessments/', McpAdListAssessmentsView.as_view()),
     path('health/', McpHealthView.as_view()),
     path('notes/', McpNotesListCreateView.as_view()),
     path('notes/<int:pk>/', McpNoteDetailView.as_view()),
