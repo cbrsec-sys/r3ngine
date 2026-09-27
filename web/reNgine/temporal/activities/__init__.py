@@ -2120,6 +2120,9 @@ def enrich_scan_cves_activity(ctx: dict) -> bool:
     Returns:
         bool: True in all cases (enrichment failures are logged, not raised).
     """
+    from datetime import timedelta
+    from django.db.models import Q
+    from django.utils import timezone
     from startScan.models import CveId
     from reNgine.cve_enrichment import CVEEnrichmentService
 
@@ -2127,25 +2130,33 @@ def enrich_scan_cves_activity(ctx: dict) -> bool:
     logger.log_line("[TEMPORAL]", "START", "task=enrich_scan_cves scan_id=%s" % scan_id)
     activity.logger.warning("[TIER7][CVE_ENRICH] Activity starting | scan_id=%s", scan_id)
 
+    # Only process CVEs that still need work. Skipping already-fresh rows keeps
+    # this under the Temporal heartbeat budget when retries fire.
+    cutoff = timezone.now() - timedelta(days=7)
     cve_names = list(
         CveId.objects
         .filter(cve_ids__scan_history_id=scan_id)
+        .filter(
+            Q(cvss_v31_base_score__isnull=True)
+            | Q(last_enriched_at__isnull=True)
+            | Q(last_enriched_at__lt=cutoff)
+        )
         .values_list('name', flat=True)
         .distinct()
     )
 
     if not cve_names:
-        activity.logger.warning("[TIER7][CVE_ENRICH] No CVEs found for this scan | scan_id=%s", scan_id)
-        logger.log_line("[TEMPORAL]", "COMPLETE", "task=enrich_scan_cves scan_id=%s enriched=0/0 skipped=no_cves" % scan_id)
+        activity.logger.warning("[TIER7][CVE_ENRICH] No CVEs need enrichment for this scan | scan_id=%s", scan_id)
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=enrich_scan_cves scan_id=%s enriched=0/0 skipped=already_fresh" % scan_id)
         return True
 
     activity.logger.warning("[TIER7][CVE_ENRICH] Enriching %d CVE(s) | scan_id=%s", len(cve_names), scan_id)
     service = CVEEnrichmentService()
     enriched = 0
 
-    for cve_name in cve_names:
+    for idx, cve_name in enumerate(cve_names, start=1):
         try:
-            activity.heartbeat(f"enriching {cve_name}")
+            activity.heartbeat(f"enriching {idx}/{len(cve_names)} {cve_name}")
             if service.enrich_cve(cve_name):
                 enriched += 1
         except Exception as exc:

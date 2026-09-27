@@ -848,11 +848,14 @@ class MasterScanWorkflow:
                             )
                             # Enrich CVEs found during this scan with NVD/EPSS/KEV data
                             # before risk scoring so CVSS and EPSS values are available.
+                            # Budget sized for large CVE sets + slow NVD; heartbeat must
+                            # outlast a single external API stall (NVD read timeout=10s
+                            # plus vulnx/sploitscan).
                             await workflow.execute_activity(
                                 "EnrichScanCVEsActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=45),
-                                heartbeat_timeout=timedelta(minutes=5),
+                                start_to_close_timeout=timedelta(hours=2),
+                                heartbeat_timeout=timedelta(minutes=15),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
                             )
@@ -3730,7 +3733,7 @@ class SingleTaskRetryWorkflow:
                 await workflow.execute_activity("ParseAssessmentResultsActivity", ctx, start_to_close_timeout=timedelta(minutes=5), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
                 await workflow.execute_activity("CorrelateVulnerabilitiesActivity", ctx, start_to_close_timeout=timedelta(minutes=90), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
                 await workflow.execute_activity("CorrelateExposuresActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
-                await workflow.execute_activity("EnrichScanCVEsActivity", ctx, start_to_close_timeout=timedelta(minutes=45), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
+                await workflow.execute_activity("EnrichScanCVEsActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=15), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
                 await workflow.execute_activity("CalculateRiskScoresActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
                 await workflow.execute_activity("GenerateImpactAssessmentActivity", ctx, start_to_close_timeout=timedelta(hours=1), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_LLM, task_queue="python-orchestrator-queue")
             elif task_name == "dalfox_xss_scan":

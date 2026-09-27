@@ -33,6 +33,15 @@ from mcp.views.validation import (
     McpEnrichVulnerabilityView,
     McpValidateVulnerabilityView,
 )
+from mcp.views.attack_path_proposals import (
+    McpAbortAttackPathProposalView,
+    McpApproveAttackPathProposalView,
+    McpGetAttackPathProposalView,
+    McpGetAttackPathView,
+    McpListAttackPathProposalsView,
+    McpProposeAttackPathView,
+    McpUpdateAttackPathProposalView,
+)
 from mcp.views.notes import McpNoteDetailView, McpNotesListCreateView
 from mcp.views.osint_verify import McpVerifyOsintStagingView
 from mcp.views.read import (
@@ -154,7 +163,14 @@ urlpatterns = [
     path('search/', McpSearchView.as_view()),
     path('dashboard/', McpDashboardView.as_view()),
     path('attack-paths/<str:path_id>/enrich/', McpEnrichAttackPathView.as_view()),
+    path('attack-paths/<str:path_id>/', McpGetAttackPathView.as_view()),
     path('attack-paths/', McpAttackPathsView.as_view()),
+    path('attack-path-proposals/propose/', McpProposeAttackPathView.as_view()),
+    path('attack-path-proposals/<int:pk>/update/', McpUpdateAttackPathProposalView.as_view()),
+    path('attack-path-proposals/<int:pk>/approve/', McpApproveAttackPathProposalView.as_view()),
+    path('attack-path-proposals/<int:pk>/abort/', McpAbortAttackPathProposalView.as_view()),
+    path('attack-path-proposals/<int:pk>/', McpGetAttackPathProposalView.as_view()),
+    path('attack-path-proposals/', McpListAttackPathProposalsView.as_view()),
     path('engines/<int:pk>/', McpGetEngineDetailView.as_view()),
     path('engines/', McpListEnginesView.as_view()),
     path('capabilities/', McpListCapabilitiesView.as_view()),

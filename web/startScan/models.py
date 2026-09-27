@@ -556,6 +556,9 @@ class CveId(models.Model):
 	epss_percentile = models.FloatField(null=True, blank=True)  # 0-100
 	published_date = models.DateTimeField(null=True, blank=True)
 	last_modified_date = models.DateTimeField(null=True, blank=True)
+	# When we last ran local enrichment (NVD/EPSS/etc). Distinct from NVD's
+	# lastModified — using that for the 7-day skip caused perpetual re-enrichment.
+	last_enriched_at = models.DateTimeField(null=True, blank=True, db_index=True)
 	vulnerability_type = models.CharField(max_length=50, null=True, blank=True)  # SCA, DAST, SAST, Config
 	is_poc = models.BooleanField(default=False)
 	is_template = models.BooleanField(default=False)
