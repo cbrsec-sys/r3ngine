@@ -64,10 +64,10 @@ body.cyber-noise::after {
   background-image: url("/staticfiles/img/cyber_noise.png") !important;
   background-size: 128px 128px !important;
   background-repeat: repeat !important;
-  opacity: 0.2 !important;
+  opacity: 0.14 !important;
   z-index: 9999 !important;
   pointer-events: none !important;
-  mix-blend-mode: overlay !important;
+  /* Avoid mix-blend-mode: forces continuous compositing with any animated UI underneath */
 }
 
 h1,

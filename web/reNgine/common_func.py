@@ -738,6 +738,12 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 	# remove nulls
 	vuln_data = replace_nulls(vuln_data)
 
+	# agent_enrichment is NOT NULL jsonb with no DB-level DEFAULT. Explicit None
+	# (or a missing key on some insert paths) raises IntegrityError on create.
+	enrichment = vuln_data.get('agent_enrichment', None)
+	if enrichment is None or not isinstance(enrichment, dict):
+		vuln_data['agent_enrichment'] = {}
+
 	# Check for False Positive rules
 	is_suppressed = False
 	try:
