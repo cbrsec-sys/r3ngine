@@ -87,6 +87,30 @@ from mcp.views.ad_plugin import (
     McpAdReportView,
     McpAdStartAssessmentView,
 )
+from mcp.views.credential_plugin import (
+    McpCredGetCrackingView,
+    McpCredGetTaskView,
+    McpCredListCrackingView,
+    McpCredListCredentialsView,
+    McpCredListTasksView,
+    McpCredStartCrackingView,
+    McpCredStartTaskView,
+)
+from mcp.views.compliance_plugin import (
+    McpComplianceEnrichControlView,
+    McpComplianceGetAssessmentView,
+    McpComplianceGetReportView,
+    McpComplianceListAssessmentsView,
+    McpComplianceListControlsView,
+)
+from mcp.views.burp_plugin import (
+    McpBurpGetIssueView,
+    McpBurpHealthView,
+    McpBurpListIssuesView,
+    McpBurpListSyncLogsView,
+    McpBurpMetricsView,
+    McpBurpSyncImportView,
+)
 from mcp.views.settings import McpSettingsView
 
 urlpatterns = [
@@ -143,6 +167,24 @@ urlpatterns = [
     path('ad/assessments/<int:pk>/report/', McpAdReportView.as_view()),
     path('ad/assessments/<int:pk>/', McpAdGetAssessmentView.as_view()),
     path('ad/assessments/', McpAdListAssessmentsView.as_view()),
+    path('credentials/tasks/start/', McpCredStartTaskView.as_view()),
+    path('credentials/tasks/<int:pk>/', McpCredGetTaskView.as_view()),
+    path('credentials/tasks/', McpCredListTasksView.as_view()),
+    path('credentials/discovered/', McpCredListCredentialsView.as_view()),
+    path('credentials/cracking/start/', McpCredStartCrackingView.as_view()),
+    path('credentials/cracking/<int:pk>/', McpCredGetCrackingView.as_view()),
+    path('credentials/cracking/', McpCredListCrackingView.as_view()),
+    path('compliance/assessments/<int:pk>/report/', McpComplianceGetReportView.as_view()),
+    path('compliance/assessments/<int:pk>/', McpComplianceGetAssessmentView.as_view()),
+    path('compliance/assessments/', McpComplianceListAssessmentsView.as_view()),
+    path('compliance/controls/<int:pk>/enrich/', McpComplianceEnrichControlView.as_view()),
+    path('compliance/controls/', McpComplianceListControlsView.as_view()),
+    path('burp/issues/metrics/', McpBurpMetricsView.as_view()),
+    path('burp/issues/<int:pk>/', McpBurpGetIssueView.as_view()),
+    path('burp/issues/', McpBurpListIssuesView.as_view()),
+    path('burp/sync-logs/', McpBurpListSyncLogsView.as_view()),
+    path('burp/health/', McpBurpHealthView.as_view()),
+    path('burp/sync/import/', McpBurpSyncImportView.as_view()),
     path('health/', McpHealthView.as_view()),
     path('notes/', McpNotesListCreateView.as_view()),
     path('notes/<int:pk>/', McpNoteDetailView.as_view()),

@@ -195,7 +195,7 @@ export interface VigoliumVulnConfig {
   concurrency: number;
   rate_limit: number;
   timeout: string;
-  run_phase_a: boolean;  // Phase A: spidering + discovery
+  run_phase_a: boolean;  // Phase A: spidering (Tier 6 vuln scan)
   run_phase_b: boolean;  // Phase B: known-issue-scan + dynamic-assessment
   scope_origin: 'all' | 'relaxed' | 'balanced' | 'strict';
   skip_spidering: boolean;

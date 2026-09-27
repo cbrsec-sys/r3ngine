@@ -114,6 +114,36 @@ BloodHound CE / SharpHound are **not** run by the platform. Agents use:
 
 `r3ngine_get_attack_paths` remains **APME** (web-recon). Prefer `r3ngine_get_ad_attack_paths` for AD identity paths.
 
+### Credential Intelligence (plugin: `credential_intelligence`)
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_list_credential_tasks` / `r3ngine_get_credential_task` | Browse auth-testing tasks |
+| `r3ngine_start_credential_task` | Create + run kerbrute/netexec/brutus/hashcat jobs |
+| `r3ngine_list_discovered_credentials` | Credentials with **secrets redacted** |
+| `r3ngine_list_hash_cracking` / `r3ngine_get_hash_cracking` / `r3ngine_start_hash_cracking` | Hashcat jobs (plaintext redacted) |
+
+### Compliance Assessment (plugin: `compliance_assessment`)
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_list_compliance_assessments` / `r3ngine_get_compliance_assessment` | Browse assessments |
+| `r3ngine_list_compliance_controls` | Control results for an assessment |
+| `r3ngine_get_compliance_report` | Attestation JSON when present |
+| `r3ngine_enrich_compliance_control` | AI remediation for a control |
+
+### Burp Suite Integration (plugin: `burpsuite_integration`)
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_list_burp_issues` / `r3ngine_get_burp_issue` | Imported Burp findings |
+| `r3ngine_get_burp_metrics` | Severity / unmatched rollup |
+| `r3ngine_list_burp_sync_logs` | Sync history |
+| `r3ngine_get_burp_health` | Live Burp API connectivity |
+| `r3ngine_start_burp_sync` | Start import+correlate workflow |
+
+**Not exposed via MCP:** `metasploit_integration`, `active_exploitation` (offensive craft), `email_security` / `exploit_readiness_layer` (no dedicated plugin HTTP surface for agents).
+
 Other plugins can declare `mcp.tools` in their manifest and add matching `/api/mcp/` host views + sidecar registrars using the same gate.
 
 ## Detail tools

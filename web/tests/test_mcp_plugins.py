@@ -233,3 +233,51 @@ class McpAdPluginGateTests(TestCase):
         res = self.client.get('/api/mcp/ad/assessments/1/report/')
         self.assertEqual(res.status_code, 404)
         self.assertEqual(res.json()['reason'], 'plugin_not_installed')
+
+
+class McpOtherPluginGateTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='mcp-other', password='x')
+        assign_role(self.user, 'penetration_tester')
+        self.client, self.sid = mcp_client_with_session(self.user)
+
+    def test_credential_list_404_when_missing(self):
+        res = self.client.get('/api/mcp/credentials/tasks/')
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json()['reason'], 'plugin_not_installed')
+
+    def test_compliance_list_404_when_missing(self):
+        res = self.client.get('/api/mcp/compliance/assessments/')
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json()['reason'], 'plugin_not_installed')
+
+    def test_burp_list_404_when_missing(self):
+        res = self.client.get('/api/mcp/burp/issues/')
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json()['reason'], 'plugin_not_installed')
+
+    def test_tool_map_extra_plugin_paths(self):
+        self.assertEqual(
+            tool_name_for('GET', '/api/mcp/credentials/tasks/'),
+            'r3ngine_list_credential_tasks',
+        )
+        self.assertEqual(
+            tool_name_for('POST', '/api/mcp/credentials/tasks/start/'),
+            'r3ngine_start_credential_task',
+        )
+        self.assertEqual(
+            tool_name_for('GET', '/api/mcp/compliance/assessments/'),
+            'r3ngine_list_compliance_assessments',
+        )
+        self.assertEqual(
+            tool_name_for('POST', '/api/mcp/compliance/controls/9/enrich/'),
+            'r3ngine_enrich_compliance_control',
+        )
+        self.assertEqual(
+            tool_name_for('GET', '/api/mcp/burp/issues/'),
+            'r3ngine_list_burp_issues',
+        )
+        self.assertEqual(
+            tool_name_for('POST', '/api/mcp/burp/sync/import/'),
+            'r3ngine_start_burp_sync',
+        )

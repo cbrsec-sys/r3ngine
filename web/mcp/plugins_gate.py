@@ -90,5 +90,14 @@ def require_plugin(slug: str, *, backend_module: Optional[str] = None) -> Plugin
     return plugin
 
 
+def gate_plugin(slug: str, *, backend_module: Optional[str] = None) -> Optional[Response]:
+    """Return a 404 Response if the plugin is unavailable, else None."""
+    try:
+        require_plugin(slug, backend_module=backend_module)
+        return None
+    except McpPluginUnavailable as exc:
+        return plugin_unavailable_response(exc)
+
+
 def plugin_unavailable_response(exc: McpPluginUnavailable) -> Response:
     return Response(exc.detail, status=404)

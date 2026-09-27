@@ -470,25 +470,29 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
 
     proxy = get_random_proxy()
 
-    # --- Phase A: Spidering + Discovery ---
-    # Crawls and actively probes all targets to build the URL graph.  Runs first
-    # so that any spidering-discovered endpoints are available for Phase B.
+    # --- Phase A: Spidering only ---
+    # Browser crawl of all targets so spidering-discovered endpoints feed Phase B.
+    # Discovery is intentionally omitted here — the dedicated vigolium_discovery
+    # task (Tier 2) and vigolium_analysis (Tier 5) already cover that phase.
     # ExternalHarvest is excluded — vigolium skips it in --stateless mode anyway
     # (it requires an active database session to ingest passive sources).
-    # When skip_spidering is True, spidering is omitted from --only so only the
-    # discovery probe runs (no browser crawl), and --skip spidering is on base_cmd.
-    if run_phase_a:
-        output_file_discovery = f"{results_dir}/findings_discovery.jsonl"
-        phase_a_phases = "discovery" if skip_spidering else "spidering,discovery"
-        cmd_a = base_cmd + f" --only {phase_a_phases} -o {output_file_discovery}"
+    # When skip_spidering is True, Phase A has nothing left to run and is skipped.
+    if run_phase_a and not skip_spidering:
+        output_file_spidering = f"{results_dir}/findings_spidering.jsonl"
+        cmd_a = base_cmd + f" --only spidering -o {output_file_spidering}"
         _run_vigolium_phase(
-            self, cmd_a, output_file_discovery,
-            f"Scan/Discovery ({phase_a_phases})",
+            self, cmd_a, output_file_spidering,
+            "Scan/Spidering (spidering)",
             save_http_records=False,
             proxy=proxy,
         )
+    elif run_phase_a and skip_spidering:
+        logger.info(
+            "Vigolium Phase A (spidering) skipped — skip_spidering is enabled "
+            "(discovery is not part of the Tier 6 vulnerability scan)."
+        )
     else:
-        logger.info("Vigolium Phase A (spidering+discovery) skipped by configuration.")
+        logger.info("Vigolium Phase A (spidering) skipped by configuration.")
 
     # --- Phase B: KnownIssueScan + DynamicAssessment ---
     # Runs the Nuclei-based template scanner and the dynamic interaction engine
