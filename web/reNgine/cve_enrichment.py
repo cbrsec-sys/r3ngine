@@ -60,7 +60,7 @@ class CVEEnrichmentService:
     
     # ==================== Public API ====================
     
-    def enrich_cve(self, cve_name: str) -> Optional[CveId]:
+    def enrich_cve(self, cve_name: str, force: bool = False) -> Optional[CveId]:
         """
         Fetch and store CVE metadata from NVD and EPSS APIs.
         
@@ -68,6 +68,7 @@ class CVEEnrichmentService:
         
         Args:
             cve_name (str): CVE identifier, e.g., 'CVE-2024-1234'
+            force (bool): When True, bypass the 7-day local enrichment skip.
         
         Returns:
             CveId: Updated or created CveId object, or None if enrichment fails
@@ -101,10 +102,18 @@ class CVEEnrichmentService:
             # We don't perform external enrichment for non-CVE strings, just return
             return cve_obj
         
-        # Skip re-enrichment if recently updated (within 7 days)
-        if not created and cve_obj.last_modified_date:
-            days_old = (timezone.now() - cve_obj.last_modified_date).days
-            if days_old < 7 and cve_obj.cvss_v31_base_score is not None:
+        # Skip re-enrichment if we recently enriched locally (within 7 days).
+        # Do NOT use NVD lastModified here — that is upstream metadata and is
+        # often weeks/months old, which caused EnrichScanCVEsActivity to
+        # re-hammer every CVE, blow the Temporal heartbeat, and retry forever.
+        if (
+            not force
+            and not created
+            and cve_obj.last_enriched_at
+            and cve_obj.cvss_v31_base_score is not None
+        ):
+            days_old = (timezone.now() - cve_obj.last_enriched_at).days
+            if days_old < 7:
                 logger.debug(f"CVE {cve_name} recently enriched, skipping")
                 return cve_obj
         
@@ -137,7 +146,8 @@ class CVEEnrichmentService:
         except Exception as e:
             logger.warning(f"AI risk assessment failed for {cve_name}: {e}")
 
-        # Save and return
+        # Stamp local enrichment time (keep last_modified_date as NVD's value).
+        cve_obj.last_enriched_at = timezone.now()
         cve_obj.save()
         return cve_obj
     
@@ -733,7 +743,7 @@ class CVEBatchEnricher:
         count = 0
         for cve in cves_to_refresh:
             try:
-                self.service.enrich_cve(cve.name)
+                self.service.enrich_cve(cve.name, force=True)
                 count += 1
             except Exception as e:
                 logger.error(f"Failed to refresh {cve.name}: {e}")
