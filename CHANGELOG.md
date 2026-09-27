@@ -1,5 +1,25 @@
 # Changelog
 
+### [v3.7.7] - 2026-09-27
+
+#### Added
+
+- **Plugin-gated MCP tools**:
+  - `r3ngine_list_plugins` / `r3ngine_get_plugin` discovery plus a `plugins` section on `r3ngine_list_capabilities`.
+  - Host gates optional tools with `Plugin.is_enabled` + backend import; thin `/api/mcp/` wrappers never open raw `/api/plugins/{slug}/`.
+  - **Active Directory** (`active_directory`): list/get/start assessments, BloodHound/SharpHound JSON ingest (collectors not run), findings, AD graph attack paths, JSON reports.
+  - **Credential Intelligence**: task lifecycle, discovered credentials with secrets redacted, hash cracking status (plaintext redacted).
+  - **Compliance Assessment**: assessments, controls, attestation JSON, AI control enrich.
+  - **Burp Suite Integration**: issues, metrics, sync logs, health, import workflow trigger; `api_urls.py` shim so the host loader mounts the plugin.
+  - Sidecar (**r3ngine-mcp v1.4.0**) registers plugin tools only after session open when the matching slug is enabled (`tools/list_changed` on stdio).
+  - Manifest contract: optional `mcp.tools` in plugin `manifest.yaml` (documented in `documents/plugin-system.md` / plugin developers guide).
+  - Still excluded from MCP: Metasploit and active exploitation (offensive craft); email security / exploit readiness (no agent HTTP surface).
+
+#### Notes
+
+- Requires matching [r3ngine-mcp](https://github.com/whiterabb17/r3ngine-mcp) **v1.4.0** and updated plugin packages from [r3ngine-plugins](https://github.com/whiterabb17/r3ngine-plugins).
+- See `documents/mcp.md`.
+
 ### [v3.7.6] - 2026-09-25
 
 #### Added
