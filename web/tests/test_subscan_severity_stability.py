@@ -188,6 +188,27 @@ class TestSubscanSeverityStability(TestCase):
         # Also confirm the Command database object was updated with a return code indicating termination/killed status
         mock_cmd_obj.save.assert_called()
 
+    def test_save_vulnerability_rejects_null_agent_enrichment(self):
+        """Explicit agent_enrichment=None must not hit the NOT NULL jsonb column."""
+        from reNgine.common_func import save_vulnerability
+        from startScan.models import Vulnerability
+
+        vuln, created = save_vulnerability(
+            target_domain=self.domain,
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url='http://target.stability.test.local/enrichment-null',
+            name='Agent Enrichment Null Guard',
+            severity=0,
+            description='probe',
+            type='test',
+            agent_enrichment=None,
+        )
+        self.assertTrue(created)
+        self.assertEqual(vuln.agent_enrichment, {})
+        stored = Vulnerability.objects.get(pk=vuln.pk)
+        self.assertEqual(stored.agent_enrichment, {})
+
     def test_save_vulnerability_deduplication(self):
         """
         Verify that save_vulnerability correctly deduplicates findings based on core identity
