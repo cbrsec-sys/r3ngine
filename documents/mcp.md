@@ -112,7 +112,21 @@ BloodHound CE / SharpHound are **not** run by the platform. Agents use:
 | `r3ngine_get_ad_attack_paths` | AD graph paths (`category`: da_paths, kerberoastable, …) — **not** APME |
 | `r3ngine_get_ad_report` | Comprehensive JSON report for agents |
 
-`r3ngine_get_attack_paths` remains **APME** (web-recon). Prefer `r3ngine_get_ad_attack_paths` for AD identity paths.
+`r3ngine_get_attack_paths` / `r3ngine_get_attack_path` remain **APME** (web-recon). Prefer `r3ngine_get_ad_attack_paths` for AD identity paths.
+
+### APME attack-path proposals
+
+Path create/enrich/update/dismiss and APME queue are **propose → operator approve** (same human gate as follow-ups):
+
+| Tool | Purpose |
+|------|---------|
+| `r3ngine_get_attack_paths` / `r3ngine_get_attack_path` | Read paths |
+| `r3ngine_propose_attack_path` | Draft enrich/create/update/dismiss/trigger_apme/recalculate_apme |
+| `r3ngine_list_attack_path_proposals` / `r3ngine_get_attack_path_proposal` | Browse proposals |
+| `r3ngine_update_attack_path_proposal` | Edit while `proposed` |
+| `r3ngine_approve_attack_path_proposal` / `r3ngine_abort_attack_path_proposal` | Operator yes only |
+
+Direct `r3ngine_enrich_attack_path`, `r3ngine_trigger_apme`, and `r3ngine_recalculate_apme` return **410** and point agents at proposals. UI non-MCP APME endpoints are unchanged.
 
 ### Credential Intelligence (plugin: `credential_intelligence`)
 
@@ -164,7 +178,8 @@ Agents (and the Subdomains tab **Run single tool** modal) can:
 2. **`r3ngine_get_tool_args`** — host-local CLI schema for a tool (installed binary `--help`, versioned DB cache; seed fallback when the binary is missing). Call this before inventing flags.
 3. **`r3ngine_run_tool`** — start one pipeline tool on a subdomain, endpoint, or URL. Optional `tool_args` must match the schema (denylisted retargeting / filesystem flags; no free-form shell). Timeline rows are namespaced `single_tool_<task>` so they never collide with master-scan claim / tier-retry / resume.
 4. **Follow-up plans** — `propose` → optional `update` → operator `approve` / `abort` / `retry`; detail payloads may include capped `suggested_followups`.
-5. **OSINT staging** — `r3ngine_list_osint_staging` / `r3ngine_verify_osint_staging` with `agent_verified` badges in the UI.
+5. **Attack-path proposals** — `r3ngine_propose_attack_path` → optional update → operator approve/abort (enrich/create/update/dismiss/APME queue).
+6. **OSINT staging** — `r3ngine_list_osint_staging` / `r3ngine_verify_osint_staging` with `agent_verified` badges in the UI.
 
 Operators manage keys, sessions, and the audit chain in **Settings → MCP Access**. Sync installed binaries and refresh arg schemas on the web container with `manage.py sync_installed_tools` and `manage.py refresh_tool_arg_schemas` when tools are updated.
 

@@ -1,6 +1,3 @@
-from rest_framework.response import Response
-
-from api.apme_views import RecalculateAttackPathsAPIView, TriggerLLMAPMEAPIView
 from api.permissions import HasPermission, IsPenetrationTester
 from api.views.recon import (
     StartEmailDiscoveryView,
@@ -19,6 +16,7 @@ from api.views.scan import (
 )
 from mcp.views.base import McpDataView
 from reNgine.definitions import PERM_INITATE_SCANS_SUBSCANS
+from rest_framework.response import Response
 
 
 def _delegate_post(view_cls, request, **kwargs):
@@ -112,12 +110,34 @@ class McpStopEmployeeIntelView(McpIntelDispatchView):
 
 class McpTriggerApmeView(McpIntelDispatchView):
     def post(self, request):
-        return _delegate_post(TriggerLLMAPMEAPIView, request)
+        from mcp.attack_path_proposals import PROPOSE_APPROVE_MSG
+        return Response(
+            {
+                'error': PROPOSE_APPROVE_MSG,
+                'hint': {
+                    'tool': 'r3ngine_propose_attack_path',
+                    'operation': 'trigger_apme',
+                    'scan_id': (request.data or {}).get('scan_id'),
+                },
+            },
+            status=410,
+        )
 
 
 class McpRecalculateApmeView(McpIntelDispatchView):
     def post(self, request):
-        return _delegate_post(RecalculateAttackPathsAPIView, request)
+        from mcp.attack_path_proposals import PROPOSE_APPROVE_MSG
+        return Response(
+            {
+                'error': PROPOSE_APPROVE_MSG,
+                'hint': {
+                    'tool': 'r3ngine_propose_attack_path',
+                    'operation': 'recalculate_apme',
+                    'scan_id': (request.data or {}).get('scan_id'),
+                },
+            },
+            status=410,
+        )
 
 
 class McpStartWorkflowView(McpIntelDispatchView):

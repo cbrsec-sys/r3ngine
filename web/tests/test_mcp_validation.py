@@ -225,14 +225,12 @@ class McpValidationTests(TestCase):
             },
             format='json',
         )
-        self.assertEqual(res.status_code, 200)
-        body = res.json()
-        review = body['agent_path_review']
-        self.assertEqual(review['feasibility'], 'stretched')
-        self.assertEqual(review['missing_prereqs'], ['valid session token'])
+        self.assertEqual(res.status_code, 410)
+        self.assertIn('propose', res.json()['error'].lower())
         self.impact.refresh_from_db()
-        nested = self.impact.potential_attack_chain['agent_path_review']
-        self.assertEqual(nested['feasibility'], 'stretched')
+        self.assertIsNone(
+            (self.impact.potential_attack_chain or {}).get('agent_path_review')
+        )
 
     def test_attack_paths_list_includes_review(self):
         self.impact.potential_attack_chain = {
