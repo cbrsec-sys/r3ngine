@@ -28,6 +28,7 @@ import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { BreachDetailsModal } from './BreachDetailsModal';
 import { formatSecretType, getSecretCategory } from '../utils/secretTypeUtils';
 import type { SecretLeak } from '../types';
+import { getSafeUrl } from '../../../utils/securityUtils';
 
 interface SecretLeaksTabProps {
   projectSlug: string;
@@ -210,7 +211,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                           <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {group.source_url}
                           </Typography>
-                          <IconButton size="small" component="a" href={/^https?:\/\//i.test(group.source_url) ? group.source_url : '#'} target="_blank" sx={{ color: tokens.accent.primary, p: 0.5 }} onClick={e => e.stopPropagation()}>
+                          <IconButton size="small" component="a" href={getSafeUrl(group.source_url) ?? '#'} target="_blank" sx={{ color: tokens.accent.primary, p: 0.5 }} onClick={e => e.stopPropagation()}>
                             <ExternalLink size={12} />
                           </IconButton>
                         </Stack>

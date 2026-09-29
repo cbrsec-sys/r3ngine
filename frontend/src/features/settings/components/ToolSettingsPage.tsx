@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import {
   Box,
   Typography,
@@ -49,7 +48,8 @@ import {
   useToolSettings,
   useFileContent,
   useUpdateToolConfig,
-  useUploadToolFiles
+  useUploadToolFiles,
+  fetchToolFileContent
 } from '../api';
 import { useParams } from '@tanstack/react-router';
 
@@ -112,14 +112,10 @@ export const ToolSettingsPage: React.FC = () => {
 
   const handleEditConfig = (key: string, name: string) => {
     setEditingFile({ key, name });
-    // Note: We'll use the fileContent hook by setting a query param state if needed,
-    // but for simplicity and to match the legacy logic which fetches on click,
-    // we can use axios directly or a manual refetch.
-    // Let's use axios for now to ensure it works with the current setup.
     setFileContent('Loading...');
-    axios.get(`/api/getFileContents/?${key}`)
+    fetchToolFileContent(key)
       .then(res => {
-        if (res.data.status) setFileContent(res.data.content);
+        if (res.status) setFileContent(res.content);
         else setFileContent('Error loading file content');
       })
       .catch(() => setFileContent('Failed to fetch file content'));
@@ -128,9 +124,9 @@ export const ToolSettingsPage: React.FC = () => {
   const handleEditGF = (patternName: string) => {
     setEditingFile({ key: 'gf_pattern', name: patternName });
     setFileContent('Loading...');
-    axios.get(`/api/getFileContents/?gf_pattern&name=${patternName}`)
+    fetchToolFileContent('gf_pattern', patternName)
       .then(res => {
-        if (res.data.status) setFileContent(res.data.content);
+        if (res.status) setFileContent(res.content);
         else setFileContent('Error loading GF pattern');
       })
       .catch(() => setFileContent('Failed to fetch GF pattern'));
@@ -139,9 +135,9 @@ export const ToolSettingsPage: React.FC = () => {
   const handleViewNucleiTemplate = (templateName: string) => {
     setEditingFile({ key: 'nuclei_template', name: templateName });
     setFileContent('Loading...');
-    axios.get(`/api/getFileContents/?nuclei_template&name=${templateName}`)
+    fetchToolFileContent('nuclei_template', templateName)
       .then(res => {
-        if (res.data.status) setFileContent(res.data.content);
+        if (res.status) setFileContent(res.content);
         else setFileContent('Error loading template');
       })
       .catch(() => setFileContent('Failed to fetch template'));

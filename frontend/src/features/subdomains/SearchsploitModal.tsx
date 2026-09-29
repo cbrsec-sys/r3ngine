@@ -15,18 +15,7 @@ import {
 } from '@mui/material';
 import { Bug, X, ExternalLink } from 'lucide-react';
 import type { Subdomain } from './types';
-import axios from 'axios';
-
-interface ExploitResult {
-  Title: string;
-  Date: string;
-  Author: string;
-  Type: string;
-  Platform: string;
-  Port: number;
-  Path: string;
-  Codes: string;
-}
+import { searchsploitForSubdomain, type ExploitResult } from './api';
 
 interface SearchsploitModalProps {
   open: boolean;
@@ -68,11 +57,11 @@ export const SearchsploitModal: React.FC<SearchsploitModalProps> = ({ open, onCl
     setResults(null);
     setErrorMsg('');
     try {
-      const response = await axios.post(`/api/action/subdomain/${subdomain.id}/searchsploit/`, { query });
-      if (response.data.status) {
-        setResults(response.data.results);
+      const result = await searchsploitForSubdomain(subdomain.id, query);
+      if (result.status) {
+        setResults(result.results);
       } else {
-        setErrorMsg(response.data.message || 'Search failed');
+        setErrorMsg(result.message || 'Search failed');
       }
     } catch (error: any) {
       setErrorMsg(error.response?.data?.message || 'Error running searchsploit');

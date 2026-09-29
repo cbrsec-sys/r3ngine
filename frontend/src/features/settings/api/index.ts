@@ -1012,4 +1012,48 @@ export const useDeleteRemoteWorker = () => {
   });
 };
 
+/**
+ * Reads one editable tool file. `key` is the bare selector flag the endpoint expects
+ * (e.g. `nuclei_config`, `gf_pattern`); `name` picks an entry for list-type keys.
+ */
+export const fetchToolFileContent = async (key: string, name?: string): Promise<FileContentResponse> => {
+  const query = name === undefined ? key : `${key}&name=${name}`;
+  const { data } = await axios.get<FileContentResponse>(`/api/getFileContents/?${query}`);
+  return data;
+};
+
+/** Downloads the configuration backup archive (zip). */
+export const exportConfigBackup = async (): Promise<Blob> => {
+  const response = await axios.get<Blob>('/api/settings/export/', {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
+/** Downloads the scan results backup archive (zip). */
+export const exportScanResultsBackup = async (): Promise<Blob> => {
+  const response = await axios.get<Blob>('/api/settings/export/scan-results/', {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
+export interface ConfigImportResponse {
+  status: boolean;
+  message?: string;
+}
+
+export const importConfigBackup = async (file: File, overwriteExisting: boolean): Promise<ConfigImportResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('overwrite_existing', overwriteExisting ? 'true' : 'false');
+
+  const response = await axios.post<ConfigImportResponse>('/api/settings/import/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    }
+  });
+  return response.data;
+};
+
 export * from './mcp';

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { operations } from '@/types/api';
-import type { Vulnerability, VulnerabilityResponse } from '../types';
+import type { GptVulnerabilityReport, Vulnerability, VulnerabilityResponse } from '../types';
 
 
 export interface VulnerabilityFilters {
@@ -113,7 +113,7 @@ export const useDeleteVulnerability = () => {
 
 export const useGptVulnerabilityDetails = () => {
   return useMutation({
-    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+    mutationFn: async ({ id, name }: { id: number; name: string }): Promise<GptVulnerabilityReport> => {
       const response = await fetch(`/api/tools/gpt_vulnerability_report/?id=${id}`, {
         credentials: 'include'
       });

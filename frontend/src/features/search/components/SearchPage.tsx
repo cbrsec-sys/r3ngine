@@ -34,7 +34,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { useSearch, useSearchHistory } from '../api';
-import { escapeRegExp } from '../../../utils/securityUtils';
+import { escapeRegExp, getSafeUrl } from '../../../utils/securityUtils';
 import { useParams, useNavigate, useSearch as useUrlSearch } from '@tanstack/react-router';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
@@ -232,7 +232,7 @@ export const SearchPage: React.FC = () => {
                               </Typography>
                             </Box>
                           </Stack>
-                          <IconButton component={Link} href={s.http_url} target="_blank" sx={{ color: 'text.disabled' }}>
+                          <IconButton component={Link} href={getSafeUrl(s.http_url) ?? '#'} target="_blank" sx={{ color: 'text.disabled' }}>
                             <ExternalLink size={18} />
                           </IconButton>
                         </CardContent>
@@ -262,7 +262,7 @@ export const SearchPage: React.FC = () => {
                               </Typography>
                             </Box>
                           </Stack>
-                          <IconButton component={Link} href={e.http_url} target="_blank" sx={{ color: 'text.disabled' }}>
+                          <IconButton component={Link} href={getSafeUrl(e.http_url) ?? '#'} target="_blank" sx={{ color: 'text.disabled' }}>
                             <ExternalLink size={18} />
                           </IconButton>
                         </CardContent>

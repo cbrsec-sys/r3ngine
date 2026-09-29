@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { FileText, Monitor, User as UserIcon, Calendar } from 'lucide-react';
 import { TacticalPanel } from '../../../../components/TacticalPanel';
+import { getSafeUrl } from '../../../../utils/securityUtils';
 
 interface Document {
   id: number;
@@ -55,7 +56,7 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({ documents }) =
                     <Typography 
                       variant="caption" 
                       component="a" 
-                      href={doc.url} 
+                      href={getSafeUrl(doc.url) ?? '#'} 
                       target="_blank" 
                       sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                     >

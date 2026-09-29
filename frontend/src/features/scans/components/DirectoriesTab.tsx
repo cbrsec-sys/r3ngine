@@ -54,6 +54,7 @@ import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useDirectoryFileDispatch, useDirectoryFileDelete } from '../api';
 import { BruteConfigDialog } from './BruteConfigDialog';
 import { getMenuPaperSx } from '../../../theme/semanticColors';
+import { getSafeUrl, openSafeUrl } from '../../../utils/securityUtils';
 
 interface DirectoriesTabProps {
   projectSlug: string;
@@ -148,7 +149,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
   };
 
   const handleOpenInBrowser = () => {
-    if (selectedFile) window.open(selectedFile.url, '_blank', 'noopener,noreferrer');
+    if (selectedFile) openSafeUrl(selectedFile.url, '_blank', 'noopener,noreferrer');
     handleActionClose();
   };
 
@@ -475,7 +476,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'text.primary' }}>{sub.name}</Typography>
                           {sub.http_url && (
-                            <IconButton size="small" component="a" href={sub.http_url} target="_blank" sx={{ p: 0.2, color: tokens.accent.primary }}>
+                            <IconButton size="small" component="a" href={getSafeUrl(sub.http_url) ?? '#'} target="_blank" sx={{ p: 0.2, color: tokens.accent.primary }}>
                               <ExternalLink size={12} />
                             </IconButton>
                           )}
@@ -576,7 +577,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                               color: 'text.primary',
                                               textDecoration: 'none',
                                               '&:hover': { color: tokens.accent.primary }
-                                            }} component="a" href={file.url} target="_blank">
+                                            }} component="a" href={getSafeUrl(file.url) ?? '#'} target="_blank">
                                               {decodeBase64(file.name)}
                                             </Typography>
                                             <Box sx={{
@@ -605,7 +606,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                                 {file.lines} L
                                               </Typography>
                                             )}
-                                            <IconButton size="small" component="a" href={file.url} target="_blank" sx={{ color: 'text.disabled', p: 0.5 }}>
+                                            <IconButton size="small" component="a" href={getSafeUrl(file.url) ?? '#'} target="_blank" sx={{ color: 'text.disabled', p: 0.5 }}>
                                               <ExternalLink size={12} />
                                             </IconButton>
                                             <IconButton
@@ -1005,7 +1006,7 @@ const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> =
                 color: 'text.primary',
                 textDecoration: 'none',
                 '&:hover': { color: tokens.accent.primary }
-              }} component="a" href={file.url} target="_blank">
+              }} component="a" href={getSafeUrl(file.url) ?? '#'} target="_blank">
                 {decodeBase64(file.name)}
               </Typography>
               <Typography sx={{ fontSize: '10px', color: 'text.disabled', fontFamily: 'monospace' }}>
@@ -1049,7 +1050,7 @@ const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> =
                 </Box>
               )}
             </Stack>
-            <IconButton size="small" component="a" href={file.url} target="_blank" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D`, p: 1 }}>
+            <IconButton size="small" component="a" href={getSafeUrl(file.url) ?? '#'} target="_blank" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D`, p: 1 }}>
               <ExternalLink size={14} />
             </IconButton>
           </Box>

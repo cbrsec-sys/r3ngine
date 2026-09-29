@@ -40,6 +40,7 @@ import { copyToClipboard } from '../../endpoints/utils/copy';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { ExtractAuthModal } from './ExtractAuthModal';
+import { getSafeUrl } from '../../../utils/securityUtils';
 
 interface EndpointsTabProps {
   projectSlug: string;
@@ -564,7 +565,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                               textDecoration: 'none',
                               wordBreak: 'break-all',
                               '&:hover': { color: tokens.accent.primary }
-                            }} component="a" href={endpoint.http_url} target="_blank">
+                            }} component="a" href={getSafeUrl(endpoint.http_url) ?? '#'} target="_blank">
                               {endpoint.http_url}
                             </Typography>
                           </Box>
@@ -679,7 +680,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                             <IconButton
                               size="small"
                               component="a"
-                              href={endpoint.http_url}
+                              href={getSafeUrl(endpoint.http_url) ?? '#'}
                               target="_blank"
                               sx={{ color: 'text.secondary', '&:hover': { color: tokens.accent.primary } }}
                             >

@@ -6,7 +6,7 @@
   },
   "src/components/Shell/index.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 3
+      "count": 1
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 9
@@ -200,9 +200,6 @@
     }
   },
   "src/features/dashboard/components/DistributionCharts.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 19
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -287,11 +284,6 @@
   "src/features/engines/components/YamlPreviewPanel.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
-    }
-  },
-  "src/features/engines/components/__tests__/EngineConfigReferenceModal.test.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/features/engines/components/sections/SubdomainDiscoverySection.tsx": {
@@ -393,7 +385,7 @@
   },
   "src/features/plugins/api/pluginsApi.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 3
+      "count": 1
     }
   },
   "src/features/plugins/components/InstallProgressOverlay.tsx": {
@@ -408,7 +400,7 @@
   },
   "src/features/plugins/components/PluginCard.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 4
+      "count": 1
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
@@ -422,7 +414,7 @@
   },
   "src/features/plugins/components/PluginComponent.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 6
+      "count": 2
     }
   },
   "src/features/plugins/components/PluginComponentLoader.tsx": {
@@ -438,11 +430,6 @@
   "src/features/plugins/components/PluginPageLoader.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
-    }
-  },
-  "src/features/plugins/components/PluginSlot.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
     }
   },
   "src/features/plugins/pages/PluginManagementPage.tsx": {
@@ -463,11 +450,6 @@
   "src/features/projects/index.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 3
-    }
-  },
-  "src/features/scans/api/graphApi.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/features/scans/api/index.ts": {
@@ -550,12 +532,6 @@
     }
   },
   "src/features/scans/components/GraphCanvas.tsx": {
-    "@typescript-eslint/ban-ts-comment": {
-      "count": 4
-    },
-    "@typescript-eslint/no-explicit-any": {
-      "count": 23
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -618,9 +594,6 @@
     }
   },
   "src/features/scans/components/ScanDetailPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 36
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 17
     },
@@ -693,9 +666,6 @@
     }
   },
   "src/features/scans/components/SubdomainsTab.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 15
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 9
     },
@@ -704,12 +674,6 @@
     }
   },
   "src/features/scans/components/VisualizationTab.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 35
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 10
-    },
     "react-hooks/immutability": {
       "count": 2
     }
@@ -717,11 +681,6 @@
   "src/features/scans/index.tsx": {
     "react-refresh/only-export-components": {
       "count": 9
-    }
-  },
-  "src/features/scans/types/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 19
     }
   },
   "src/features/scans/utils/dorkUtils.ts": {
@@ -941,9 +900,6 @@
     }
   },
   "src/features/targets/components/TargetSummary.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 21
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 22
     }
@@ -995,9 +951,6 @@
     }
   },
   "src/features/vulnerabilities/components/VulnerabilityDetailModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 11
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 5
     },
@@ -1011,9 +964,6 @@
     }
   },
   "src/features/vulnerabilities/components/VulnerabilityTable.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 9
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 12
     },
@@ -1042,18 +992,7 @@
       "count": 1
     }
   },
-  "src/main.tsx": {
-    "@typescript-eslint/ban-ts-comment": {
-      "count": 3
-    },
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    }
-  },
   "src/pages/StressTestingPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 41
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 16
     },
@@ -1066,7 +1005,7 @@
   },
   "src/router.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 2
+      "count": 1
     },
     "react-hooks/rules-of-hooks": {
       "count": 2

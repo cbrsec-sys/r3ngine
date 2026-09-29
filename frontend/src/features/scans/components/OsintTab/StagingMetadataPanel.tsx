@@ -3,6 +3,7 @@ import { Box, Typography, Chip, IconButton, Tooltip, Button } from '@mui/materia
 import { Copy, ExternalLink, Check } from 'lucide-react';
 import type { OsintStaging } from '../../types';
 import { useThemeTokens } from '../../../../theme/useThemeTokens';
+import { getSafeUrl } from '../../../../utils/securityUtils';
 
 interface StagingMetadataPanelProps {
   item: OsintStaging;
@@ -84,7 +85,7 @@ const TypedContent: React.FC<{
 
     case 'Social': {
       const profileUrl = String(meta.profile_url || item.content);
-      const isSafe = /^https?:\/\//i.test(profileUrl);
+      const safeProfileUrl = getSafeUrl(profileUrl);
       return (
         <>
           {meta.platform && (
@@ -98,9 +99,9 @@ const TypedContent: React.FC<{
               <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'text.secondary' }}>
                 {profileUrl}
               </Typography>
-              {isSafe && (
+              {safeProfileUrl && (
                 <Tooltip title="Open profile">
-                  <IconButton size="small" component="a" href={profileUrl}
+                  <IconButton size="small" component="a" href={safeProfileUrl}
                     target="_blank" rel="noopener noreferrer"
                     sx={{ p: 0.25, opacity: 0.5, '&:hover': { opacity: 1 } }}>
                     <ExternalLink size={11} />

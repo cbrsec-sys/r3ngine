@@ -57,6 +57,7 @@ import { useAddTarget } from '../../targets/api';
 import { formatDistanceToNow, subMonths } from 'date-fns';
 //import { HackerOneProgram } from '../types';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getSafeUrl } from '../../../utils/securityUtils';
 
 const getProgramCardStyle = (tokens: any) => ({
   bgcolor: 'action.hover',
@@ -289,7 +290,7 @@ export const BountyHubPage: React.FC = () => {
                 <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                   <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
                     <Avatar
-                      src={p.attributes.profile_picture}
+                      src={getSafeUrl(p.attributes.profile_picture)}
                       variant="rounded"
                       sx={{ width: 48, height: 48, border: '1px solid rgba(255,255,255,0.1)' }}
                     />
@@ -444,7 +445,7 @@ export const BountyHubPage: React.FC = () => {
           <>
             <DialogTitle sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
               <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                <Avatar src={details.attributes.profile_picture} sx={{ width: 40, height: 40 }} />
+                <Avatar src={getSafeUrl(details.attributes.profile_picture)} sx={{ width: 40, height: 40 }} />
                 <Box>
                   <Typography variant="h6" sx={{ color: 'text.primary', fontFamily: 'Orbitron' }}>{details.attributes.name}</Typography>
                   <Typography variant="caption" sx={{ color: tokens.accent.primary }}>@{details.attributes.handle}</Typography>

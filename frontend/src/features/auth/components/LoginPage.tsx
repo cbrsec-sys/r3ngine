@@ -13,6 +13,7 @@ import {
 import { Eye, EyeOff, User, Lock, ExternalLink } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 import { useLogin } from '../api';
+import { getSafeUrl } from '../../../utils/securityUtils';
 
 /** Static grain overlay — same look as animated canvas static, zero rAF cost */
 const StaticOverlay: React.FC = () => (
@@ -56,7 +57,7 @@ export const LoginPage: React.FC = () => {
     try {
       const response = await loginMutation.mutateAsync(formData);
       if (response.status) {
-        window.location.href = response.redirect_url || '/';
+        window.location.href = getSafeUrl(response.redirect_url) ?? '/';
       } else {
         setError(response.message || 'Invalid username or password.');
       }

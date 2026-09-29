@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@tanstack/react-router';
 import { Box, Typography, Grid, Paper, Tabs, Tab, Chip } from '@mui/material';
 import { Activity, Shield, BarChart2 } from 'lucide-react';
 import { useAssessments } from '../api';
@@ -18,7 +18,7 @@ const TABS = [
 ];
 
 export const AssessmentExecutionDashboard: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ from: '/$projectSlug/assessments/$id/execution' });
   const [activeTab, setActiveTab] = useState<'execution' | 'evidence' | 'metrics'>('execution');
 
   // Use existing query to get initial status, fallback to finding by ID

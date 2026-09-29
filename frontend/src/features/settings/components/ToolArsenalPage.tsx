@@ -48,6 +48,7 @@ import type { InstalledTool } from '../api';
 import { useParams } from '@tanstack/react-router';
 import { ToolFormModal } from './ToolFormModal';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getSafeUrl } from '../../../utils/securityUtils';
 
 export const ToolArsenalPage: React.FC = () => {
   const { tokens } = useThemeTokens();
@@ -348,7 +349,7 @@ export const ToolArsenalPage: React.FC = () => {
               <CardContent sx={{ p: 3, pt: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', flexGrow: 1, overflow: 'hidden' }}>
                 {/* Logo/Icon */}
                 <Avatar
-                  src={tool.logo_url || undefined}
+                  src={getSafeUrl(tool.logo_url)}
                   sx={{
                     width: 60,
                     height: 60,
@@ -379,11 +380,11 @@ export const ToolArsenalPage: React.FC = () => {
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                  <Typography component="a" href={tool.github_url} target="_blank" sx={{ color: 'text.disabled', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: tokens.accent.primary } }}>
+                  <Typography component="a" href={getSafeUrl(tool.github_url) ?? '#'} target="_blank" sx={{ color: 'text.disabled', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: tokens.accent.primary } }}>
                     GITHUB <ExternalLink size={10} />
                   </Typography>
                   {tool.license_url && (
-                    <Typography component="a" href={tool.license_url} target="_blank" sx={{ color: 'text.disabled', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: tokens.accent.primary } }}>
+                    <Typography component="a" href={getSafeUrl(tool.license_url) ?? '#'} target="_blank" sx={{ color: 'text.disabled', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: tokens.accent.primary } }}>
                       LICENSE <ExternalLink size={10} />
                     </Typography>
                   )}

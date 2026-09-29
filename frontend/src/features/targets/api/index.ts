@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { paths, operations, components } from '@/types/api';
-import type { Domain, Organization, Engine } from '../types';
+import type { Domain, Organization, Engine, TargetSummaryResponse } from '../types';
 
 export const useDomains = (projectSlug: string) => {
   return useQuery<Domain[]>({
@@ -112,7 +112,7 @@ export const useDeleteTargets = (projectSlug: string) => {
 };
 
 export const useTargetSummary = (projectSlug: string, targetId: number) => {
-  return useQuery({
+  return useQuery<TargetSummaryResponse>({
     queryKey: ['target-summary', projectSlug, targetId],
     queryFn: async () => {
       const response = await fetch(`/api/target-summary/${projectSlug}/${targetId}/`, {

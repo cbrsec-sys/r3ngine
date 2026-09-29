@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { Search, ExternalLink, Globe } from 'lucide-react';
 import { TacticalPanel } from '../../../../components/TacticalPanel';
+import { getSafeUrl } from '../../../../utils/securityUtils';
 
 interface Dork {
   id: number;
@@ -38,7 +39,7 @@ export const DorkSection: React.FC<DorkSectionProps> = ({ dorks }) => {
                   <IconButton 
                     edge="end" 
                     component="a" 
-                    href={dork.url} 
+                    href={getSafeUrl(dork.url) ?? '#'} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     sx={{ color: 'primary.main' }}
