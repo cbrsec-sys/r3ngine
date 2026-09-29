@@ -179,7 +179,7 @@ class TestSecondOrderScan(TestCase):
 
     def test_embedded_config_written_to_disk(self):
         proxy = _make_scan_proxy()
-        config_path = '/usr/local/config/second_order_merged.json'
+        config_path = os.path.join(proxy.results_dir, 'second_order_merged.json')
         with patch('reNgine.tasks.vuln.run_command'), \
              patch('reNgine.tasks.vuln.get_http_urls', return_value=[]), \
              patch('reNgine.common_func.save_vulnerability'):
