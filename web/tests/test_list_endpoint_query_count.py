@@ -329,6 +329,23 @@ class VulnerabilityListQueryCountTests(ListQueryCountMixin, TestCase):
 		self.assert_flat()
 
 
+class VulnerabilityCompactListQueryCountTests(VulnerabilityListQueryCountTests):
+	"""`?compact=1` must stay flat too, and cost less than the default format."""
+
+	def query_params(self):
+		return {**super().query_params(), 'compact': '1'}
+
+	def test_compact_costs_fewer_queries_than_default(self):
+		self.add_rows(5)
+		compact, _ = self.fetch()
+		with CaptureQueriesContext(connection) as default:
+			response = self.client.get(self.url, {'format': 'json', 'scan_history': self.scan.id})
+		self.assertEqual(response.status_code, 200)
+		self.assertLess(len(compact), len(default))
+		# Session/user lookups, count, page, then one query per prefetched relation.
+		self.assertLessEqual(len(compact), 8, [q['sql'][:200] for q in compact.captured_queries])
+
+
 class ScanHistoryListMixin(ListQueryCountMixin):
 
 	def add_row(self, index):

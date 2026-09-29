@@ -21,6 +21,7 @@
 | [Neo4j Integration](neo4j-integration.md) | Graph database integration and APME |
 | [Configuration](configuration.md) | Environment variables and engine YAML configuration |
 | [Docker Setup](docker-setup.md) | Container architecture and service definitions |
+| [Open work](TODO.md) | Deferred issues, decisions taken and known follow-ups |
 
 ---
 

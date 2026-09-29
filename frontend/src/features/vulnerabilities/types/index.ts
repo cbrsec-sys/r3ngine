@@ -25,6 +25,34 @@ export type VulnerabilityCve = NonNullable<Vulnerability["cve_ids"]>[number] & {
   vulnerability_type?: string | null;
 };
 
+/** Relations `VulnerabilityCompactSerializer` drops or reduces. */
+type VulnerabilityRelationKey =
+  | 'scan_history' | 'validation_results' | 'subdomain' | 'endpoint' | 'target_domain'
+  | 'tags' | 'references' | 'cve_ids' | 'cwe_ids' | 'vuln_subscan_ids';
+
+type Related<K extends keyof Vulnerability, F extends keyof NonNullable<Vulnerability[K]>> =
+  Pick<NonNullable<Vulnerability[K]>, F> | null;
+
+/**
+ * A row of `GET /api/listVulnerability/?compact=1`: the vulnerability's own fields, with
+ * each relation reduced to the keys list views read. Every key kept has the same name and
+ * value as in the default row, so a compact row can stand in for a `Vulnerability` there.
+ */
+export type VulnerabilityCompact = Omit<Vulnerability, VulnerabilityRelationKey> & {
+  /** `{}` when the finding has no scan. */
+  readonly scan_history?: { id?: number };
+  readonly subdomain?: Related<'subdomain', 'id' | 'name'>;
+  readonly endpoint?: Related<'endpoint', 'id' | 'http_url'>;
+  readonly target_domain?: Related<'target_domain', 'id' | 'name'>;
+  readonly tags?: Vulnerability['tags'];
+  readonly references?: Vulnerability['references'];
+  readonly cve_ids?: VulnerabilityCve[];
+};
+
+export type VulnerabilityCompactResponse = Omit<VulnerabilityResponse, 'results'> & {
+  results: VulnerabilityCompact[];
+};
+
 /** Response of `GET /api/tools/gpt_vulnerability_report/`. */
 export interface GptVulnerabilityReport {
   status: boolean;

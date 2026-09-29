@@ -65,6 +65,6 @@ from api.serializers.web_endpoints import (
     ParameterSerializer, AuthCandidateSerializer, EndpointSerializer, EndpointOnlyURLsSerializer,
 )
 from api.serializers.findings import (
-    ValidationResultSerializer, VulnerabilitySerializer, ExposureEvidenceSerializer,
-    ExposureStatusUpdateSerializer, ExposureSerializer,
+    ValidationResultSerializer, VulnerabilitySerializer, VulnerabilityCompactSerializer,
+    ExposureEvidenceSerializer, ExposureStatusUpdateSerializer, ExposureSerializer,
 )

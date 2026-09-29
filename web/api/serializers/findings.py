@@ -1,10 +1,14 @@
 from django.db import models
-from django.db.models import prefetch_related_objects
+from django.db.models import Prefetch, prefetch_related_objects
 from django.forms.models import model_to_dict
 from rest_framework import serializers
 
 from api.serializers.users import MinimalUserSerializer
-from startScan.models import Exposure, ExposureEvidence, ValidationResult, Vulnerability
+from startScan.models import (
+	CveId, EndPoint, Exposure, ExposureEvidence, Subdomain, ValidationResult, Vulnerability,
+	VulnerabilityReference, VulnerabilityTags,
+)
+from targetApp.models import Domain
 
 
 class ValidationResultSerializer(serializers.ModelSerializer):
@@ -77,34 +81,28 @@ class VulnerabilityListSerializer(serializers.ListSerializer):
 		return super().to_representation(rows)
 
 
-class VulnerabilitySerializer(serializers.ModelSerializer):
+class _VulnerabilityDisplayFieldsMixin(serializers.Serializer):
+	"""The display-formatted scalar fields shared by the full and compact formats."""
 
 	discovered_date = serializers.SerializerMethodField()
 	severity = serializers.SerializerMethodField()
+
+	_SEVERITY_LABELS = {0: 'Info', 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical'}
+
+	def get_discovered_date(self, vulnerability: Vulnerability) -> str | None:
+		if vulnerability.discovered_date:
+			return vulnerability.discovered_date.strftime("%b %d, %Y %H:%M")
+		return None
+
+	def get_severity(self, vulnerability: Vulnerability) -> str:
+		return self._SEVERITY_LABELS.get(vulnerability.severity, 'Unknown')
+
+
+class VulnerabilitySerializer(_VulnerabilityDisplayFieldsMixin, serializers.ModelSerializer):
+
 	scan_history = serializers.SerializerMethodField()
 	validation_results = ValidationResultSerializer(many=True, read_only=True)
 
-	def get_discovered_date(self, Vulnerability):
-		if Vulnerability.discovered_date:
-			return Vulnerability.discovered_date.strftime("%b %d, %Y %H:%M")
-		return None
-
-	def get_severity(self, Vulnerability):
-		if Vulnerability.severity == 0:
-			return "Info"
-		elif Vulnerability.severity == 1:
-			return "Low"
-		elif Vulnerability.severity == 2:
-			return "Medium"
-		elif Vulnerability.severity == 3:
-			return "High"
-		elif Vulnerability.severity == 4:
-			return "Critical"
-		elif Vulnerability.severity == -1:
-			return "Unknown"
-		else:
-			return "Unknown"
-		
 	def get_scan_history(self, vulnerability):
 		scan_history_dict = {}
 		scan_history = vulnerability.scan_history
@@ -126,6 +124,104 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 		fields = '__all__'
 		depth = 2
 		list_serializer_class = VulnerabilityListSerializer
+
+
+class _CompactSubdomainSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Subdomain
+		fields = ('id', 'name')
+
+
+class _CompactEndpointSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = EndPoint
+		fields = ('id', 'http_url')
+
+
+class _CompactDomainSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Domain
+		fields = ('id', 'name')
+
+
+class _CompactTagSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = VulnerabilityTags
+		fields = ('id', 'name')
+
+
+class _CompactReferenceSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = VulnerabilityReference
+		fields = ('id', 'url')
+
+
+class _CompactCveSerializer(serializers.ModelSerializer):
+	"""The CVE enrichment columns the vulnerability table's expanded row renders."""
+
+	class Meta:
+		model = CveId
+		fields = (
+			'id', 'name', 'is_cisa_kev', 'cvss_v31_base_score',
+			'attack_vector', 'attack_complexity', 'privileges_required', 'user_interaction',
+			'confidentiality_impact', 'integrity_impact', 'availability_impact',
+			'epss_score', 'epss_percentile', 'published_date', 'last_modified_date',
+			'vulnerability_type',
+		)
+
+
+# Every column of the vulnerability row itself; relations are handled explicitly.
+_VULNERABILITY_SCALAR_FIELDS = tuple(
+	field.name for field in Vulnerability._meta.concrete_fields if not field.is_relation
+)
+
+
+class VulnerabilityCompactSerializer(_VulnerabilityDisplayFieldsMixin, serializers.ModelSerializer):
+	"""List-row format of `GET /api/listVulnerability/?compact=1`.
+
+	Keeps the vulnerability's own fields and reduces each relation to the keys
+	the UI reads. Every key it keeps has the same name and value as in
+	VulnerabilitySerializer, so a compact row is a subset of a default row.
+	"""
+
+	scan_history = serializers.SerializerMethodField()
+	subdomain = _CompactSubdomainSerializer(read_only=True)
+	endpoint = _CompactEndpointSerializer(read_only=True)
+	target_domain = _CompactDomainSerializer(read_only=True)
+	tags = _CompactTagSerializer(many=True, read_only=True)
+	references = _CompactReferenceSerializer(many=True, read_only=True)
+	cve_ids = _CompactCveSerializer(many=True, read_only=True)
+
+	class Meta:
+		model = Vulnerability
+		fields = (
+			*_VULNERABILITY_SCALAR_FIELDS,
+			'scan_history', 'subdomain', 'endpoint', 'target_domain',
+			'tags', 'references', 'cve_ids',
+		)
+
+	def get_scan_history(self, vulnerability: Vulnerability) -> dict:
+		if vulnerability.scan_history_id is None:
+			return {}
+		return {'id': vulnerability.scan_history_id}
+
+	@staticmethod
+	def optimize_queryset(queryset: models.QuerySet) -> models.QuerySet:
+		"""Load exactly what the compact format renders: three joins and three prefetches."""
+		return (
+			queryset
+			.select_related('subdomain', 'endpoint', 'target_domain')
+			.only(
+				*_VULNERABILITY_SCALAR_FIELDS, 'scan_history',
+				'subdomain__id', 'subdomain__name',
+				'endpoint__id', 'endpoint__http_url',
+				'target_domain__id', 'target_domain__name',
+			)
+			.prefetch_related(
+				'tags', 'references',
+				Prefetch('cve_ids', queryset=CveId.objects.only(*_CompactCveSerializer.Meta.fields)),
+			)
+		)
 
 
 class ExposureEvidenceSerializer(serializers.ModelSerializer):

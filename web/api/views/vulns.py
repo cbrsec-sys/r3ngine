@@ -72,6 +72,20 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 	serializer_class = VulnerabilitySerializer
 	queryset = Vulnerability.objects.none()
 
+	COMPACT_TRUE_VALUES = ('1', 'true')
+
+	def is_compact(self) -> bool:
+		"""`?compact=1` (or `true`) opts the list action into VulnerabilityCompactSerializer."""
+		request = getattr(self, 'request', None)
+		if request is None or self.action != 'list':
+			return False
+		return request.query_params.get('compact', '').strip().lower() in self.COMPACT_TRUE_VALUES
+
+	def get_serializer_class(self):
+		if self.is_compact():
+			return VulnerabilityCompactSerializer
+		return super().get_serializer_class()
+
 	@staticmethod
 	def _normalize_severity_filter(severity_value):
 		from reNgine.definitions import NUCLEI_SEVERITY_MAP
@@ -214,6 +228,12 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		return self.queryset
 
 	def filter_queryset(self, qs):
+		qs = self._search_and_order()
+		if self.is_compact():
+			qs = VulnerabilityCompactSerializer.optimize_queryset(qs)
+		return qs
+
+	def _search_and_order(self):
 		qs = self.queryset.filter()
 		search_value = self.request.GET.get(u'search[value]', '')
 		_order_col = self.request.GET.get(u'order[0][column]', None)
