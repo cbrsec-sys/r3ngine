@@ -36,6 +36,9 @@ Trace behavior as:
 
 ## Validation
 - Prefer targeted checks over assuming the full stack can start.
-- Good defaults: `npx tsc -b`, `npm run lint`, targeted Django tests, and `python3 -m py_compile` for touched backend modules.
+- Good defaults: `npx tsc -b`, `npm run lint`, `npm test`, targeted Django tests, and `python3 -m py_compile` for touched backend modules.
 - Run `tsc`/`npm` locally in `frontend/`, never inside `r3ngine-web-1` — `node_modules` there is masked by an anonymous volume.
+- ESLint violations that predate CI are baselined in `frontend/eslint-suppressions.json`; only new ones fail. After fixing some, run `npx eslint . --prune-suppressions`.
 - Django tests need the container: `docker exec r3ngine-web-1 bash -c "cd /usr/src/app && python3 manage.py test <module> --keepdb --verbosity=2"`.
+- Without the stack, any Postgres on 127.0.0.1:5432 (user/password/db `rengine`) works: `cd web && DJANGO_SETTINGS_MODULE=reNgine.settings_test_local python manage.py test tests --exclude-tag=integration`. Tests tagged `integration` need live network, real tool binaries or the docker stack.
+- CI (`.github/workflows/ci.yml`) runs all of the above on every push; the full image build is manual (`docker-image.yml`).

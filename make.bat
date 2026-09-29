@@ -56,7 +56,7 @@ if "%1" == "makemigrations" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% exec web python
 :: Apply migrations
 if "%1" == "migrate" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% exec web python3 manage.py migrate
 :: Pull Docker images.
-if "%1" == "pull" %DOCKER_COMPOSE% docker.pkg.github.com & docker-compose %COMPOSE_ALL_FILES% pull
+if "%1" == "pull" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% pull --ignore-buildable
 :: Down all services.
 if "%1" == "down" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% down
 :: Stop all services.

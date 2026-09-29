@@ -48,7 +48,7 @@ services:
     entrypoint: /usr/src/app/entrypoint.sh
     restart: always
     init: true
-    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
+    image: ${R3NGINE_IMAGE:-r3ngine:local}
     environment:
       - DEBUG=1
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
@@ -253,7 +253,7 @@ services:
           memory: 256M
 
   temporal-python-orchestrator:
-    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
+    image: ${R3NGINE_IMAGE:-r3ngine:local}
     restart: always
     init: true
     entrypoint: /usr/src/app/temporal-entrypoint.sh
@@ -300,7 +300,7 @@ services:
           memory: 2G
 
   temporal-go-executor:
-    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
+    image: ${R3NGINE_IMAGE:-r3ngine:local}
     restart: always
     init: true
     entrypoint: /usr/src/app/executor-entrypoint.sh

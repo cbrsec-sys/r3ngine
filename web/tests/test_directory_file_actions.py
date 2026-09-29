@@ -217,8 +217,8 @@ class TestDirectoryFileDispatchView(TestCase):
             start_scan_date=timezone.now(),
         )
 
-    @patch('api.views.run_and_close')
-    @patch('api.views.TemporalClientProvider')
+    @patch('api.views.scan.run_and_close')
+    @patch('api.views.scan.TemporalClientProvider')
     def test_dispatch_scan_vuln_returns_dispatched(self, mock_tc, mock_run):
         mock_run.return_value = 'wf-test-123'
         response = self.client.post('/api/action/directory-file/dispatch/', {
@@ -230,8 +230,8 @@ class TestDirectoryFileDispatchView(TestCase):
         self.assertEqual(response.data['status'], 'dispatched')
         self.assertIn('workflow_id', response.data)
 
-    @patch('api.views.run_and_close')
-    @patch('api.views.TemporalClientProvider')
+    @patch('api.views.scan.run_and_close')
+    @patch('api.views.scan.TemporalClientProvider')
     def test_dispatch_extract_auth_returns_dispatched(self, mock_tc, mock_run):
         mock_run.return_value = 'wf-auth-123'
         response = self.client.post('/api/action/directory-file/dispatch/', {
@@ -265,8 +265,8 @@ class TestDirectoryFileDispatchView(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 403)
 
-    @patch('api.views.run_and_close')
-    @patch('api.views.TemporalClientProvider')
+    @patch('api.views.scan.run_and_close')
+    @patch('api.views.scan.TemporalClientProvider')
     @unittest.skip("Plugin tests are skipped for now")
     def test_dispatch_brute_test_with_plugin_enabled(self, mock_tc, mock_run):
         from plugins.models import Plugin

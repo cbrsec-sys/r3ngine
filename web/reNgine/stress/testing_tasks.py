@@ -174,7 +174,7 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
                     "wrk": WrkParser,
                     "hping3": Hping3Parser,
                     "locust": LocustParser,
-                    "stressor": TAStresserParser,
+                    "stressor": TAStressorParser,
                 }
                 parser_cls = parsers.get(tool)
                 if not parser_cls:

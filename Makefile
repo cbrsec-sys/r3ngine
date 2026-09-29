@@ -70,9 +70,8 @@ changepassword:	## Change password for user
 migrate:		## Apply migrations
 	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} exec web python3 manage.py migrate
 
-pull:			## Pull Docker images.
-	docker login docker.pkg.github.com
-	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} pull
+pull:			## Pull third-party Docker images (the app image is built locally, or set R3NGINE_IMAGE).
+	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} pull --ignore-buildable
 
 down:			## Down all services.
 	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} down

@@ -348,13 +348,14 @@ class AddManualSubdomain(APIView):
 				status=400
 			)
 
-		subdomains_to_process = normalize_manual_subdomains(subdomain_input)
+		submitted_names = split_manual_subdomains(subdomain_input)
+		subdomains_to_process = normalize_manual_subdomains(submitted_names)
 
 		if not subdomains_to_process:
 			return Response({'status': False, 'message': 'No valid subdomain names found in input.'}, status=400)
 
-		# Filter out duplicates within the input itself
-		subdomains_to_process = list(dict.fromkeys(subdomains_to_process))
+		# Repeats within the input itself are reported as duplicates.
+		input_duplicate_count = len(submitted_names) - len(subdomains_to_process)
 
 		MAX_SUBDOMAINS_PER_REQUEST = 500
 		if len(subdomains_to_process) > MAX_SUBDOMAINS_PER_REQUEST:
@@ -364,7 +365,7 @@ class AddManualSubdomain(APIView):
 			)
 
 		added_count = 0
-		duplicate_count = 0
+		duplicate_count = input_duplicate_count
 		invalid_count = 0
 		out_of_scope_count = 0
 		materialized_count = 0

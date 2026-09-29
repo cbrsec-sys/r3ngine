@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import unittest
 from unittest.mock import patch, MagicMock
@@ -74,17 +75,25 @@ class ToolExecutionTest(TransactionTestCase):
             if not os.path.exists(sample_file):
                  sample_file = "tests/sample_data/wpscan_sample.json"
                 
-            output_file = f"{self.results_dir}/vulnerability/wpscan/{self.domain_name}_wpscan.json"
-            os.makedirs(os.path.dirname(output_file), exist_ok=True)
-            
             with open(sample_file, 'r') as f:
-                with open(output_file, 'w') as out:
-                    out.write(f.read())
-            
+                sample = f.read()
+
+            # wpscan_scan deletes a stale output file before each attempt, so the
+            # sample has to appear when the tool "runs", at the path it was given.
+            def fake_stream(cmd, **kwargs):
+                match = re.search(r'--output (\S+)', cmd)
+                if match:
+                    os.makedirs(os.path.dirname(match.group(1)), exist_ok=True)
+                    with open(match.group(1), 'w') as out:
+                        out.write(sample)
+                return iter([])
+
+            # wpscan_scan only runs where WordPress was fingerprinted.
+            self.subdomain.technologies.add(Technology.objects.create(name='WordPress'))
             print(f"[DEBUG] Subdomains for scan: {Subdomain.objects.filter(scan_history=self.scan).count()}")
             
             # Patch in tasks module
-            with patch('reNgine.tasks.stream_command') as mock_stream:
+            with patch('reNgine.tasks.stream_command', side_effect=fake_stream):
                 res = wpscan_scan(self.task, urls=[f"http://{self.domain_name}"], ctx=self.ctx)
                 print(f"[DEBUG] wpscan_scan result: {res}")
             
@@ -103,6 +112,8 @@ class ToolExecutionTest(TransactionTestCase):
             if not os.path.exists(sample_file):
                 sample_file = "tests/sample_data/cpanel_sample.json"
                 
+            # cpanel_scan only runs where cPanel/WHM was fingerprinted.
+            self.subdomain.technologies.add(Technology.objects.create(name='cPanel'))
             output_file = f"{self.results_dir}/vulnerability/cpanel/{self.domain_name}_cpanel.json"
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
             
@@ -484,7 +495,8 @@ class ToolExecutionTest(TransactionTestCase):
         if self.is_real_mode:
             pass
         else:
-            with patch('reNgine.tasks.osint.subprocess.Popen') as mock_popen:
+            with patch('reNgine.tasks.osint.subprocess.Popen') as mock_popen, \
+                    patch('reNgine.tasks.osint.shutil.which', side_effect=lambda cmd: f'/usr/local/bin/{cmd}'):
                 process_mock = MagicMock()
                 # Mock username-anarchy output (one username per line) and gosearch output
                 process_mock.communicate.side_effect = [

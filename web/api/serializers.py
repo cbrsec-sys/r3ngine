@@ -1,4 +1,5 @@
 from dashboard.models import *
+from django.apps import apps
 from django.contrib.humanize.templatetags.humanize import (naturalday, naturaltime)
 from django.db.models import F, JSONField, Value
 from django.forms.models import model_to_dict
@@ -167,7 +168,6 @@ class DomainSerializer(serializers.ModelSerializer):
 		depth = 2
 
 	def _get_recent_scan(self, obj):
-		from django.apps import apps
 		ScanHistory = apps.get_model('startScan.ScanHistory')
 		return (
 			ScanHistory.objects

@@ -1598,11 +1598,6 @@ def second_order_scan(self, urls=[], ctx={}, description=None):
 
 def nuclei_dast_scan(self, urls=[], ctx={}, description=None):
 	"""Nuclei DAST Scan"""
-	from reNgine.common_func import save_vulnerability, get_http_urls, sanitize_url, get_subdomain_from_url
-	from reNgine.utils.task import stream_command, save_subdomain, save_endpoint
-	from reNgine.tasks.parsers import is_nuclei_finding, parse_nuclei_result
-	import os
-
 	logger.info('Nuclei DAST scan started')
 	input_path = f'{self.results_dir}/input_endpoints_nuclei_dast.txt'
 	if not urls:

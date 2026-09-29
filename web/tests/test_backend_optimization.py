@@ -1,4 +1,6 @@
 import os
+import shutil
+import tempfile
 import unittest
 import json
 import base64
@@ -29,8 +31,10 @@ class BackendOptimizationTest(TransactionTestCase):
             start_scan_date=timezone.now(),
             scan_type=self.engine
         )
-        self.results_dir = f"/tmp/rengine_results/{self.scan.id}"
-        os.makedirs(self.results_dir, exist_ok=True)
+        # Fresh per test: scan ids repeat across runs, and dir_file_fuzz skips
+        # targets whose fuzz_done_*.marker a previous run left behind.
+        self.results_dir = tempfile.mkdtemp(prefix=f"rengine_results_{self.scan.id}_")
+        self.addCleanup(shutil.rmtree, self.results_dir, ignore_errors=True)
         self.scan.results_dir = self.results_dir
         self.scan.save()
         
@@ -127,6 +131,8 @@ class BackendOptimizationTest(TransactionTestCase):
         task_instance.results_dir = self.results_dir
         task_instance.starting_point_path = ""
         task_instance.yaml_configuration = self.ctx['yaml_configuration']
+        task_instance.subdomain_id = None
+        task_instance.output_path = os.path.join(self.results_dir, 'nuclei_output.json')
         
         actual_func = getattr(nuclei_scan, 'run', getattr(nuclei_scan, '__wrapped__', nuclei_scan))
         # Signature: (self, urls=[], ctx={}, description=None)
@@ -169,6 +175,8 @@ class BackendOptimizationTest(TransactionTestCase):
         task_instance.results_dir = self.results_dir
         task_instance.starting_point_path = ""
         task_instance.yaml_configuration = self.ctx['yaml_configuration']
+        task_instance.subdomain_id = None
+        task_instance.output_path = os.path.join(self.results_dir, 'nuclei_output.json')
 
         actual_func = getattr(nuclei_scan, 'run', getattr(nuclei_scan, '__wrapped__', nuclei_scan))
         actual_func(task_instance, [f"http://{self.domain_name}"], self.ctx)
@@ -230,6 +238,7 @@ class BackendOptimizationTest(TransactionTestCase):
                     os.makedirs(os.path.dirname(output_file), exist_ok=True)
                     with open(output_file, 'w') as f:
                         json.dump(dirsearch_results, f)
+            return 0, ''
         
         mock_stream.side_effect = stream_side_effect
         mock_run.side_effect = run_side_effect

@@ -2,7 +2,7 @@
 import json
 import os
 from django.contrib.auth import get_user_model
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, tag
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rolepermissions.roles import assign_role
@@ -308,6 +308,8 @@ class ExternalToolsFixtureArgCacheTests(TransactionTestCase):
             'PIPELINE_BINARIES primaries must exist in fixtures/external_tools.yaml',
         )
 
+    # Probes the running go-executor / python-orchestrator containers via docker.
+    @tag('integration')
     def test_populate_arg_cache_from_real_installed_binaries(self):
         from reNgine.tool_args import (
             PIPELINE_BINARIES,

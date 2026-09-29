@@ -17,13 +17,43 @@ not be credited with fixing anything.
 Django has no setting for "persistent connections except in tests", so the
 runner is the explicit place to say it once, for every way tests are started.
 """
+import builtins
+from unittest.mock import NonCallableMock
+
 from django.conf import settings
 from django.db import connections
 from django.test.runner import DiscoverRunner
 
+_real_open = builtins.open
+
+
+def _open_rejecting_mocks(file, *args, **kwargs):
+    """``open()`` that refuses mock objects as the file argument.
+
+    ``MagicMock.__index__`` returns 1, so ``open(task_proxy.output_path, 'w')``
+    on an unconfigured mock opens stdout, and closing it closes fd 1. The next
+    Postgres connection then reuses fd 1 and dies with "could not receive data
+    from server: Bad file descriptor" in whichever test runs later — this is
+    the cross-test failure described in the module docstring.
+    """
+    if isinstance(file, NonCallableMock):
+        raise TypeError(
+            'open() received a mock object; it would open file descriptor 1 '
+            '(stdout). Give the mocked task proxy a real output_path.'
+        )
+    return _real_open(file, *args, **kwargs)
+
 
 class RengineTestRunner(DiscoverRunner):
     """DiscoverRunner with CONN_MAX_AGE forced to 0 for every alias."""
+
+    def setup_test_environment(self, **kwargs):
+        super().setup_test_environment(**kwargs)
+        builtins.open = _open_rejecting_mocks
+
+    def teardown_test_environment(self, **kwargs):
+        builtins.open = _real_open
+        super().teardown_test_environment(**kwargs)
 
     def setup_databases(self, **kwargs):
         for alias in connections:

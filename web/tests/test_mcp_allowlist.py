@@ -10,6 +10,13 @@ User = get_user_model()
 
 FORBIDDEN_METHODS = {'DELETE', 'PUT'}
 
+# SAFE validation endpoints (interpret/enrich only), covered by test_mcp_validation.
+PATCH_ENRICH_PATTERNS = {
+    'vulnerabilities/<int:pk>/enrich/',
+    'vulnerabilities/<int:pk>/validation/',
+    'attack-paths/<str:path_id>/enrich/',
+}
+
 
 def mcp_client_with_session(user):
     secret = generate_mcp_secret()
@@ -55,7 +62,9 @@ class McpAllowlistTests(TestCase):
             if 'PATCH' in methods:
                 pattern_s = str(pattern.pattern)
                 self.assertTrue(
-                    'settings' in pattern_s or 'notes' in pattern_s,
+                    'settings' in pattern_s
+                    or 'notes' in pattern_s
+                    or pattern_s in PATCH_ENRICH_PATTERNS,
                     msg=pattern_s,
                 )
 

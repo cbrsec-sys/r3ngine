@@ -5,6 +5,8 @@ import shlex
 import subprocess
 import tempfile
 
+from django.conf import settings
+
 from reNgine.definitions import (
     ANTHROPIC,
     NUCLEI_SEVERITY_MAP,
@@ -401,7 +403,7 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
     else:
         _scan_dir = getattr(getattr(self, 'scan', None), 'results_dir', None)
         base_results = _scan_dir if isinstance(_scan_dir, str) and _scan_dir else (
-            f"{RENGINE_HOME}/scan_results/{self.scan_id}"
+            os.path.join(settings.RENGINE_RESULTS, str(self.scan_id))
         )
 
     if urls:
