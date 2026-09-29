@@ -10,6 +10,8 @@ django.setup()
 from startScan.models import ScanHistory, EngineType, SubScan, Subdomain
 from targetApp.models import Domain
 from django.utils import timezone
+import shutil
+import tempfile
 import yaml
 
 class TestTemporalOrchestration(TestCase):
@@ -31,11 +33,15 @@ class TestTemporalOrchestration(TestCase):
                 }
             })
         )
+        # Subscans create their directory under scan.results_dir.
+        results_dir = tempfile.mkdtemp(prefix='rengine_test_orchestration_')
+        self.addCleanup(shutil.rmtree, results_dir, ignore_errors=True)
         self.scan = ScanHistory.objects.create(
             domain=self.domain,
             scan_type=self.engine,
             start_scan_date=timezone.now(),
-            tasks=[]
+            tasks=[],
+            results_dir=results_dir,
         )
 
     def tearDown(self):

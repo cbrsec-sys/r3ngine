@@ -52,6 +52,14 @@ SINGLETON_MODELS = (
 # Only these model classes may be deserialized during config import
 _ALLOWED_IMPORT_MODELS = frozenset(DASHBOARD_MODELS + SCANENGINE_MODELS)
 
+WORDLIST_DIR = '/usr/src/wordlist/'
+
+# Archive member -> location of the tool's config inside the container.
+TOOL_CONFIG_FILES = {
+    'tool_configs/theharvester_api-keys.yaml': '/usr/src/github/theHarvester/api-keys.yaml',
+    'tool_configs/spiderfoot.cfg': '/usr/src/github/spiderfoot/spiderfoot.cfg',
+}
+
 class ExportConfig(APIView):
     permission_classes = [IsAuthenticated, HasPermission]
     permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
@@ -77,24 +85,18 @@ class ExportConfig(APIView):
             zip_file.writestr('scanengine_models.json', json.dumps(scanengine_data, indent=4))
 
             # 3. Export Wordlists from Filesystem
-            wordlist_dir = '/usr/src/wordlist/'
-            if os.path.exists(wordlist_dir):
-                for filename in os.listdir(wordlist_dir):
+            if os.path.exists(WORDLIST_DIR):
+                for filename in os.listdir(WORDLIST_DIR):
                     if filename.endswith('.txt'):
-                        file_path = os.path.join(wordlist_dir, filename)
+                        file_path = os.path.join(WORDLIST_DIR, filename)
                         with open(file_path, 'rb') as f:
                             zip_file.writestr(f'wordlists/{filename}', f.read())
 
             # 4. Export Spiderfoot and theHarvester Tool Configs
-            harvester_config_path = '/usr/src/github/theHarvester/api-keys.yaml'
-            if os.path.exists(harvester_config_path):
-                with open(harvester_config_path, 'rb') as f:
-                    zip_file.writestr('tool_configs/theharvester_api-keys.yaml', f.read())
-
-            spiderfoot_config_path = '/usr/src/github/spiderfoot/spiderfoot.cfg'
-            if os.path.exists(spiderfoot_config_path):
-                with open(spiderfoot_config_path, 'rb') as f:
-                    zip_file.writestr('tool_configs/spiderfoot.cfg', f.read())
+            for member, config_path in TOOL_CONFIG_FILES.items():
+                if os.path.exists(config_path):
+                    with open(config_path, 'rb') as f:
+                        zip_file.writestr(member, f.read())
 
         zip_buffer.seek(0)
         
@@ -126,17 +128,14 @@ class ImportConfig(APIView):
                     self.restore_models(scanengine_data, overwrite_existing)
 
                 # 3. Restore Wordlists to Filesystem
-                wordlist_dir = '/usr/src/wordlist/'
-                if not os.path.exists(wordlist_dir):
-                    os.makedirs(wordlist_dir)
-
-                safe_wordlist_dir = os.path.realpath(wordlist_dir)
+                os.makedirs(WORDLIST_DIR, exist_ok=True)
+                safe_wordlist_dir = os.path.realpath(WORDLIST_DIR)
                 for file_info in zip_file.infolist():
                     if file_info.filename.startswith('wordlists/') and file_info.filename.endswith('.txt'):
                         filename = os.path.basename(file_info.filename)
                         if not filename or not re.fullmatch(r'[a-zA-Z0-9_\-\.]+\.txt', filename):
                             continue
-                        file_path = os.path.realpath(os.path.join(wordlist_dir, filename))
+                        file_path = os.path.realpath(os.path.join(WORDLIST_DIR, filename))
                         if not file_path.startswith(safe_wordlist_dir + os.sep):
                             continue
                         # Only overwrite wordlists if overwrite_existing is true, or if file doesn't exist
@@ -145,19 +144,13 @@ class ImportConfig(APIView):
                                 f.write(zip_file.read(file_info.filename))
 
                 # 4. Restore Spiderfoot and theHarvester Tool Configs
-                for file_info in zip_file.infolist():
-                    if file_info.filename.startswith('tool_configs/'):
-                        dest_path = None
-                        if file_info.filename == 'tool_configs/theharvester_api-keys.yaml':
-                            dest_path = '/usr/src/github/theHarvester/api-keys.yaml'
-                        elif file_info.filename == 'tool_configs/spiderfoot.cfg':
-                            dest_path = '/usr/src/github/spiderfoot/spiderfoot.cfg'
-                        
-                        if dest_path:
-                            if overwrite_existing or not os.path.exists(dest_path):
-                                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                                with open(dest_path, 'wb') as f:
-                                    f.write(zip_file.read(file_info.filename))
+                for member, dest_path in TOOL_CONFIG_FILES.items():
+                    if member not in zip_file.namelist():
+                        continue
+                    if overwrite_existing or not os.path.exists(dest_path):
+                        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                        with open(dest_path, 'wb') as f:
+                            f.write(zip_file.read(member))
 
             return Response({'status': True, 'message': 'Configuration imported successfully.'})
         except zipfile.BadZipFile:

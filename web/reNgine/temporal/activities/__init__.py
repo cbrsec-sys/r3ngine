@@ -36,6 +36,10 @@ from startScan.models import Subdomain
 
 logger = get_module_logger(__name__)
 
+# Per-scan proxy list files live on the github_repos volume, which the tool
+# containers share with the orchestrator.
+PROXY_LIST_ROOT = '/usr/src/github/scan_results'
+
 def resolve_target_host(ctx: dict, subdomain=None, domain=None) -> str:
     """Resolve the host a task runs against, for display on its timeline entry.
 
@@ -1391,7 +1395,7 @@ def create_proxy_list_activity(ctx: dict) -> str:
         logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=no_proxies")
         return None
 
-    results_dir = f"/usr/src/github/scan_results/{scan_id}"
+    results_dir = os.path.join(PROXY_LIST_ROOT, str(scan_id))
     os.makedirs(results_dir, exist_ok=True)
     
     file_path = os.path.join(results_dir, f"proxies_{uuid.uuid4().hex}.txt")

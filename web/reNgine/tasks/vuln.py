@@ -1554,8 +1554,10 @@ def second_order_scan(self, urls=[], ctx={}, description=None):
 
 	logger.info('Second Order scan started')
 
-	config_path = "/usr/local/config/second_order_merged.json"
-	os.makedirs("/usr/local/config", exist_ok=True)
+	# Per scan rather than a shared /usr/local/config: concurrent scans no longer
+	# race on one file, and the task needs no write access outside its results.
+	os.makedirs(self.results_dir, exist_ok=True)
+	config_path = os.path.join(self.results_dir, 'second_order_merged.json')
 
 	with open(config_path, 'w') as fh:
 		json.dump(_SECOND_ORDER_MERGED_CONFIG, fh)

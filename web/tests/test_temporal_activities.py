@@ -146,8 +146,17 @@ class TestCheckpointStubRemoval(TestCase):
 
 class TestCreateProxyListActivity(TestCase):
     def setUp(self):
+        import shutil
+        import tempfile
+        from unittest.mock import patch
         from scanEngine.models import Proxy
         Proxy.objects.all().delete()
+        # The real root is a container volume path the test runner cannot write.
+        root = tempfile.mkdtemp(prefix='rengine_test_proxies_')
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        patcher = patch('reNgine.temporal.activities.PROXY_LIST_ROOT', root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         
     def test_create_proxy_list_enabled_http(self):
         """If mocked proxies are enabled and HTTP, it creates the list."""
