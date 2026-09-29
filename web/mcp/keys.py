@@ -1,16 +1,14 @@
-import hashlib
-import hmac
-import secrets
+from reNgine.utils.secret_tokens import generate_token, hash_token, token_matches
 
 MCP_KEY_PREFIX = 'r3n_mcp_'
 
 
 def generate_mcp_secret() -> str:
-    return MCP_KEY_PREFIX + secrets.token_urlsafe(32)
+    return generate_token(MCP_KEY_PREFIX)
 
 
 def hash_mcp_secret(secret: str) -> str:
-    return hashlib.sha256(secret.encode('utf-8')).hexdigest()
+    return hash_token(secret)
 
 
 def display_prefix(secret: str) -> str:
@@ -18,5 +16,4 @@ def display_prefix(secret: str) -> str:
 
 
 def secrets_match(secret: str, key_hash: str) -> bool:
-    digest = hash_mcp_secret(secret)
-    return hmac.compare_digest(digest, key_hash)
+    return token_matches(secret, key_hash)

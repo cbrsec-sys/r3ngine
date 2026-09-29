@@ -28,6 +28,10 @@ services:
       - WORKER_NAME=${WORKER_NAME}
       - WORKER_AUTH_TOKEN=${WORKER_AUTH_TOKEN}
       - MASTER_URL=${MASTER_URL}
+      # The heartbeat verifies the master's TLS certificate. For the self-signed
+      # one install.sh creates, mount its CA and point MASTER_CA_BUNDLE at it.
+      - MASTER_CA_BUNDLE=${MASTER_CA_BUNDLE:-}
+      - MASTER_TLS_VERIFY=${MASTER_TLS_VERIFY:-1}
     volumes:
       - ../web:/usr/src/app
       - github_repos:/usr/src/github

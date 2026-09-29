@@ -28,6 +28,9 @@ from api.serializers import (
     SecretLeakSerializer, EmailSerializer, EmployeeSerializer, 
     DorkSerializer, MetafinderDocumentSerializer, S3BucketSerializer, OsintStagingSerializer
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ScanSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -435,8 +438,9 @@ class ScanAiExportAPIView(APIView):
 
         try:
             zip_buffer, filename = build_ai_export_zip(scan=scan, options=options)
-        except Exception as exc:
-            return Response({"error": f"Failed to build AI export: {exc}"}, status=500)
+        except Exception:
+            logger.exception("Failed to build AI export for scan %s", scan.id)
+            return Response({"error": "Failed to build AI export; see server logs."}, status=500)
 
         return FileResponse(
             zip_buffer,

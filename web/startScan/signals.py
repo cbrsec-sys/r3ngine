@@ -1,10 +1,9 @@
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-import os
-import shutil
 import logging
 from startScan.models import ScanHistory, SubScan
 from reNgine.temporal_client import TemporalClientProvider
+from reNgine.utils.results_fs import remove_results_dir
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +25,15 @@ def cancel_scan_workflows_and_cleanup(sender, instance, **kwargs):
     except Exception as e:
         logger.warning(f"Failed to query temporal executions for ScanHistory ID {instance.id}: {e}")
 
-    # Cleanup results directory
-    if instance.results_dir and os.path.exists(instance.results_dir):
-        try:
-            logger.info(f"Cleaning up scan results directory: {instance.results_dir}")
-            shutil.rmtree(instance.results_dir)
-        except Exception as e:
-            logger.warning(f"Failed to clean up results directory {instance.results_dir} during ScanHistory deletion: {e}")
+    # The one place a scan's results directory is removed; views only delete the row.
+    try:
+        if remove_results_dir(instance.results_dir):
+            logger.info("Removed scan results directory %s", instance.results_dir)
+    except OSError:
+        logger.warning(
+            "Failed to remove results directory %s during ScanHistory deletion",
+            instance.results_dir, exc_info=True,
+        )
 
 
 @receiver(pre_delete, sender=SubScan)

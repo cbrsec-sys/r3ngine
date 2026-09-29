@@ -24,11 +24,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework_datatables.pagination import DatatablesPageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.renderers import JSONRenderer
 from django.http import FileResponse, Http404, HttpResponse
 import mimetypes
 import os
+import shutil
 
 
 from django.shortcuts import get_object_or_404
@@ -109,6 +111,7 @@ from api.views.misc import (
     LinkedInSessionUploadView, LinkedInSessionStatusView, LinkedInSessionDeleteView,
     LinkedInHelperScriptView,
 )
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 class ProxySettingsAPIView(APIView):
 	permission_classes = [IsAuthenticated, HasPermission]
 	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
@@ -184,9 +187,9 @@ class ProxyFetchAPIView(APIView):
 			finally:
 				loop.close()
 			return Response({'status': True, 'task_id': job_id})
-		except Exception as e:
-			logger.exception("[ProxyFetch] Unexpected error in ProxyFetchAPIView: %s", e)
-			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+		except Exception:
+			logger.exception("[ProxyFetch] Unexpected error in ProxyFetchAPIView")
+			return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class TorStatusAPIView(APIView):
@@ -222,105 +225,127 @@ class TorExitIPAPIView(APIView):
 			return Response({'ip': None})
 
 
-class UninstallTool(APIView):
+def _resolve_tool(request):
+	"""Find the InstalledExternalTool named by ``tool_id`` or ``name``, or build the error Response."""
+	params = request.data if request.method == 'POST' else request.query_params
+	tool_id = params.get('tool_id')
+	tool_name = params.get('name')
+	if tool_id:
+		tool = InstalledExternalTool.objects.filter(id=tool_id).first()
+	elif tool_name:
+		tool = InstalledExternalTool.objects.filter(name=tool_name).first()
+	else:
+		return None, Response({'status': False, 'message': 'tool_id or name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+	if tool is None:
+		return None, Response({'status': False, 'message': 'Tool Not found'}, status=status.HTTP_404_NOT_FOUND)
+	return tool, None
+
+
+class _ToolCommandView(APIView):
+	"""Base for views that run an admin-configured tool command.
+
+	They change state, so the browser must use POST: DRF only enforces CSRF on
+	unsafe methods, and a GET would let any page trigger the command through an
+	admin's session cookie. GET is still accepted from token-authenticated
+	clients (the mobile /mapi/ app), which carry no ambient credentials.
+	"""
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
 
 	def get(self, request):
-		req = self.request
-		tool_id = req.query_params.get('tool_id')
-		tool_name = req.query_params.get('name')
+		if isinstance(request.successful_authenticator, SessionAuthentication):
+			return Response(
+				{'status': False, 'message': 'Use POST for this action.'},
+				status=status.HTTP_405_METHOD_NOT_ALLOWED,
+			)
+		return self.run(request)
 
-		if tool_id:
-			tool = InstalledExternalTool.objects.get(id=tool_id)
-		elif tool_name:
-			tool = InstalledExternalTool.objects.get(name=tool_name)
+	def post(self, request):
+		return self.run(request)
 
-
-		if tool.is_default:
-			return Response({'status': False, 'message': 'Default tools can not be uninstalled'})
-
-		# check install instructions, if it is installed using go, then remove from go bin path,
-		# else try to remove from github clone path
-
-		# getting tool name is tricky!
-
-		if 'go install' in tool.install_command:
-			tool_name = tool.install_command.split('/')[-1].split('@')[0]
-			uninstall_command = 'rm /usr/local/bin/' + tool_name
-		elif 'git clone' in tool.install_command:
-			tool_name = tool.install_command[:-1] if tool.install_command[-1] == '/' else tool.install_command
-			tool_name = tool_name.split('/')[-1]
-			uninstall_command = 'rm -rf ' + tool.github_clone_path
-		else:
-			return Response({'status': False, 'message': 'Cannot uninstall tool!'})
-
-		run_command(uninstall_command, shell=True)
-
-		tool.delete()
-
-		return Response({'status': True, 'message': 'Uninstall Tool Success'})
+	def run(self, request):
+		raise NotImplementedError
 
 
-class UpdateTool(APIView):
-	permission_classes = [HasPermission]
-	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
+class UpdateTool(_ToolCommandView):
 
-	def get(self, request):
-		req = self.request
-		tool_id = req.query_params.get('tool_id')
-		tool_name = req.query_params.get('name')
-
-		if tool_id:
-			tool = InstalledExternalTool.objects.get(id=tool_id)
-		elif tool_name:
-			tool = InstalledExternalTool.objects.get(name=tool_name)
+	def run(self, request):
+		tool, error = _resolve_tool(request)
+		if error:
+			return error
 
 		# if git clone was used for installation, then we must use git pull inside project directory,
 		# otherwise use the same command as given
-
-		update_command = tool.update_command.lower()
+		update_command = (tool.update_command or '').lower()
 
 		if not update_command:
-			return Response({'status': False, 'message': tool.name + 'has missing update command! Cannot update the tool.'})
+			return Response({'status': False, 'message': tool.name + ' has missing update command! Cannot update the tool.'})
 		elif update_command == 'git pull':
 			tool_name = tool.install_command[:-1] if tool.install_command[-1] == '/' else tool.install_command
 			tool_name = tool_name.split('/')[-1]
 			update_command = 'cd /usr/src/github/' + tool_name + ' && git pull && cd -'
 
-		
 		try:
 			return_code, output = run_command(update_command, shell=True)
-			if return_code == 0:
-				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
-			else:
-				logger.error("Update failed for %s: %s", tool.name, output)
-				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
-		except Exception as e:
-			logger.error(str(e))
-			return Response({'status': False, 'message': str(e)})
+		except Exception:
+			logger.exception('Update command failed to run for %s', tool.name)
+			return Response({'status': False, 'message': 'Update failed to run; see server logs.'})
+		if return_code == 0:
+			return Response({'status': True, 'message': tool.name + ' updated successfully.'})
+		logger.error("Update failed for %s: %s", tool.name, output)
+		return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
 
-class UninstallTool(APIView):
-	permission_classes = [HasPermission]
-	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
 
-	def get(self, request):
-		req = self.request
-		tool_id = req.query_params.get('tool_id')
-		if not InstalledExternalTool.objects.filter(id=tool_id).exists():
-			return Response({'status': False, 'message': 'Tool Not found'})
-		tool = InstalledExternalTool.objects.get(id=tool_id)
-		
+GO_BIN_DIR = '/usr/local/bin'
+GITHUB_TOOLS_DIR = '/usr/src/github'
+_BINARY_NAME_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
+
+
+def _remove_installed_tool_files(tool):
+	"""Delete what the tool's install_command put on disk; return an error message or None.
+
+	Only two install styles are known: ``go install`` (one binary in GO_BIN_DIR)
+	and ``git clone`` (a checkout under GITHUB_TOOLS_DIR). Nothing is passed to a
+	shell, and neither path can leave its directory.
+	"""
+	install_command = tool.install_command or ''
+	if 'go install' in install_command:
+		binary = install_command.rstrip('/').split('/')[-1].split('@')[0]
+		if not _BINARY_NAME_RE.fullmatch(binary):
+			return 'Cannot work out the installed binary name.'
+		binary_path = os.path.join(GO_BIN_DIR, binary)
+		if os.path.isfile(binary_path):
+			os.remove(binary_path)
+		return None
+	if 'git clone' in install_command:
+		clone_path = tool.github_clone_path or ''
+		root = os.path.realpath(GITHUB_TOOLS_DIR)
+		if not clone_path or os.path.realpath(clone_path) == root or not is_safe_path(root, clone_path):
+			return 'Tool checkout is not inside the tools directory.'
+		shutil.rmtree(clone_path, ignore_errors=True)
+		return None
+	return 'Cannot uninstall tool!'
+
+
+class UninstallTool(_ToolCommandView):
+
+	def run(self, request):
+		tool, error = _resolve_tool(request)
+		if error:
+			return error
+		if tool.is_default:
+			return Response({'status': False, 'message': 'Default tools can not be uninstalled'}, status=status.HTTP_400_BAD_REQUEST)
+
 		try:
-			return_code, output = run_command(tool.uninstall_command, shell=True)
-			if return_code == 0:
-				tool.delete()
-				return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
-			else:
-				return Response({'status': False, 'message': f'Uninstall failed: {output[:200]}'})
-		except Exception as e:
-			logger.error(str(e))
-			return Response({'status': False, 'message': str(e)})
+			problem = _remove_installed_tool_files(tool)
+		except OSError:
+			logger.exception('Failed to remove files of tool %s', tool.name)
+			return Response({'status': False, 'message': 'Uninstall failed; see server logs.'})
+		if problem:
+			return Response({'status': False, 'message': problem}, status=status.HTTP_400_BAD_REQUEST)
+		tool.delete()
+		return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
+
 
 class GetExternalToolCurrentVersion(APIView):
 	permission_classes = [HasPermission]
@@ -329,20 +354,9 @@ class GetExternalToolCurrentVersion(APIView):
 	def get(self, request):
 		req = self.request
 		# toolname is also the command
-		tool_id = req.query_params.get('tool_id')
-		tool_name = req.query_params.get('name')
-		# can supply either tool id or tool_name
-
-		tool = None
-
-		if tool_id:
-			if not InstalledExternalTool.objects.filter(id=tool_id).exists():
-				return Response({'status': False, 'message': 'Tool Not found'})
-			tool = InstalledExternalTool.objects.get(id=tool_id)
-		elif tool_name:
-			if not InstalledExternalTool.objects.filter(name=tool_name).exists():
-				return Response({'status': False, 'message': 'Tool Not found'})
-			tool = InstalledExternalTool.objects.get(name=tool_name)
+		tool, error = _resolve_tool(req)
+		if error:
+			return error
 
 		if not tool.version_lookup_command:
 			return Response({'status': False, 'message': 'Version Lookup command not provided.'})
@@ -353,9 +367,9 @@ class GetExternalToolCurrentVersion(APIView):
 			if return_code != 0:
 				logger.warning("Version lookup failed for %s with code %s", tool.name, return_code)
 				return Response({'status': False, 'message': 'Tool not found or check failed.'})
-		except Exception as e:
+		except Exception:
 			logger.error("Error running version lookup command", exc_info=True)
-			return Response({'status': False, 'message': f'Error running version lookup command: {str(e)}'})
+			return Response({'status': False, 'message': 'Error running version lookup command; see server logs.'})
 
 		if tool.version_match_regex:
 			version_number = re.search(re.compile(tool.version_match_regex), str(stdout))
@@ -411,8 +425,9 @@ class GithubToolCheckGetLatestRelease(APIView):
 			response = res.json()
 		except requests.exceptions.Timeout:
 			return Response({'status': False, 'message': 'GitHub API Timeout'})
-		except Exception as e:
-			return Response({'status': False, 'message': f'Error fetching from GitHub: {str(e)}'})
+		except Exception:
+			logger.exception('Error fetching tool release from GitHub')
+			return Response({'status': False, 'message': 'Error fetching from GitHub; see server logs.'})
 
 		# check if api rate limit exceeded
 		if isinstance(response, dict) and 'message' in response:
@@ -635,8 +650,9 @@ class CMSDetector(APIView):
 						logger.error(e)
 					return Response(response)
 			return Response(response)
-		except Exception as e:
-			response = {'status': False, 'message': str(e)}
+		except Exception:
+			logger.exception('CMS detection failed')
+			response = {'status': False, 'message': INTERNAL_ERROR_MESSAGE}
 			return Response(response)
 
 
@@ -669,12 +685,12 @@ class IPToDomain(APIView):
 				'orig': ip_address,
 				'ip_address': resolved_ips,
 			}
-		except Exception as e:
-			logger.exception(e)
+		except Exception:
+			logger.exception('IP lookup failed')
 			response = {
 				'status': False,
 				'ip_address': ip_address,
-				'message': f'Exception {e}'
+				'message': INTERNAL_ERROR_MESSAGE
 			}
 		return Response(response)
 
@@ -850,8 +866,9 @@ class DeleteReconNote(APIView):
 		try:
 			TodoNote.objects.filter(id=todo_id).delete()
 			return Response({'status': True})
-		except Exception as e:
-			return Response({'status': False, 'message': str(e)}, status=400)
+		except Exception:
+			logger.exception('Failed to delete todo note')
+			return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=500)
 
 
 class ListScanHistory(APIView):
@@ -916,8 +933,9 @@ class CreateOrganization(APIView):
 				domain = Domain.objects.get(id=domain_id)
 				organization.domains.add(domain)
 			return Response({'status': True, 'message': 'Organization created successfully', 'id': organization.id})
-		except Exception as e:
-			return Response({'status': False, 'message': str(e)}, status=400)
+		except Exception:
+			logger.exception('Failed to create organization')
+			return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=500)
 
 
 class UpdateOrganization(APIView):
@@ -947,8 +965,9 @@ class UpdateOrganization(APIView):
 				organization.domains.add(domain)
 				
 			return Response({'status': True, 'message': 'Organization updated successfully'})
-		except Exception as e:
-			return Response({'status': False, 'message': str(e)}, status=400)
+		except Exception:
+			logger.exception('Failed to update organization')
+			return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=500)
 
 
 class ListWordlists(APIView):

@@ -35,7 +35,7 @@ def capture_url(browser, url, scan_id, results_dir=None):
     )
 
     # Prepare paths
-    url_hash = hashlib.md5(url.encode()).hexdigest()
+    url_hash = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()
     
     screenshot_rel_dir = f"screenshots/{scan_id}"
     html_rel_dir = f"html/{scan_id}"

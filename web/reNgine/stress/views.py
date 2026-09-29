@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from startScan.models import ScanHistory, ScanReport
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -176,10 +177,10 @@ class StressReportGenerationAPI(APIView):
                 status=status.HTTP_201_CREATED,
             )
 
-        except Exception as e:
-            logger.error(f"[StressReportGenerationAPI] Error initiating report: {e}")
+        except Exception:
+            logger.exception("[StressReportGenerationAPI] Error initiating report")
             return Response(
-                {"status": False, "error": str(e)},
+                {"status": False, "error": INTERNAL_ERROR_MESSAGE},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -203,6 +204,6 @@ class StressReportGenerationAPI(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        except Exception as e:
-            logger.error(f"[StressReportGenerationAPI] Error getting report status: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("[StressReportGenerationAPI] Error getting report status")
+            return Response({"error": INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

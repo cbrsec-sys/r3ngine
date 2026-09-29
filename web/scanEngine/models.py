@@ -388,11 +388,15 @@ class ScanProfile(models.Model):
         return d
 
 
+WORKER_TOKEN_PREFIX = 'r3n_wkr_'
+
+
 class ScanWorker(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
-    auth_token = models.CharField(max_length=255, unique=True) # Used to secure worker access
+    # SHA-256 of the worker's bearer token; the token itself is shown once at creation.
+    auth_token_hash = models.CharField(max_length=64, unique=True)
     task_queue = models.CharField(max_length=100)
     hostname = models.CharField(max_length=100, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)

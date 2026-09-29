@@ -380,6 +380,20 @@ async def _register_daily_cron_schedule(
     logger.info(f"[Startup] Registered daily cron schedule '{schedule_id}' for {hour:02d}:{minute:02d}")
 
 
+def master_tls_verify():
+    """``requests`` verify= value for calls from a remote worker to the master.
+
+    The heartbeat carries the worker's bearer token, so the master's certificate
+    is verified by default. For the self-signed certificate that install.sh
+    generates, point MASTER_CA_BUNDLE at its CA file; MASTER_TLS_VERIFY=0 turns
+    verification off at your own risk.
+    """
+    ca_bundle = os.environ.get('MASTER_CA_BUNDLE')
+    if ca_bundle:
+        return ca_bundle
+    return os.environ.get('MASTER_TLS_VERIFY', '1').strip().lower() not in ('0', 'false', 'no')
+
+
 class Command(BaseCommand):
     help = 'Runs the Python Temporal Orchestrator Worker on python-orchestrator-queue.'
 
@@ -431,14 +445,16 @@ class Command(BaseCommand):
             if not worker_name or not worker_token or not r3ngine_url:
                 return
             import requests
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            
+
+            tls_verify = master_tls_verify()
+            if tls_verify is False:
+                logger.warning("MASTER_TLS_VERIFY is off: the worker token is sent without verifying the master's certificate.")
+
             def send_heartbeat():
                 return requests.post(
-                    f"{r3ngine_url.rstrip('/')}/api/settings/workers/heartbeat/", 
+                    f"{r3ngine_url.rstrip('/')}/api/settings/workers/heartbeat/",
                     json={"worker_name": worker_name, "token": worker_token},
-                    verify=False,
+                    verify=tls_verify,
                     timeout=10
                 )
             

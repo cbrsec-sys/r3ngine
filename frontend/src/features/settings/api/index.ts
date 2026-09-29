@@ -457,8 +457,9 @@ export const useToolVersion = () => {
 export const useUpdateTool = () => {
   return useMutation({
     mutationFn: async (toolId: number) => {
-      const { data } = await axios.get(`/api/tool/update/`, {
-        params: { tool_id: toolId },
+      // POST: the command changes server state, so it must carry a CSRF token.
+      const { data } = await axios.post(`/api/tool/update/`, { tool_id: toolId }, {
+        headers: { 'X-CSRFToken': getCsrfToken() },
       });
       return data;
     },
@@ -469,8 +470,9 @@ export const useUninstallTool = (slug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (toolId: number) => {
-      const { data } = await axios.get(`/api/tool/uninstall/`, {
-        params: { tool_id: toolId },
+      // POST: the command changes server state, so it must carry a CSRF token.
+      const { data } = await axios.post(`/api/tool/uninstall/`, { tool_id: toolId }, {
+        headers: { 'X-CSRFToken': getCsrfToken() },
       });
       return data;
     },
@@ -950,17 +952,24 @@ export const useDeleteUser = () => {
 export interface RemoteWorker {
   id: number;
   name: string;
-  auth_token: string;
+  description: string | null;
+  task_queue: string;
+  hostname: string | null;
   ip_address: string | null;
+  is_active: boolean;
   last_heartbeat: string | null;
-  created_at: string;
+}
+
+/** Returned by create only: the worker token is shown once and stored hashed. */
+export interface CreatedRemoteWorker extends RemoteWorker {
+  auth_token: string;
 }
 
 export const useRemoteWorkers = () => {
   return useQuery<RemoteWorker[]>({
     queryKey: ['remote-workers'],
     queryFn: async () => {
-      const response = await axios.get('/api/settings/workers/');
+      const response = await axios.get('/api/workers/');
       return Array.isArray(response.data) ? response.data : response.data.results;
     },
     refetchInterval: 30000,
@@ -970,8 +979,8 @@ export const useRemoteWorkers = () => {
 export const useCreateRemoteWorker = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { name: string, auth_token: string }) => {
-      const response = await axios.post('/api/settings/workers/', data, {
+    mutationFn: async (data: { name: string }): Promise<CreatedRemoteWorker> => {
+      const response = await axios.post('/api/workers/', data, {
         headers: {
           'X-CSRFToken': getCsrfToken(),
           'Accept': 'application/json'
@@ -989,7 +998,7 @@ export const useDeleteRemoteWorker = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (workerId: number) => {
-      const response = await axios.delete(`/api/settings/workers/${workerId}/`, {
+      const response = await axios.delete(`/api/workers/${workerId}/`, {
         headers: {
           'X-CSRFToken': getCsrfToken(),
           'Accept': 'application/json'

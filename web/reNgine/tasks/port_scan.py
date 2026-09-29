@@ -1,4 +1,5 @@
 import logging
+import shlex
 import os
 import json
 import xmltodict
@@ -1077,7 +1078,7 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 		logger.warning(f'Running IKE-scan on {target}')
 		ike_output_file = f'{self.results_dir}/ike_scan_{target}.txt'
 		# ike-scan does not natively support HTTP/SOCKS proxies
-		cmd = f'ike-scan --multiline {target} > {ike_output_file}'
+		cmd = f'ike-scan --multiline {shlex.quote(target)} > {shlex.quote(ike_output_file)}'
 		#proxy = get_random_proxy()
 		run_command(
 			cmd,
@@ -1106,7 +1107,7 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 			logger.warning(f'Running SSLScan on {target}:{port}')
 			ssl_output_file = f'{self.results_dir}/sslscan_{target}_{port}.xml'
 			# sslscan does not natively support proxies
-			cmd = f'sslscan --xml={ssl_output_file} {target}:{port}'
+			cmd = f'sslscan --xml={shlex.quote(ssl_output_file)} {shlex.quote(f"{target}:{port}")}'
 			#proxy = get_random_proxy()
 			run_command(
 				cmd,

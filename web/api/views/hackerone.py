@@ -56,6 +56,8 @@ from api.permissions import *
 from api.serializers import *
 from reNgine.utils.graph import Neo4jManager
 from reNgine.temporal_client import TemporalClientProvider, run_and_close
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
+from rest_framework.exceptions import APIException
 
 logger = logging.getLogger(__name__)
 
@@ -301,5 +303,9 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			return Response({"error": "HackerOne API credentials not configured"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 		elif str(exc) == "Invalid API credentials":
 			return Response({"error": "Invalid HackerOne API credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+		elif isinstance(exc, APIException):
+			# Authentication, permission and validation errors keep DRF's handling.
+			return super().handle_exception(exc)
 		else:
-			return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+			logger.exception("HackerOne API request failed")
+			return Response({"error": INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

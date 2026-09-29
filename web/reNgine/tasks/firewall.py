@@ -5,6 +5,7 @@ Runs testssl.sh (per-finding Vulnerability records) and queries crt.sh
 certificate transparency logs (feeds subdomain pipeline).
 """
 import json
+import shlex
 import logging
 import os
 import tempfile
@@ -35,8 +36,8 @@ def run_tls_deep_audit(self, ctx, config):
     for port in ssl_ports:
         output_json = f'{self.results_dir}/testssl_{target}_{port}.json'
         cmd = (
-            f'testssl.sh --jsonfile {output_json} --color 0 --quiet '
-            f'{target}:{port}'
+            f'testssl.sh --jsonfile {shlex.quote(output_json)} --color 0 --quiet '
+            f'{shlex.quote(f"{target}:{port}")}'
         )
         logger.warning(f'Running testssl.sh on {target}:{port}')
         run_command(

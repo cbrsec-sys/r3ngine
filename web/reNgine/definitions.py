@@ -1099,3 +1099,7 @@ TARGET_TYPE_CHOICES = [
     (TARGET_TYPE_CRYPTO_ADDRESS, 'Crypto Address'),
     (TARGET_TYPE_CODE_PATH, 'Code Path / Repository'),
 ]
+
+
+# Returned to clients in place of exception text; the details go to the server log.
+INTERNAL_ERROR_MESSAGE = 'Internal error; see server logs for details.'

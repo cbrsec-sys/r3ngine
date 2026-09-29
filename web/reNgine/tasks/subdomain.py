@@ -1,5 +1,6 @@
 ﻿import logging
 import os
+import shlex
 import json
 import validators
 from pathlib import Path
@@ -26,7 +27,7 @@ def amass_intel_discovery(self, host, ctx={}, description=None):
 	
 	output_path = f'{self.results_dir}/amass_intel.txt'
 	
-	cmd = f'amass intel -d {host} -whois -o {output_path}'
+	cmd = f'amass intel -d {shlex.quote(host)} -whois -o {shlex.quote(output_path)}'
 	cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
 	
 	#proxy = get_random_proxy()
@@ -118,7 +119,7 @@ def subdomain_discovery(
 			if tool == 'amass-passive':
 				use_amass_config = config.get(USE_AMASS_CONFIG, False)
 				results_file = f'{self.results_dir}/subdomains_amass.txt'
-				cmd = f'amass enum -passive -d {host} -o {results_file}'
+				cmd = f'amass enum -passive -d {shlex.quote(host)} -o {shlex.quote(results_file)}'
 				cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
 				#if proxy:
 				#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
@@ -128,7 +129,7 @@ def subdomain_discovery(
 				amass_wordlist_name = config.get(AMASS_WORDLIST, 'deepmagic.com-prefixes-top50000')
 				wordlist_path = f'/usr/src/wordlist/{amass_wordlist_name}.txt'
 				results_file = f'{self.results_dir}/subdomains_amass_active.txt'
-				cmd = f'amass enum -active -d {host} -o {results_file}'
+				cmd = f'amass enum -active -d {shlex.quote(host)} -o {shlex.quote(results_file)}'
 				cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
 				cmd += f' -brute -w {wordlist_path}'
 				#if proxy:
@@ -136,7 +137,7 @@ def subdomain_discovery(
 
 			elif tool == 'sublist3r':
 				results_file = f'{self.results_dir}/subdomains_sublister.txt'
-				cmd = f'python3 /usr/src/github/Sublist3r/sublist3r.py -d {host} -t {threads} -o {results_file}'
+				cmd = f'python3 /usr/src/github/Sublist3r/sublist3r.py -d {shlex.quote(host)} -t {threads} -o {shlex.quote(results_file)}'
 
 			elif tool == 'subfinder':
 				results_file = f'{self.results_dir}/subdomains_subfinder.txt'

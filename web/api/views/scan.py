@@ -57,6 +57,7 @@ from api.serializers import *
 from reNgine.utils.graph import Neo4jManager
 from reNgine.temporal_client import TemporalClientProvider, run_and_close
 from api.views.tools import _WORKFLOW_REGISTRY
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -159,9 +160,9 @@ class InitiateScan(APIView):
 						raise Exception(res.get('error', 'Failed to initiate scan'))
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
-				except Exception as e:
+				except Exception:
 					logger.error("Error initiating scan for domain %s", domain_id, exc_info=True)
-					errors.append({'domain_id': domain_id, 'error': str(e)})
+					errors.append({'domain_id': domain_id, 'error': INTERNAL_ERROR_MESSAGE})
 
 			if not results:
 				return Response({
@@ -176,12 +177,12 @@ class InitiateScan(APIView):
 				'results': results,
 				'errors': errors if errors else None
 			})
-		except Exception as e:
-			logger.error(e)
+		except Exception:
+			logger.exception('Failed to initiate scans')
 			return Response({
 				'status': False,
-				'message': str(e)
-			}, status=status.HTTP_400_BAD_REQUEST)
+				'message': INTERNAL_ERROR_MESSAGE
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class InitiateSubTask(APIView):
@@ -238,9 +239,9 @@ class InitiateSubTask(APIView):
 					'task_queue': task_queue or worker_name,
 				}
 				return sub_id, initiate_subscan_temporal(**ctx)
-			except Exception as ex:
-				logger.exception('Error starting concurrent subscan for subdomain %s', sub_id, exc_info=True)
-				return sub_id, {'success': False, 'error': str(ex)}
+			except Exception:
+				logger.exception('Error starting concurrent subscan for subdomain %s', sub_id)
+				return sub_id, {'success': False, 'error': INTERNAL_ERROR_MESSAGE}
 			finally:
 				# Close all connections created or cached for this thread to prevent leaks
 				connections.close_all()
@@ -290,9 +291,9 @@ class StopScan(APIView):
 				if scan.scan_status == SUCCESS_TASK or scan.scan_status == ABORTED_TASK:
 					continue
 				response = abort_scan_history(scan, aborted_by=request.user)
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
+			except Exception:
+				logger.exception('Failed to abort scan %s', scan_id)
+				response = {'status': False, 'message': INTERNAL_ERROR_MESSAGE}
 
 		for subscan_id in subscan_ids:
 			try:
@@ -300,9 +301,9 @@ class StopScan(APIView):
 				if subscan.status == SUCCESS_TASK or subscan.status == ABORTED_TASK:
 					continue
 				response = abort_subscan(subscan)
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
+			except Exception:
+				logger.exception('Failed to abort subscan %s', subscan_id)
+				response = {'status': False, 'message': INTERNAL_ERROR_MESSAGE}
 
 		return Response(response)
 
@@ -1293,10 +1294,9 @@ class ExtractAuthLogsView(APIView):
                         logs.append(fields['data'])
 
             return Response({'status': True, 'logs': logs}, status=status.HTTP_200_OK)
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to fetch auth logs for {workflow_id}: {exc}")
-            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Failed to fetch auth logs for %s", workflow_id)
+            return Response({'error': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # ---------------------------------------------------------------------------
 # Phase 4 — ScanProfile CRUD API

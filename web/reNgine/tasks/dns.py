@@ -6,6 +6,7 @@ Checks for: zone transfer (AXFR), dangling CNAMEs, DNSSEC configuration,
 DNS amplification risk, and optionally subdomain brute-force via fierce.
 """
 import json
+import shlex
 import logging
 import os
 import subprocess
@@ -68,7 +69,7 @@ def dns_security(self, host=None, ctx={}, description=None):
 
 def _check_axfr(self, ctx, target, results_dir):
     output_json = f'{results_dir}/dnsrecon_axfr_{target.replace(".", "_")}.json'
-    cmd = f'dnsrecon -d {target} -t axfr --json {output_json} 2>/dev/null'
+    cmd = f'dnsrecon -d {shlex.quote(target)} -t axfr --json {shlex.quote(output_json)} 2>/dev/null'
     logger.warning(f'Running dnsrecon AXFR check for {target}')
     run_command(
         cmd,
@@ -226,7 +227,7 @@ def _brute_subdomains(self, ctx, target, results_dir):
 
     output_file = f'{results_dir}/fierce_{target.replace(".", "_")}.txt'
     cmd = (
-        f'fierce --domain {target} --dns-servers 8.8.8.8 '
+        f'fierce --domain {shlex.quote(target)} --dns-servers 8.8.8.8 '
         f'--subdomains {wordlist} 2>&1 | tee {output_file}'
     )
     logger.warning(f'Running fierce brute-force for {target}')

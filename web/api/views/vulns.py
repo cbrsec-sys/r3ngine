@@ -43,6 +43,7 @@ from reNgine.definitions import (
     PERM_MODIFY_TARGETS, PERM_MODIFY_SCAN_CONFIGURATIONS,
     PERM_MODIFY_WORDLISTS, PERM_INITATE_SCANS_SUBSCANS,
     PERM_MODIFY_SCAN_REPORT, PERM_MODIFY_SCAN_RESULTS,
+    INTERNAL_ERROR_MESSAGE,
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -720,11 +721,11 @@ class CVEDetails(APIView):
 					})
 
 				logger.info("Successfully enriched %s", formatted_cve_id)
-			except Exception as e:
-				logger.error("Enrichment failed for %s: %s", formatted_cve_id, e)
+			except Exception:
+				logger.exception("Enrichment failed for %s", formatted_cve_id)
 				return Response({
 					'status': False,
-					'message': f'Failed to enrich CVE data: {str(e)}'
+					'message': 'Failed to enrich CVE data; see server logs.'
 				})
 
 		# 3. Fetch additional context and references from CIRCL.LU API

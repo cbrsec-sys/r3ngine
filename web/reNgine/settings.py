@@ -630,6 +630,8 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     r'^/mapi/auth/token/refresh/',
     r'^/mapi/.*$',
     r'^/api/mcp/.*$',
+    # Remote workers have no session; the view authenticates their token itself.
+    r'^/api/settings/workers/heartbeat/$',
 ]
 
 from datetime import timedelta

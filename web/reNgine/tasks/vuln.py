@@ -1,4 +1,5 @@
 import logging
+import shlex
 import os
 import re
 import json
@@ -1511,7 +1512,7 @@ def smugglex_scan(self, urls=[], ctx={}, description=None):
 
 	# add proxy to the command
 	if proxy:
-		cmd += f" --proxy {proxy}"
+		cmd += f" --proxy {shlex.quote(proxy)}"
 
 	# SmuggleX checks
 	cmd += f" -c cl-te,te-cl,te-te,h2c,h2,cl-edge,h2-downgrade"
@@ -1570,7 +1571,7 @@ def second_order_scan(self, urls=[], ctx={}, description=None):
 	os.makedirs(out_dir, exist_ok=True)
 
 	for target in targets:
-		cmd = "second-order -target %s -config %s -output %s" % (target, config_path, out_dir)
+		cmd = "second-order -target %s -config %s -output %s" % (shlex.quote(target), shlex.quote(config_path), shlex.quote(out_dir))
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 
 	for fname in os.listdir(out_dir):

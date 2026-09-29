@@ -19,6 +19,7 @@ thread pool to keep wall-clock time reasonable even with many candidate URLs.
 """
 
 import logging
+import shlex
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -369,9 +370,9 @@ def post_scan_processing(self, ctx: dict = {}, description: str = None):
             logger.info('[POST_SCAN] Pass 3 — running InQL on new GraphQL endpoint: %s', ep.http_url)
 
             inql_output = f'{results_dir}/post_scan/inql_{subdomain.name}'
-            cmd = f'inql -t {ep.http_url} -o {inql_output}'
+            cmd = f'inql -t {shlex.quote(ep.http_url)} -o {shlex.quote(inql_output)}'
             if proxy:
-                cmd += f' -p {proxy}'
+                cmd += f' -p {shlex.quote(proxy)}'
             try:
                 run_command(cmd, shell=True, scan_id=scan_id, activity_id=self.activity_id)
                 if os.path.exists(inql_output):

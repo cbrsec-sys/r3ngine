@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import shlex
 import os
 import base64
 import json
@@ -58,7 +59,7 @@ _FUZZ_BATCH_SIZE = 100
 
 
 def _fuzz_target_marker(results_dir, target_url):
-	digest = hashlib.md5(target_url.encode('utf-8')).hexdigest()
+	digest = hashlib.md5(target_url.encode('utf-8'), usedforsecurity=False).hexdigest()
 	return os.path.join(results_dir, f'fuzz_done_{digest}.marker')
 
 
@@ -197,11 +198,11 @@ def build_dirsearch_run_cmd(base_cmd, target_url, output_path, proxy=None):
 	dirsearch 0.5.0 renamed ``--format`` to ``--output-formats``.
 	"""
 	cmd = (
-		f'{base_cmd} -u {str(target_url).rstrip("/")}'
+		f'{base_cmd} -u {shlex.quote(str(target_url).rstrip("/"))}'
 		f' --output-formats=json -o {output_path} --no-color'
 	)
 	if proxy:
-		cmd += f' --proxy {proxy}'
+		cmd += f' --proxy {shlex.quote(proxy)}'
 	return cmd
 
 
@@ -631,7 +632,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				if not any(proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
 					proxy = 'http://' + proxy
 
-			lock_key = f"fuzz_execution_lock_{self.scan_id}_{hashlib.md5(target_url.encode()).hexdigest()}"
+			lock_key = f"fuzz_execution_lock_{self.scan_id}_{hashlib.md5(target_url.encode(), usedforsecurity=False).hexdigest()}"
 			with redis_client.lock(lock_key, timeout=1800):
 				ffuf_results_local = []
 				ffuf_exc = [None]
@@ -640,7 +641,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				def _run_ffuf():
 					try:
 						_fuzz_url = target_url if target_url.endswith('/') else target_url + '/'
-						fcmd = ffuf_base_cmd + f' -u {_fuzz_url}FUZZ -json'
+						fcmd = ffuf_base_cmd + f' -u {shlex.quote(_fuzz_url + "FUZZ")} -json'
 
 						ffuf_proxy = resolve_httpx_compatible_proxy(proxy, tool_name='ffuf')
 						fcmd += f' -x {ffuf_proxy}' if ffuf_proxy else ''
@@ -809,8 +810,8 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				def _run_feroxbuster():
 					if not run_feroxbuster or not ferox_base_cmd:
 						return
-					ferox_output = f'{self.results_dir}/feroxbuster_{hashlib.md5(target_url.encode()).hexdigest()[:8]}.json'
-					fcmd = f'{ferox_base_cmd} --url {target_url} --output {ferox_output}'
+					ferox_output = f'{self.results_dir}/feroxbuster_{hashlib.md5(target_url.encode(), usedforsecurity=False).hexdigest()[:8]}.json'
+					fcmd = f'{ferox_base_cmd} --url {shlex.quote(target_url)} --output {shlex.quote(ferox_output)}'
 					ferox_proxy = proxy
 					if ferox_proxy:
 						if ferox_proxy.startswith('socks'):

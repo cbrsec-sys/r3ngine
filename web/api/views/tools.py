@@ -56,6 +56,7 @@ from api.permissions import *
 from api.serializers import *
 from reNgine.utils.graph import Neo4jManager
 from reNgine.temporal_client import TemporalClientProvider, run_and_close
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +101,12 @@ class UploadWordlist(APIView):
 				'status': True,
 				'message': 'Wordlist uploaded successfully'
 			})
-		except Exception as e:
+		except Exception:
+			logger.exception('%s failed', type(self).__name__)
 			return Response({
 				'status': False,
-				'message': str(e)
-			}, status=status.HTTP_400_BAD_REQUEST)
+				'message': INTERNAL_ERROR_MESSAGE
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GetWordlistContent(APIView):
@@ -135,11 +137,12 @@ class GetWordlistContent(APIView):
 				'status': False,
 				'message': 'File not found'
 			}, status=status.HTTP_404_NOT_FOUND)
-		except Exception as e:
+		except Exception:
+			logger.exception('%s failed', type(self).__name__)
 			return Response({
 				'status': False,
-				'message': str(e)
-			}, status=status.HTTP_400_BAD_REQUEST)
+				'message': INTERNAL_ERROR_MESSAGE
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GetEngineDetails(APIView):
@@ -161,11 +164,12 @@ class GetEngineDetails(APIView):
 				'engine_name': engine.engine_name,
 				'yaml_configuration': engine.yaml_configuration
 			})
-		except Exception as e:
+		except Exception:
+			logger.exception('%s failed', type(self).__name__)
 			return Response({
 				'status': False,
-				'message': str(e)
-			}, status=status.HTTP_400_BAD_REQUEST)
+				'message': INTERNAL_ERROR_MESSAGE
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CreateEngine(APIView):
@@ -192,11 +196,12 @@ class CreateEngine(APIView):
 				'status': True,
 				'message': 'Engine created successfully'
 			})
-		except Exception as e:
+		except Exception:
+			logger.exception('%s failed', type(self).__name__)
 			return Response({
 				'status': False,
-				'message': str(e)
-			}, status=status.HTTP_400_BAD_REQUEST)
+				'message': INTERNAL_ERROR_MESSAGE
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UpdateEngine(APIView):
@@ -224,11 +229,12 @@ class UpdateEngine(APIView):
 				'status': True,
 				'message': 'Engine updated successfully'
 			})
-		except Exception as e:
+		except Exception:
+			logger.exception('%s failed', type(self).__name__)
 			return Response({
 				'status': False,
-				'message': str(e)
-			}, status=status.HTTP_400_BAD_REQUEST)
+				'message': INTERNAL_ERROR_MESSAGE
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class RunSearchsploitAction(APIView):
@@ -261,8 +267,9 @@ class RunSearchsploitAction(APIView):
             data = json.loads(result.stdout)
             exploits = data.get('RESULTS_EXPLOIT', [])
             return Response({'status': True, 'results': exploits})
-        except Exception as e:
-            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception('Exploit search failed')
+            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class LaunchADAssessmentFromSubdomain(APIView):
 	"""Create an ADAssessment pre-populated from a Subdomain's root domain.

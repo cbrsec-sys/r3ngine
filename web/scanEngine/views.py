@@ -28,6 +28,7 @@ from scanEngine.forms import *
 from scanEngine.forms import ConfigurationForm
 from scanEngine.models import *
 from dashboard.models import SpiderfootAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey, ProjectDiscoveryAPIKey
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 
 def index(request, slug):
@@ -616,8 +617,9 @@ def fetch_proxies(request, slug):
                 daemon=True,
             ).start()
             return http.JsonResponse({'task_id': job_id})
-        except Exception as e:
-            return http.JsonResponse({'error': str(e)}, status=500)
+        except Exception:
+            logger.exception('Failed to start background job')
+            return http.JsonResponse({'error': INTERNAL_ERROR_MESSAGE}, status=500)
     return http.JsonResponse({'error': 'Invalid request method. POST required.'}, status=405)
 
 
@@ -851,8 +853,10 @@ def start_ollama_service(request, slug):
     try:
         manager.start()
         return http.JsonResponse({'status': 'success', 'message': 'Ollama service started.'})
-    except OllamaStartError as e:
-        return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    except OllamaStartError:
+        # Wraps docker errors, which are not for the browser.
+        logger.exception('Failed to start Ollama')
+        return http.JsonResponse({'status': 'error', 'message': 'Failed to start Ollama; see server logs.'}, status=500)
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def stop_ollama_service(request, slug):
@@ -1362,8 +1366,9 @@ def get_full_yaml_config(request, slug):
             content = config_obj.content
             
         return http.JsonResponse({'status': 'success', 'content': content})
-    except Exception as e:
-        return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    except Exception:
+        logger.exception('Failed to read file content')
+        return http.JsonResponse({'status': 'error', 'message': INTERNAL_ERROR_MESSAGE}, status=500)
 
 
 @login_required

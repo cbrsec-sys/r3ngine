@@ -3,6 +3,7 @@ import os
 import json
 import hashlib
 import re
+import shlex
 import subprocess
 import requests
 import validators
@@ -670,7 +671,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			if os.path.exists(arjun_output):
 				logger.warning('[WEB_API] Arjun: cache hit for %s — loading existing results', subdomain_name)
 			else:
-				cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} -oJ {arjun_output}"
+				cmd = f"arjun -u {shlex.quote(url)} --passive -m {arjun_methods} -t {threads} -oJ {shlex.quote(arjun_output)}"
 				logger.warning('[WEB_API] Arjun: running on %s | cmd: %s', subdomain_name, cmd)
 				_, arjun_stdout = run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 				# Write empty sentinel so Temporal retries don't re-run the tool
@@ -721,10 +722,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			if os.path.exists(ps_sentinel):
 				logger.warning('[WEB_API] ParamSpider: cache hit for %s — loading existing results', subdomain_name)
 			else:
-				cmd = f"paramspider --domain {subdomain_name}"
+				cmd = f"paramspider --domain {shlex.quote(subdomain_name)}"
 				proxy = get_random_proxy()
 				if proxy:
-					cmd = f"paramspider --domain {subdomain_name} --proxy {proxy}"
+					cmd = f"paramspider --domain {shlex.quote(subdomain_name)} --proxy {shlex.quote(proxy)}"
 				logger.warning('[WEB_API] ParamSpider: running on %s | cmd: %s', subdomain_name, cmd)
 				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 				# Write sentinel so retries skip re-running
@@ -764,7 +765,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			if os.path.exists(lf_output):
 				logger.warning('[WEB_API] LinkFinder: cache hit for %s — loading existing results', subdomain_name)
 			else:
-				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
+				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {shlex.quote(url)} -o cli | tee {shlex.quote(lf_output)}"
 				logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
 				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 				logger.warning('[WEB_API] LinkFinder: finished on %s', subdomain_name)
@@ -809,10 +810,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				logger.warning('[WEB_API] InQL: no GraphQL endpoint detected, skipping %s', subdomain_name)
 			else:
 				inql_output = f"{results_dir}/inql_{subdomain_name}"
-				cmd = f"inql -t {url} -o {inql_output}"
+				cmd = f"inql -t {shlex.quote(url)} -o {shlex.quote(inql_output)}"
 				proxy = get_random_proxy()
 				if proxy:
-					cmd += f" -p {proxy}"
+					cmd += f" -p {shlex.quote(proxy)}"
 				logger.warning('[WEB_API] InQL: running on %s | cmd: %s', subdomain_name, cmd)
 				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 				if os.path.exists(inql_output):
@@ -990,10 +991,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 
 		logger.warning('[WEB_API] Sourcemapper: identified %d valid sourcemap target(s)', len(valid_sourcemap_targets))
 		for sm_url in valid_sourcemap_targets:
-			url_hash = hashlib.md5(sm_url.encode('utf-8')).hexdigest()[:10]
+			url_hash = hashlib.md5(sm_url.encode('utf-8'), usedforsecurity=False).hexdigest()[:10]
 			url_out_dir = f"{sourcemap_base_dir}/{url_hash}"
 			os.makedirs(url_out_dir, exist_ok=True)
-			cmd = f"sourcemapper -output {url_out_dir} -url {sm_url}"
+			cmd = f"sourcemapper -output {shlex.quote(url_out_dir)} -url {shlex.quote(sm_url)}"
 			run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(url_out_dir) and os.listdir(url_out_dir):
 				vuln_data = parse_sourcemapper_result(sm_url, url_out_dir)
@@ -1015,7 +1016,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			if not hostname or hostname in seen_hosts:
 				continue
 			seen_hosts.add(hostname)
-			cmd = f"gqlspection -u {url} -l all"
+			cmd = f"gqlspection -u {shlex.quote(url)} -l all"
 			return_code, output = run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 			if gqlspection_schema_dumped(return_code, output):
 				vuln_data = parse_gqlspection_result(url, output)
@@ -1071,7 +1072,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				# process ignores it.
 				cmd = (
 					f"grpcurl -connect-timeout {_GRPC_CONNECT_TIMEOUT} "
-					f"-max-time {_GRPC_MAX_TIME} {transport} {hostname}:{port} list"
+					f"-max-time {_GRPC_MAX_TIME} {transport} {shlex.quote(f'{hostname}:{port}')} list"
 				)
 				return_code, output = run_command(
 					cmd, shell=True, cwd=results_dir,

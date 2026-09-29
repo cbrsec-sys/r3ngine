@@ -6,6 +6,7 @@ protocol-specific tools: enum4linux-ng (SMB), onesixtyone + snmpwalk (SNMP),
 ldapsearch (LDAP), rdp-sec-check (RDP).
 """
 import json
+import shlex
 import logging
 import os
 import subprocess
@@ -44,7 +45,7 @@ def run_network_enum(self, ctx, ports_data):
 
 def _smb_enum(self, ctx, host):
     output_json = f'{self.results_dir}/enum4linux_{host.replace(".", "_")}.json'
-    cmd = f'enum4linux-ng -A {host} -oJ {output_json}'
+    cmd = f'enum4linux-ng -A {shlex.quote(host)} -oJ {shlex.quote(output_json)}'
     logger.warning(f'Running enum4linux-ng on {host}')
     try:
         run_command(

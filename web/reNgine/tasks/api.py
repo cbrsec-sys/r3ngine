@@ -5,6 +5,7 @@ Adds jwt_tool (JWT algorithm confusion / forging) and graphql-cop
 (GraphQL security audit) to the per-URL scan loop.
 """
 import json
+import shlex
 import logging
 import os
 
@@ -29,7 +30,7 @@ def run_jwt_scan(self, ctx, url, subdomain, results_dir):
     subdomain_name = subdomain.name.replace('.', '_')
     output_file = f'{results_dir}/jwt_{subdomain_name}.txt'
     cmd = (
-        f'python3 {_JWT_TOOL_PATH} -t {url} -M at -np 2>&1 | tee {output_file}'
+        f'python3 {_JWT_TOOL_PATH} -t {shlex.quote(url)} -M at -np 2>&1 | tee {shlex.quote(output_file)}'
     )
     logger.warning(f'Running jwt_tool on {url}')
     run_command(
@@ -93,7 +94,7 @@ def run_graphql_cop(self, ctx, url, subdomain):
         output_file = (
             f'{self.results_dir}/graphqlcop_{graphql_url.replace("://", "_").replace("/", "_")[:80]}.json'
         )
-        cmd = f'python3 /usr/src/github/graphql-cop/graphql-cop.py -t {graphql_url} -o json 2>/dev/null | tee {output_file}'
+        cmd = f'python3 /usr/src/github/graphql-cop/graphql-cop.py -t {shlex.quote(graphql_url)} -o json 2>/dev/null | tee {shlex.quote(output_file)}'
         logger.warning(f'Running graphql-cop on {graphql_url}')
         run_command(
             cmd,

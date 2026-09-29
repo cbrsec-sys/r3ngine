@@ -1,4 +1,5 @@
 import logging
+import shlex
 import json
 import concurrent.futures
 import tldextract
@@ -182,7 +183,7 @@ def fetch_related_tlds_and_domains(domain, scan_id=None, activity_id=None):
 	extracted = tldextract.extract(domain)
 	base_domain = f"{extracted.domain}.{extracted.suffix}"
 
-	cmd = f'tlsx -san -cn -silent -ro -host {domain}'
+	cmd = f'tlsx -san -cn -silent -ro -host {shlex.quote(domain)}'
 	_, result = run_command(cmd, shell=True, scan_id=scan_id, activity_id=activity_id)
 
 	for line in result.splitlines():

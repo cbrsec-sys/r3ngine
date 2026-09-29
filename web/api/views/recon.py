@@ -43,6 +43,7 @@ from reNgine.definitions import (
     PERM_MODIFY_TARGETS, PERM_MODIFY_SCAN_CONFIGURATIONS,
     PERM_MODIFY_WORDLISTS, PERM_INITATE_SCANS_SUBSCANS,
     PERM_MODIFY_SCAN_REPORT, PERM_MODIFY_SCAN_RESULTS,
+    INTERNAL_ERROR_MESSAGE,
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -312,8 +313,9 @@ class AddReconNote(APIView):
 			note.project = project
 			note.save()
 			response = {'status': True}
-		except Exception as e:
-			response = {'status': False, 'message': str(e)}
+		except Exception:
+			logger.exception('Failed to save recon note')
+			response = {'status': False, 'message': INTERNAL_ERROR_MESSAGE}
 
 		return Response(response)
 

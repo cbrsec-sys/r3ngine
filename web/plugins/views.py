@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from .models import Plugin
 from .serializers import PluginSerializer
 from .utils import AtomicInstaller, PluginManager, MarketplaceManager
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +110,9 @@ class PluginViewSet(viewsets.ModelViewSet):
             )
             rdb.publish('orchestrator_control', 'restart')
             return Response({'success': True, 'message': 'Restart command sent to orchestrator.'})
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception('Failed to send orchestrator restart')
+            return Response({'error': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['post'], url_path='restart-server')
     def restart_server(self, request):

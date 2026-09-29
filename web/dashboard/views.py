@@ -273,9 +273,9 @@ def admin_interface_update(request, slug):
                     user.set_password(change_password)
                     user.save()
                 messageData = {'status': True}
-            except Exception as e:
-                logger.error(e)
-                messageData = {'status': False, 'error': str(e)}
+            except Exception:
+                logger.exception('User admin action failed')
+                messageData = {'status': False, 'error': INTERNAL_ERROR_MESSAGE}
         elif mode == 'create':
             try:
                 response = json.loads(request.body)
@@ -289,9 +289,9 @@ def admin_interface_update(request, slug):
                 )
                 assign_role(user, response.get('role'))
                 messageData = {'status': True}
-            except Exception as e:
-                logger.error(e)
-                messageData = {'status': False, 'error': str(e)}
+            except Exception:
+                logger.exception('User admin action failed')
+                messageData = {'status': False, 'error': INTERNAL_ERROR_MESSAGE}
         return JsonResponse(messageData)
     return HttpResponseRedirect(reverse('admin_interface', kwargs={'slug': slug}))
 
@@ -669,10 +669,11 @@ def login_v3(request):
                     'status': False,
                     'message': 'Invalid username or password.'
                 })
-        except Exception as e:
+        except Exception:
+            logger.exception('Login failed')
             return JsonResponse({
                 'status': False,
-                'message': str(e)
+                'message': INTERNAL_ERROR_MESSAGE
             })
             
     if request.user.is_authenticated:

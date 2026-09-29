@@ -11,6 +11,7 @@ from reNgine.definitions import (
     INITIATED_TASK,
     RUNNING_TASK,
     PAUSED_TASK,
+    INTERNAL_ERROR_MESSAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,9 +74,10 @@ def abort_subscan(subscan):
         create_scan_activity(subscan.scan_history_id, "Subscan aborted", ABORTED_TASK)
 
         return {'status': True}
-    except Exception as e:
-        logger.error("abort_subscan failed for subscan %s: %s", subscan.id, e)
-        return {'status': False, 'message': str(e)}
+    except Exception:
+        # The message reaches API clients; the details stay in the log.
+        logger.exception("abort_subscan failed for subscan %s", subscan.id)
+        return {'status': False, 'message': INTERNAL_ERROR_MESSAGE}
 
 
 def abort_scan_history(scan, aborted_by=None):
@@ -109,6 +111,6 @@ def abort_scan_history(scan, aborted_by=None):
         create_scan_activity(scan.id, "Scan aborted", ABORTED_TASK)
 
         return {'status': True}
-    except Exception as e:
-        logger.error(f"abort_scan_history failed for scan {scan.id}: {e}")
-        return {'status': False, 'message': str(e)}
+    except Exception:
+        logger.exception("abort_scan_history failed for scan %s", scan.id)
+        return {'status': False, 'message': INTERNAL_ERROR_MESSAGE}

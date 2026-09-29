@@ -1,5 +1,6 @@
 import csv
 import logging
+import shlex
 import math
 import re
 import shutil
@@ -678,7 +679,7 @@ def theHarvester(self, config, host, scan_history_id, activity_id, results_dir, 
 
     # Run cmd
     logger.info("theHarvester started")
-    cmd = f"uv run theHarvester -d {host} -b all -f {output_path_json}"
+    cmd = f"uv run theHarvester -d {shlex.quote(host)} -b all -f {shlex.quote(output_path_json)}"
     logger.warning("TheHarvester command: %s", cmd)
     run_command(
         cmd,

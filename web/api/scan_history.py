@@ -5,8 +5,7 @@ from django.shortcuts import get_object_or_404
 from startScan.models import ScanHistory, EngineType, Domain
 from .serializers import ScanHistorySerializer
 import logging
-import os
-import shutil
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -32,21 +31,20 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
             if result.get('status'):
                 return Response({'status': True, 'message': 'Scan successfully stopped'})
             return Response({'status': False, 'message': result.get('message', 'Unknown error')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            logger.error(f"Error stopping scan {pk}: {str(e)}")
-            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Error stopping scan %s", pk)
+            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def delete_scan(self, request, pk=None):
         scan = self.get_object()
         try:
-            if scan.results_dir and os.path.exists(scan.results_dir):
-                shutil.rmtree(scan.results_dir)
+            # The pre_delete signal removes the results directory.
             scan.delete()
             return Response({'status': True, 'message': 'Scan history deleted'})
-        except Exception as e:
-            logger.error(f"Error deleting scan {pk}: {str(e)}")
-            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Error deleting scan %s", pk)
+            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def pause_scan(self, request, pk=None):
@@ -79,9 +77,9 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
             from reNgine.tasks import create_scan_activity
             create_scan_activity(scan.id, "Scan paused", PAUSED_TASK)
             return Response({'status': True, 'message': 'Scan successfully paused'})
-        except Exception as e:
-            logger.error(f"Error pausing scan {pk}: {str(e)}")
-            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Error pausing scan %s", pk)
+            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def unpause_scan(self, request, pk=None):
@@ -114,9 +112,9 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
             from reNgine.tasks import create_scan_activity
             create_scan_activity(scan.id, "Scan resumed", RUNNING_TASK)
             return Response({'status': True, 'message': 'Scan successfully resumed'})
-        except Exception as e:
-            logger.error(f"Error resuming scan {pk}: {str(e)}")
-            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Error resuming scan %s", pk)
+            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['post'])
     def bulk_stop(self, request):
@@ -208,10 +206,5 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
         scans = ScanHistory.objects.filter(id__in=ids)
         count = scans.count()
         for scan in scans:
-            if scan.results_dir and os.path.exists(scan.results_dir):
-                try:
-                    shutil.rmtree(scan.results_dir)
-                except Exception:
-                    pass
             scan.delete()
         return Response({'status': True, 'message': f'{count} scans deleted'})

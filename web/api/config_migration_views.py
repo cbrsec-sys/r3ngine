@@ -27,6 +27,10 @@ from scanEngine.models import (
 )
 import shutil
 import tempfile
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
+import logging
+
+logger = logging.getLogger(__name__)
 
 DASHBOARD_MODELS = [
     OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
@@ -155,8 +159,9 @@ class ImportConfig(APIView):
             return Response({'status': True, 'message': 'Configuration imported successfully.'})
         except zipfile.BadZipFile:
             return Response({'status': False, 'message': 'Invalid zip file.'}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception('Configuration import failed')
+            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def restore_models(self, data, overwrite_existing):
         """Restore serialized models from a data dictionary.
@@ -179,7 +184,7 @@ class ImportConfig(APIView):
                     for deserialized_obj in deserialize('json', json_str):
                         model_class = type(deserialized_obj.object)
                         if model_class not in _ALLOWED_IMPORT_MODELS:
-                            print(f"Skipping disallowed model type during import: {model_class.__name__}")
+                            logger.warning("Skipping disallowed model type during import: %s", model_class.__name__)
                             continue
                         
                         if model_class in SINGLETON_MODELS:
@@ -200,9 +205,8 @@ class ImportConfig(APIView):
                                 # Only save if an object with this primary key does not exist
                                 if not model_class.objects.filter(pk=deserialized_obj.object.pk).exists():
                                     deserialized_obj.save()
-                except Exception as e:
-                    # Log exception and continue
-                    print(f"Error restoring {model_name}: {e}")
+                except Exception:
+                    logger.exception("Error restoring %s", model_name)
 
 class ExportScanResults(APIView):
     permission_classes = [IsAuthenticated, HasPermission]
@@ -213,14 +217,16 @@ class ExportScanResults(APIView):
         if not os.path.exists(scan_results_dir):
             return Response({'status': False, 'message': 'Scan results directory not found.'}, status=status.HTTP_404_NOT_FOUND)
         
-        temp_dir = tempfile.gettempdir()
-        zip_path = os.path.join(temp_dir, 'scan_results_backup')
-        
+        # A private directory per request: a fixed /tmp name let two concurrent
+        # exports overwrite each other's archive.
+        temp_dir = tempfile.mkdtemp(prefix='scan_results_export_')
         try:
-            shutil.make_archive(zip_path, 'zip', scan_results_dir)
-            zip_file_path = f"{zip_path}.zip"
-            
-            response = FileResponse(open(zip_file_path, 'rb'), as_attachment=True, filename='scan_results_backup.zip')
-            return response
-        except Exception as e:
-            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            zip_file_path = shutil.make_archive(os.path.join(temp_dir, 'scan_results_backup'), 'zip', scan_results_dir)
+            archive = open(zip_file_path, 'rb')
+        except Exception:
+            logger.exception('Scan results export failed')
+            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        finally:
+            # The open handle keeps the archive readable after its directory is gone.
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        return FileResponse(archive, as_attachment=True, filename='scan_results_backup.zip')
