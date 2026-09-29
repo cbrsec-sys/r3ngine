@@ -216,9 +216,9 @@ class MasterScanWorkflow:
             )
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
             # Non-fatal: scan runs normally even if timeline pre-population fails
-            pass
+            workflow.logger.warning("Scan timeline pre-population failed: %s", exc)
 
         # TOR circuit rotation — only dispatched when TOR mode is active
         if ctx.get('use_tor', False):
@@ -229,8 +229,9 @@ class MasterScanWorkflow:
                     retry_policy=RetryPolicy(maximum_attempts=1),
                     task_queue="python-orchestrator-queue"
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                # The scan still goes through TOR, only on the previous circuit.
+                workflow.logger.warning("TOR circuit rotation failed: %s", exc)
 
         # State flags for finally-block dispatch (mirrors SubScanWorkflow pattern).
         is_cancelled = False
@@ -1725,8 +1726,8 @@ class SubScanWorkflow:
             )
         except asyncio.CancelledError:
             raise
-        except Exception:
-            pass
+        except Exception as exc:
+            workflow.logger.warning("Subscan timeline pre-population failed: %s", exc)
 
         # TOR circuit rotation — only dispatched when TOR mode is active
         if ctx.get('use_tor', False):
@@ -1737,8 +1738,9 @@ class SubScanWorkflow:
                     retry_policy=RetryPolicy(maximum_attempts=1),
                     task_queue="python-orchestrator-queue"
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                # The scan still goes through TOR, only on the previous circuit.
+                workflow.logger.warning("TOR circuit rotation failed: %s", exc)
 
         # Validate tasks against the permitted task list before any dispatch
         known_explicit = set(_SUBSCAN_DISPATCH.keys())

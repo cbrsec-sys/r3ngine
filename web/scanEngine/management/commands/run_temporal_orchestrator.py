@@ -51,6 +51,8 @@ class DjangoAwareThreadPoolExecutor(ThreadPoolExecutor):
                 connections.close_all()
         return super().submit(wrapped_fn)
 
+from reNgine.temporal_schedule_utils import delete_schedule_if_exists
+
 # Workflows
 from reNgine.temporal_workflows import (
     MasterScanWorkflow,
@@ -314,12 +316,8 @@ async def _register_startup_schedule(
     run_key = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S") if always_run else today
     workflow_id = f"{schedule_id}-{run_key}"
 
-    # Remove stale schedule from the previous run (idempotent — ignore if absent)
-    try:
-        handle = client.get_schedule_handle(schedule_id)
-        await handle.delete()
-    except Exception:
-        pass
+    # Remove stale schedule from the previous run
+    await delete_schedule_if_exists(client, schedule_id)
 
     await client.create_schedule(
         schedule_id,
@@ -351,12 +349,8 @@ async def _register_daily_cron_schedule(
     from temporalio.client import ScheduleCalendarSpec, ScheduleRange
     schedule_id = f"daily-cron-{task_name.replace('_', '-')}"
     
-    # Try to delete if exists to allow recreating/updating
-    try:
-        handle = client.get_schedule_handle(schedule_id)
-        await handle.delete()
-    except Exception:
-        pass
+    # Delete the existing one so a changed hour or minute takes effect
+    await delete_schedule_if_exists(client, schedule_id)
 
     await client.create_schedule(
         schedule_id,

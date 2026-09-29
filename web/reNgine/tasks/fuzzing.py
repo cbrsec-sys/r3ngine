@@ -4,6 +4,7 @@ import shlex
 import os
 import base64
 import json
+from typing import Optional
 import threading
 from urllib.parse import urlparse
 from django.utils import timezone
@@ -666,10 +667,11 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 									continue
 								try:
 									parsed = json.loads(raw_line)
-									batch.append(parsed)
-									ffuf_results_local.append(parsed)
-								except Exception:
-									pass
+								except json.JSONDecodeError:
+									# ffuf interleaves progress and banner lines with results.
+									continue
+								batch.append(parsed)
+								ffuf_results_local.append(parsed)
 								if len(batch) >= _FUZZ_BATCH_SIZE:
 									subdomain_id = subdomain.id if subdomain else 0
 									_flush_ffuf_batch(batch, dirscan, ctx, scan, subdomain_id=subdomain_id, max_repeat=max_repeat)
@@ -835,12 +837,9 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 							raw_line = raw_line.strip()
 							if not raw_line:
 								continue
-							try:
-								entry = json.loads(raw_line)
-								if entry.get('type') == 'response':
-									ferox_batch.append(entry)
-							except Exception:
-								pass
+							entry = _parse_ferox_response_line(raw_line)
+							if entry is not None:
+								ferox_batch.append(entry)
 						subdomain_id = subdomain.id if subdomain else 0
 						_flush_ferox_batch(ferox_batch, dirscan_ferox, ctx, scan, subdomain_id=subdomain_id, max_repeat=max_repeat)
 					else:
@@ -859,18 +858,16 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 										raw_line = raw_line.strip()
 										if not raw_line:
 											continue
-										try:
-											entry = json.loads(raw_line)
-											if entry.get('type') == 'response':
-												ferox_batch.append(entry)
-												ferox_total += 1
-												if len(ferox_batch) >= _FUZZ_BATCH_SIZE:
-													subdomain_id = subdomain.id if subdomain else 0
-													_flush_ferox_batch(ferox_batch, dirscan_ferox, ctx, scan, subdomain_id=subdomain_id, max_repeat=max_repeat)
-													activity_heartbeat_safe(f'feroxbuster {target_url} {ferox_total} hits')
-													ferox_batch = []
-										except Exception:
-											pass
+										entry = _parse_ferox_response_line(raw_line)
+										if entry is None:
+											continue
+										ferox_batch.append(entry)
+										ferox_total += 1
+										if len(ferox_batch) >= _FUZZ_BATCH_SIZE:
+											subdomain_id = subdomain.id if subdomain else 0
+											_flush_ferox_batch(ferox_batch, dirscan_ferox, ctx, scan, subdomain_id=subdomain_id, max_repeat=max_repeat)
+											activity_heartbeat_safe(f'feroxbuster {target_url} {ferox_total} hits')
+											ferox_batch = []
 								if ferox_batch:
 									subdomain_id = subdomain.id if subdomain else 0
 									_flush_ferox_batch(ferox_batch, dirscan_ferox, ctx, scan, subdomain_id=subdomain_id, max_repeat=max_repeat)
@@ -926,3 +923,18 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ctx,
 		description
 	)
+
+
+def _parse_ferox_response_line(raw_line: str) -> Optional[dict]:
+	"""A feroxbuster --json line if it is a response record, else None.
+
+	The output also holds statistics and configuration records, and a line cut
+	short when the tool is killed.
+	"""
+	try:
+		entry = json.loads(raw_line)
+	except json.JSONDecodeError:
+		return None
+	if isinstance(entry, dict) and entry.get('type') == 'response':
+		return entry
+	return None

@@ -120,13 +120,15 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
     def bulk_stop(self, request):
         from reNgine.utils.scan_cancellation import abort_scan_history
         ids = request.data.get('ids', [])
-        scans = ScanHistory.objects.filter(id__in=ids)
-        for scan in scans:
+        stopped = 0
+        for scan in ScanHistory.objects.filter(id__in=ids):
             try:
                 abort_scan_history(scan, aborted_by=request.user)
             except Exception:
-                pass
-        return Response({'status': True, 'message': f'{scans.count()} scans stopped'})
+                logger.exception("Bulk stop failed for scan %s", scan.id)
+                continue
+            stopped += 1
+        return Response({'status': True, 'message': f'{stopped} scans stopped'})
 
     @action(detail=False, methods=['post'])
     def bulk_pause(self, request):
@@ -149,19 +151,19 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
                         try:
                             TemporalClientProvider.pause_workflow(wf_id)
                         except Exception:
-                            pass
+                            logger.warning("Could not pause workflow %s of scan %s", wf_id, scan.id, exc_info=True)
 
                 for te in scan.temporal_executions.filter(status="RUNNING"):
                     try:
                         TemporalClientProvider.pause_workflow(te.workflow_id)
                     except Exception:
-                        pass
+                        logger.warning("Could not pause workflow %s of scan %s", te.workflow_id, scan.id, exc_info=True)
 
                 from reNgine.tasks import create_scan_activity
                 create_scan_activity(scan.id, "Scan paused", PAUSED_TASK)
                 count += 1
             except Exception:
-                pass
+                logger.exception("Bulk pause failed for scan %s", scan.id)
         return Response({'status': True, 'message': f'{count} scans paused'})
 
     @action(detail=False, methods=['post'])
@@ -185,19 +187,19 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
                         try:
                             TemporalClientProvider.resume_workflow(wf_id)
                         except Exception:
-                            pass
+                            logger.warning("Could not resume workflow %s of scan %s", wf_id, scan.id, exc_info=True)
 
                 for te in scan.temporal_executions.filter(status="RUNNING"):
                     try:
                         TemporalClientProvider.resume_workflow(te.workflow_id)
                     except Exception:
-                        pass
+                        logger.warning("Could not resume workflow %s of scan %s", te.workflow_id, scan.id, exc_info=True)
 
                 from reNgine.tasks import create_scan_activity
                 create_scan_activity(scan.id, "Scan resumed", RUNNING_TASK)
                 count += 1
             except Exception:
-                pass
+                logger.exception("Bulk resume failed for scan %s", scan.id)
         return Response({'status': True, 'message': f'{count} scans resumed'})
 
     @action(detail=False, methods=['post'])

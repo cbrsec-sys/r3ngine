@@ -6,6 +6,7 @@ import uuid
 import asyncio
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from reNgine.common_func import *
 from reNgine.definitions import *
@@ -311,37 +312,7 @@ def initiate_scan_temporal(
 				subdomain.technologies.add(tech)
 			subdomain.save()
 
-		# ---- Get Hardware Profile Details ----
-		from scanEngine.models import HardwareProfile
-		hardware_profile_ctx = None
-		if scan.hardware_profile:
-			profile = scan.hardware_profile
-			hardware_profile_ctx = {
-				'id': profile.id,
-				'name': profile.name,
-				'threads': profile.threads,
-				'rate_limit': profile.rate_limit,
-				'timeout': profile.timeout,
-				'delay': profile.delay,
-				'retries': profile.retries,
-			}
-		else:
-			try:
-				profile = HardwareProfile.objects.filter(is_default=True, is_active=True).first()
-				if not profile:
-					profile = HardwareProfile.objects.filter(is_active=True).first()
-				if profile:
-					hardware_profile_ctx = {
-						'id': profile.id,
-						'name': profile.name,
-						'threads': profile.threads,
-						'rate_limit': profile.rate_limit,
-						'timeout': profile.timeout,
-						'delay': profile.delay,
-						'retries': profile.retries,
-					}
-			except Exception:
-				pass
+		hardware_profile_ctx = hardware_profile_context(scan)
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
 		_proxy = Proxy.objects.first()
@@ -595,37 +566,7 @@ def initiate_subscan_temporal(
 		except Exception as notif_err:
 			logger.warning(f"Could not send subscan start notification: {notif_err}")
 
-		# ---- Get Hardware Profile Details ----
-		from scanEngine.models import HardwareProfile
-		hardware_profile_ctx = None
-		if scan.hardware_profile:
-			profile = scan.hardware_profile
-			hardware_profile_ctx = {
-				'id': profile.id,
-				'name': profile.name,
-				'threads': profile.threads,
-				'rate_limit': profile.rate_limit,
-				'timeout': profile.timeout,
-				'delay': profile.delay,
-				'retries': profile.retries,
-			}
-		else:
-			try:
-				profile = HardwareProfile.objects.filter(is_default=True, is_active=True).first()
-				if not profile:
-					profile = HardwareProfile.objects.filter(is_active=True).first()
-				if profile:
-					hardware_profile_ctx = {
-						'id': profile.id,
-						'name': profile.name,
-						'threads': profile.threads,
-						'rate_limit': profile.rate_limit,
-						'timeout': profile.timeout,
-						'delay': profile.delay,
-						'retries': profile.retries,
-					}
-			except Exception:
-				pass
+		hardware_profile_ctx = hardware_profile_context(scan)
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
 		_proxy = Proxy.objects.first()
@@ -1384,3 +1325,32 @@ def recover_stuck_scans():
 		"[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d retried_failed=%d",
 		active, recovered, retried,
 	)
+
+
+def hardware_profile_context(scan) -> Optional[dict]:
+	"""Throttling settings for the scan: its own profile, else the default, else any active one.
+
+	None leaves every tool on its engine defaults, so a failed lookup is logged
+	rather than silently changing how hard the scan hits the target.
+	"""
+	from scanEngine.models import HardwareProfile
+
+	profile = scan.hardware_profile
+	if profile is None:
+		try:
+			active = HardwareProfile.objects.filter(is_active=True)
+			profile = active.filter(is_default=True).first() or active.first()
+		except Exception:
+			logger.warning("Hardware profile lookup failed for scan %s; using engine defaults", scan.id, exc_info=True)
+			return None
+	if profile is None:
+		return None
+	return {
+		'id': profile.id,
+		'name': profile.name,
+		'threads': profile.threads,
+		'rate_limit': profile.rate_limit,
+		'timeout': profile.timeout,
+		'delay': profile.delay,
+		'retries': profile.retries,
+	}

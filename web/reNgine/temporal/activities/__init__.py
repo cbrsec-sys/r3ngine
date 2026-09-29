@@ -21,6 +21,7 @@ import threading
 import yaml
 
 from temporalio import activity
+from reNgine.temporal.heartbeat import keep_alive
 from django.utils import timezone
 
 from reNgine.scan_context import ScanContext
@@ -919,6 +920,7 @@ def run_dns_security_activity(ctx: dict) -> bool:
 
 
 @activity.defn(name="ParseDiscoveryResultsActivity")
+@keep_alive
 def parse_discovery_results_activity(ctx: dict) -> bool:
     """Parse and persist discovery tier results to the database.
 
@@ -1091,6 +1093,7 @@ def run_http_crawl_bridge_activity(ctx: dict) -> bool:
 
 
 @activity.defn(name="ParseHTTPCrawlResultsActivity")
+@keep_alive
 def parse_http_crawl_results_activity(ctx: dict) -> bool:
     """Verify HTTP crawl results are persisted correctly after http_crawl runs.
 
@@ -1257,6 +1260,7 @@ def run_dir_file_fuzz_activity(ctx: dict) -> bool:
 
 
 @activity.defn(name="ParseFuzzResultsActivity")
+@keep_alive
 def parse_fuzz_results_activity(ctx: dict) -> bool:
     """Verify fuzzing results are persisted to the database.
 
@@ -2998,6 +3002,7 @@ def run_startup_sync_activity(task_name: str) -> None:
 
 
 @activity.defn(name="RunMonitoringCheckActivity")
+@keep_alive
 def run_monitoring_check_activity(domain_id: int) -> None:
     """Execute a monitoring check for a domain. Called by MonitoringWorkflow on schedule.
 
@@ -3013,6 +3018,7 @@ def run_monitoring_check_activity(domain_id: int) -> None:
 
 
 @activity.defn(name="SetupScheduledScanActivity")
+@keep_alive
 def setup_scheduled_scan_activity(params: dict) -> dict:
     """Create a ScanHistory record and build a full workflow ctx for a scheduled scan.
 
@@ -3343,6 +3349,7 @@ def run_api_intel_activity(scan_history_id: int, job_id: str = None) -> dict:
 
 
 @activity.defn(name="RunLlmApmeActivity")
+@keep_alive
 def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
     from apme.apme_tasks import run_llm_apme
     from reNgine.job_tracker import update_job
@@ -3365,6 +3372,7 @@ def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
 
 
 @activity.defn(name="EnrichIdentitiesActivity")
+@keep_alive
 def enrich_identities_activity(identity: str, identity_type: str, scan_history_id: int, ctx: dict) -> str:
     from reNgine.tasks.osint import enrich_identities_task
     logger.log_line("[TEMPORAL]", "START", "task=enrich_identities type=%s scan_id=%s" % (identity_type, scan_history_id))
@@ -3385,6 +3393,7 @@ def geo_localize_activity(host: str, ip_id: int, scan_id: int = None, activity_i
 
 
 @activity.defn(name="ImportHackerOneProgramsActivity")
+@keep_alive
 def import_hackerone_programs_activity(handles: list, project_slug: str, is_sync: bool = False) -> None:
     from api.shared_api_tasks import import_hackerone_programs_task
     logger.log_line("[TEMPORAL]", "START", "task=import_hackerone_programs project=%s count=%d" % (project_slug, len(handles)))
@@ -3394,6 +3403,7 @@ def import_hackerone_programs_activity(handles: list, project_slug: str, is_sync
 
 
 @activity.defn(name="SyncBookmarkedProgramsActivity")
+@keep_alive
 def sync_bookmarked_programs_activity(project_slug: str) -> None:
     from api.shared_api_tasks import sync_bookmarked_programs_task
     logger.log_line("[TEMPORAL]", "START", "task=sync_bookmarked_programs project=%s" % project_slug)
@@ -3403,6 +3413,7 @@ def sync_bookmarked_programs_activity(project_slug: str) -> None:
 
 
 @activity.defn(name="FetchProxiesActivity")
+@keep_alive
 def fetch_proxies_activity(limit: int, job_id: str) -> None:
     logger.log_line("[TEMPORAL]", "START", "task=fetch_proxies limit=%d" % limit)
     activity.logger.info("[FetchProxies] Starting proxy fetch (limit=%d, job_id=%s)", limit, job_id)
@@ -4329,7 +4340,7 @@ def log_plugin_end_activity(ctx: dict) -> None:
         act.error_message = error
         act.save(update_fields=['status', 'time_ended', 'error_message'])
     except Exception:
-        pass
+        logger.warning("Could not close plugin ScanActivity %s", act_id, exc_info=True)
 
 
 @activity.defn(name="GetScanFinalStatusActivity")

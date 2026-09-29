@@ -84,6 +84,14 @@ Three things to check before picking one:
 - **Retries are visible.** Attempt 1 claims the pre-planned `ScanActivity` row; every later
   attempt inserts a new one, so N attempts mean N rows in the scan timeline.
 
+**`heartbeat_timeout` needs heartbeats.** An activity scheduled with a `heartbeat_timeout`
+shorter than its `start_to_close_timeout` is killed after that interval unless it calls
+`activity.heartbeat()`, then retried — a healthy long run fails on a timer. Task functions
+behind `_run_task` and `stream_command` already heartbeat; any other activity that blocks
+(a whole-task call, a wait on another workflow) goes under `@keep_alive` from
+`reNgine.temporal.heartbeat`, placed below `@activity.defn`. `tests/test_activity_heartbeats.py`
+fails for an activity that has neither.
+
 `execute_child_workflow` is the opposite case: its default is a single attempt, so omitting
 the policy there is safe.
 
