@@ -1,9 +1,13 @@
 from django.contrib.humanize.templatetags.humanize import naturaltime
+from django.db.models import Count, IntegerField, Max, OuterRef, QuerySet, Subquery
+from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
 from api.serializers.users import MinimalUserSerializer
 from reNgine.definitions import ABORTED_TASK, FAILED_TASK, RUNNING_TASK, SUCCESS_TASK
-from startScan.models import Command, ScanActivity, ScanHistory, SubScan
+from startScan.models import (
+	Command, EndPoint, ScanActivity, ScanHistory, SubScan, Subdomain, Vulnerability,
+)
 
 
 class SubScanResultSerializer(serializers.ModelSerializer):
@@ -76,6 +80,56 @@ class CommandSerializer(serializers.ModelSerializer):
 		model = Command
 		fields = '__all__'
 		depth = 1
+
+
+def _scan_related_total(model) -> Coalesce:
+	"""Correlated count of a scan's rows in `model`.
+
+	Three Count() annotations cannot be used instead: they span separate
+	multi-valued relations, so Django joins subdomains by endpoints by
+	vulnerabilities and the intermediate row count explodes long before
+	distinct collapses it again.
+	"""
+	return Coalesce(
+		Subquery(
+			model.objects
+			.filter(scan_history=OuterRef('pk'))
+			.order_by()
+			.values('scan_history')
+			.annotate(total=Count('id'))
+			.values('total')[:1],
+			output_field=IntegerField(),
+		),
+		0,
+	)
+
+
+def with_scan_history_serializer_data(queryset: QuerySet) -> QuerySet:
+	"""Attach everything ScanHistorySerializer reads, so a list costs a fixed number of queries.
+
+	The serializer declares eighteen method fields; left unannotated, the
+	counts, max severity, engine, initiator, organizations and task state each
+	query once per row.
+	"""
+	return (
+		queryset
+		.select_related('domain', 'scan_type', 'initiated_by')
+		.prefetch_related('domain__domains', 'scanactivity_set')
+		.annotate(
+			subdomain_count_ann=_scan_related_total(Subdomain),
+			endpoint_count_ann=_scan_related_total(EndPoint),
+			vulnerability_count_ann=_scan_related_total(Vulnerability),
+			max_severity_ann=Subquery(
+				Vulnerability.objects
+				.filter(scan_history=OuterRef('pk'))
+				.order_by()
+				.values('scan_history')
+				.annotate(top=Max('severity'))
+				.values('top')[:1],
+				output_field=IntegerField(),
+			),
+		)
+	)
 
 
 class ScanHistorySerializer(serializers.ModelSerializer):

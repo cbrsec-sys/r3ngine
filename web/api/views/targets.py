@@ -17,7 +17,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import connections
-from django.db.models import CharField, Count, F, Max, Q, Value
+from django.db.models import CharField, Count, Exists, F, Max, OuterRef, Q, Value
 from django.db.models.functions import Lower
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -660,7 +660,13 @@ class ScreenshotViewSet(viewsets.ModelViewSet):
 
 from rest_framework.permissions import AllowAny
 
-class DirectoryViewSet(viewsets.ModelViewSet):
+class DirectoryViewSet(viewsets.ReadOnlyModelViewSet):
+	"""Directory (endpoint) listing for the scan detail page.
+
+	Read-only: no client writes through this route, and as a ModelViewSet it
+	exposed create/update/delete of EndPoint rows to every sys_admin and
+	penetration_tester (IsAuditor only blocks writes for pure auditors).
+	"""
 	permission_classes = [IsAuditor]
 
 	queryset = EndPoint.objects.none()
@@ -693,18 +699,19 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 
 		# If subdomain_id is missing, return list of subdomains that have findings
 		if scan_id and not subdomain_id:
-			subdomains = Subdomain.objects.filter(
-				scan_history__id=scan_id,
-				endpoint__isnull=False
-			).distinct()
-			
-			results = []
-			for sd in subdomains:
-				results.append({
-					'id': sd.id,
-					'name': sd.name,
-					'directory_count': EndPoint.objects.filter(scan_history__id=scan_id, subdomain=sd).count()
-				})
+			# One grouped query. The endpoint join is the only multi-valued
+			# one, so the count is not multiplied; "has any endpoint" stays an
+			# EXISTS so it does not add a second join.
+			results = list(
+				Subdomain.objects
+				.filter(scan_history__id=scan_id)
+				.filter(Exists(EndPoint.objects.filter(subdomain=OuterRef('pk'))))
+				.annotate(directory_count=Count(
+					'endpoint', filter=Q(endpoint__scan_history__id=scan_id)
+				))
+				.order_by('id')
+				.values('id', 'name', 'directory_count')
+			)
 			return Response({
 				'count': len(results),
 				'next': None,

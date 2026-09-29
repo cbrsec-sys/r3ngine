@@ -1,3 +1,5 @@
+from django.db import models
+from django.db.models import prefetch_related_objects
 from django.forms.models import model_to_dict
 from rest_framework import serializers
 
@@ -9,6 +11,70 @@ class ValidationResultSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = ValidationResult
 		fields = '__all__'
+
+
+def _nested(prefix: str, names: tuple[str, ...]) -> tuple[str, ...]:
+	return tuple(f'{prefix}__{name}' for name in names)
+
+
+# Many-to-many fields a depth-0 nested object renders as primary-key lists.
+_SCAN_M2M = ('emails', 'employees', 'buckets', 'dorks')
+_SUBDOMAIN_M2M = ('technologies', 'ip_addresses', 'directories', 'waf')
+_ENDPOINT_M2M = ('techs', 'endpoint_subscan_ids')
+_DOMAIN_INFO_M2M = (
+	'status', 'name_servers', 'dns_records', 'related_domains',
+	'related_tlds', 'similar_domains', 'historical_ips',
+)
+
+
+class VulnerabilityListSerializer(serializers.ListSerializer):
+	"""Load VulnerabilitySerializer's nested graph once for the whole list.
+
+	The serializer uses depth=2 over five foreign keys and five many-to-many
+	fields, so each vulnerability drags in its subdomain, endpoint, exposure
+	and target with their own relations: about fifty queries per row. Every
+	path that nesting reaches is prefetched here over the rows being
+	serialized (one page, in the list view), which makes the cost a fixed
+	number of queries per page instead.
+	"""
+
+	PREFETCHES = (
+		# get_scan_history
+		'scan_history', 'scan_history__domain',
+		'scan_history__initiated_by', 'scan_history__aborted_by',
+		'validation_results',
+		'tags', 'references', 'cwe_ids', 'cve_ids', 'cve_ids__related_cves',
+		'cve_ids__related_cves__related_cves',
+		'target_domain', 'target_domain__project', 'target_domain__monitor_engine',
+		'target_domain__temporal_schedule', 'target_domain__domain_info',
+		*_nested('target_domain__domain_info', _DOMAIN_INFO_M2M),
+		'subdomain', 'subdomain__target_domain', 'subdomain__technologies',
+		'subdomain__waf', 'subdomain__scan_history',
+		*_nested('subdomain__scan_history', _SCAN_M2M),
+		'subdomain__ip_addresses',
+		*_nested('subdomain__ip_addresses', ('ports', 'ip_subscan_ids')),
+		'subdomain__directories',
+		*_nested('subdomain__directories', ('directory_files', 'dir_subscan_ids')),
+		'endpoint', 'endpoint__target_domain', 'endpoint__techs',
+		'endpoint__scan_history', *_nested('endpoint__scan_history', _SCAN_M2M),
+		'endpoint__subdomain', *_nested('endpoint__subdomain', _SUBDOMAIN_M2M),
+		'endpoint__endpoint_subscan_ids',
+		'endpoint__endpoint_subscan_ids__subdomain_subscan_ids',
+		'exposure', 'exposure__target_domain',
+		'exposure__scan_history', *_nested('exposure__scan_history', _SCAN_M2M),
+		'exposure__subdomain', *_nested('exposure__subdomain', _SUBDOMAIN_M2M),
+		'exposure__endpoint', *_nested('exposure__endpoint', _ENDPOINT_M2M),
+		'vuln_subscan_ids', 'vuln_subscan_ids__assessment', 'vuln_subscan_ids__engine',
+		'vuln_subscan_ids__subdomain_subscan_ids',
+		*_nested('vuln_subscan_ids__subdomain_subscan_ids', _SUBDOMAIN_M2M),
+		'vuln_subscan_ids__scan_history', *_nested('vuln_subscan_ids__scan_history', _SCAN_M2M),
+		'vuln_subscan_ids__subdomain', *_nested('vuln_subscan_ids__subdomain', _SUBDOMAIN_M2M),
+	)
+
+	def to_representation(self, data) -> list:
+		rows = list(data.all() if isinstance(data, models.manager.BaseManager) else data)
+		prefetch_related_objects(rows, *self.PREFETCHES)
+		return super().to_representation(rows)
 
 
 class VulnerabilitySerializer(serializers.ModelSerializer):
@@ -59,6 +125,7 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 		model = Vulnerability
 		fields = '__all__'
 		depth = 2
+		list_serializer_class = VulnerabilityListSerializer
 
 
 class ExposureEvidenceSerializer(serializers.ModelSerializer):

@@ -1,12 +1,12 @@
-from django.db.models import Count, IntegerField, Max, OuterRef, Q, Subquery
-from django.db.models.functions import Coalesce
+from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.permissions import IsAuditor, IsPenetrationTester
 from api.serializers import CommandSerializer, ScanHistorySerializer, SubScanSerializer
-from startScan.models import Command, EndPoint, ScanHistory, SubScan, Subdomain, Vulnerability
+from api.serializers.scans import with_scan_history_serializer_data
+from startScan.models import Command, ScanHistory, SubScan
 
 
 class ScanStatus(APIView):
@@ -17,55 +17,10 @@ class ScanStatus(APIView):
 	# poll could serialize the entire backlog into a web worker at once.
 	_ACTIVE_LIMIT = 100
 
-	@staticmethod
-	def _related_total(model):
-		"""Correlated count of a scan's rows in `model`.
-
-		Three Count() annotations cannot be used instead: they span separate
-		multi-valued relations, so Django joins subdomains by endpoints by
-		vulnerabilities and the intermediate row count explodes long before
-		distinct collapses it again.
-		"""
-		return Coalesce(
-			Subquery(
-				model.objects
-				.filter(scan_history=OuterRef('pk'))
-				.order_by()
-				.values('scan_history')
-				.annotate(total=Count('id'))
-				.values('total')[:1],
-				output_field=IntegerField(),
-			),
-			0,
-		)
-
 	def _scan_queryset(self, slug):
-		"""Base scan queryset carrying everything ScanHistorySerializer reads.
-
-		The serializer declares eighteen method fields. Left unannotated each
-		one queries per row, which is what made this polled endpoint expensive.
-		"""
-		return (
-			ScanHistory.objects
-			.filter(domain__project__slug=slug)
-			.select_related('domain', 'scan_type', 'initiated_by')
-			.prefetch_related('domain__domains', 'scanactivity_set')
-			.annotate(
-				subdomain_count_ann=self._related_total(Subdomain),
-				endpoint_count_ann=self._related_total(EndPoint),
-				vulnerability_count_ann=self._related_total(Vulnerability),
-				max_severity_ann=Subquery(
-					Vulnerability.objects
-					.filter(scan_history=OuterRef('pk'))
-					.order_by()
-					.values('scan_history')
-					.annotate(top=Max('severity'))
-					.values('top')[:1],
-					output_field=IntegerField(),
-				),
-			)
-			.order_by('-start_scan_date')
-		)
+		return with_scan_history_serializer_data(
+			ScanHistory.objects.filter(domain__project__slug=slug)
+		).order_by('-start_scan_date')
 
 	def _task_queryset(self, slug):
 		"""Base subscan queryset.
@@ -120,7 +75,9 @@ class ListScanHistory(APIView):
 	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
-		scan_history = ScanHistory.objects.all().order_by('-start_scan_date')
+		scan_history = with_scan_history_serializer_data(
+			ScanHistory.objects.all()
+		).order_by('-start_scan_date')
 		project = req.query_params.get('project')
 		if project:
 			scan_history = scan_history.filter(domain__project__slug=project)

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from startScan.models import ScanHistory, EngineType, Domain
 from .serializers import ScanHistorySerializer
+from .serializers.scans import with_scan_history_serializer_data
 import logging
 from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
@@ -13,7 +14,7 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
     serializer_class = ScanHistorySerializer
 
     def get_queryset(self):
-        queryset = ScanHistory.objects.prefetch_related('scanactivity_set').order_by('-id')
+        queryset = with_scan_history_serializer_data(ScanHistory.objects.all()).order_by('-id')
         project = self.request.query_params.get('project')
         target_id = self.request.query_params.get('target_id')
         if project:

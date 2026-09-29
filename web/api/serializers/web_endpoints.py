@@ -1,3 +1,5 @@
+from django.db import models
+from django.db.models import prefetch_related_objects
 from rest_framework import serializers
 
 from api.serializers.hosts import TechnologySerializer
@@ -49,6 +51,22 @@ class AuthCandidateSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+class EndpointListSerializer(serializers.ListSerializer):
+	"""Load EndpointSerializer's nested relations once for the whole list.
+
+	Three nested serializers plus the endpoint_subscan_ids many-to-many cost
+	four queries per endpoint; prefetching over the rows being serialized
+	(one page, in the list views) makes that four queries in total.
+	"""
+
+	PREFETCHES = ('techs', 'parameters', 'authcandidate_set', 'endpoint_subscan_ids')
+
+	def to_representation(self, data) -> list:
+		rows = list(data.all() if isinstance(data, models.manager.BaseManager) else data)
+		prefetch_related_objects(rows, *self.PREFETCHES)
+		return super().to_representation(rows)
+
+
 class EndpointSerializer(serializers.ModelSerializer):
 
 	techs = TechnologySerializer(many=True)
@@ -58,6 +76,7 @@ class EndpointSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = EndPoint
 		fields = '__all__'
+		list_serializer_class = EndpointListSerializer
 
 
 class EndpointOnlyURLsSerializer(serializers.ModelSerializer):
