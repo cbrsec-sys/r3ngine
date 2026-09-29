@@ -547,7 +547,7 @@ def stop_scan(request, id):
                     te.ended_at = timezone.now()
                     te.save()
                 except Exception as cancel_err:
-                    logger.warning(f"Temporal cancel failed for workflow {te.workflow_id}: {cancel_err}")
+                    logger.warning("Temporal cancel failed for workflow %s: %s", te.workflow_id, cancel_err)
             scan.scan_status = ABORTED_TASK
             scan.save()
             tasks = (
@@ -727,7 +727,7 @@ def delete_scheduled_task(request, id):
         try:
             _delete_temporal_schedule_by_id(task_object.schedule_id)
         except Exception as e:
-            logger.error(f"[delete_scheduled_task] Temporal delete failed for '{task_object.schedule_id}': {e}")
+            logger.error("[delete_scheduled_task] Temporal delete failed for '%s': %s", task_object.schedule_id, e)
         task_object.delete()
         messageData = {'status': 'true'}
         messages.add_message(
@@ -755,10 +755,10 @@ def delete_scheduled_scans(request, slug):
                 try:
                     _delete_temporal_schedule_by_id(ts.schedule_id)
                 except Exception as e:
-                    logger.error(f"[delete_scheduled_scans] Temporal delete failed for '{ts.schedule_id}': {e}")
+                    logger.error("[delete_scheduled_scans] Temporal delete failed for '%s': %s", ts.schedule_id, e)
                 ts.delete()
             except TemporalSchedule.DoesNotExist:
-                logger.error(f"[delete_scheduled_scans] TemporalSchedule id={value} not found")
+                logger.error("[delete_scheduled_scans] TemporalSchedule id=%s not found", value)
             except Exception as e:
                 logger.error(e)
         messages.add_message(
@@ -782,7 +782,7 @@ def change_scheduled_task_status(request, id):
                 else:
                     _pause_temporal_schedule(ts.schedule_id)
             except Exception as e:
-                logger.error(f"[change_scheduled_task_status] Temporal pause/unpause failed for '{ts.schedule_id}': {e}")
+                logger.error("[change_scheduled_task_status] Temporal pause/unpause failed for '%s': %s", ts.schedule_id, e)
         except TemporalSchedule.DoesNotExist:
             pass
     return HttpResponse('')

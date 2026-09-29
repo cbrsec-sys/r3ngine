@@ -51,7 +51,7 @@ from unittest.mock import patch
 from reNgine.temporal.activities import run_port_scan_activity
 
 class TestPortScanActivity(TestCase):
-    # Patch at the module where the function is defined (temporal/activities/__init__.py)
+    # Patch where the name is looked up: the activity's own module, not the package __init__
     @patch('reNgine.temporal.activities.subprocess.run')
     def test_port_scan_parses_output(self, mock_run):
         mock_run.return_value.stdout = b'...'

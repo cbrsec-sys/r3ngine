@@ -154,7 +154,7 @@ class TestCreateProxyListActivity(TestCase):
         # The real root is a container volume path the test runner cannot write.
         root = tempfile.mkdtemp(prefix='rengine_test_proxies_')
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        patcher = patch('reNgine.temporal.activities.PROXY_LIST_ROOT', root)
+        patcher = patch('reNgine.temporal.activities.proxies.PROXY_LIST_ROOT', root)
         patcher.start()
         self.addCleanup(patcher.stop)
         

@@ -43,21 +43,21 @@ class PriorityProxyTests(TestCase):
         Proxy.objects.create(use_proxy=True, proxies=FREE, priority_proxies=FREE)
         self.assertEqual(get_proxy_list(), [FREE])
 
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_a_live_priority_proxy_wins_over_the_scraped_pool(self, mock_check):
         mock_check.return_value = True
         Proxy.objects.create(use_proxy=True, proxies=FREE, priority_proxies=PAID)
 
         self.assertEqual(get_random_proxy(), PAID)
 
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_falls_back_to_scraped_pool_when_priority_is_dead(self, mock_check):
         mock_check.side_effect = lambda url, **kw: url == FREE
         Proxy.objects.create(use_proxy=True, proxies=FREE, priority_proxies=PAID)
 
         self.assertEqual(get_random_proxy(), FREE)
 
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_dead_priority_proxy_is_never_deleted(self, mock_check):
         """The whole point of the field: the operator vouched for these."""
         mock_check.return_value = False

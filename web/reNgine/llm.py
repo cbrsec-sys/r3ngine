@@ -129,7 +129,7 @@ class LLMBaseGenerator:
             llm = Ollama(base_url=OLLAMA_INSTANCE, model=self.model_name, timeout=120)
             return llm.invoke(prompt)
         except Exception as e:
-            self.logger.error(f"Ollama Error: {str(e)}")
+            self.logger.error("Ollama Error: %s", str(e))
             return f"Error: {str(e)}"
 
     def _call_openai(self, system_message, user_message, max_tokens=None):
@@ -174,7 +174,7 @@ class LLMBaseGenerator:
             # Fallback to max_completion_tokens if OpenAI model rejects max_tokens parameter
             if response.status_code == 400 and ("max_tokens" in response.text and "max_completion_tokens" in response.text):
                 self.logger.warning(
-                    f"OpenAI model '{self.model_name}' rejected 'max_tokens'. Retrying with 'max_completion_tokens'."
+                    "OpenAI model '%s' rejected 'max_tokens'. Retrying with 'max_completion_tokens'.", self.model_name
                 )
                 if "max_tokens" in data:
                     token_val = data.pop("max_tokens")
@@ -189,7 +189,7 @@ class LLMBaseGenerator:
             response.raise_for_status()
             return response.json()['choices'][0]['message']['content']
         except Exception as e:
-            self.logger.error(f"OpenAI Error: {str(e)}")
+            self.logger.error("OpenAI Error: %s", str(e))
             return f"Error: {str(e)}"
 
     def _call_anthropic(self, system_message, user_message):
@@ -219,7 +219,7 @@ class LLMBaseGenerator:
                 raise ValueError(f"Unexpected Anthropic response content type: {block.get('type')}")
             return block['text']
         except Exception as e:
-            self.logger.error(f"Anthropic Error: {str(e)}")
+            self.logger.error("Anthropic Error: %s", str(e))
             return f"Error: {str(e)}"
 
     def _call_gemini(self, system_message, user_message):
@@ -240,7 +240,7 @@ class LLMBaseGenerator:
             response.raise_for_status()
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         except Exception as e:
-            self.logger.error(f"Gemini Error: {str(e)}")
+            self.logger.error("Gemini Error: %s", str(e))
             return f"Error: {str(e)}"
 
 class LLMVulnerabilityReportGenerator(LLMBaseGenerator):
@@ -389,7 +389,7 @@ class LLMSeverityValidator(LLMBaseGenerator):
                 'raw_response': raw_response,
             }
         except Exception as e:
-            self.logger.warning(f"Failed to parse LLM severity validation JSON: {str(e)}. Fallback raw string returned.")
+            self.logger.warning("Failed to parse LLM severity validation JSON: %s. Fallback raw string returned.", str(e))
             return {
                 'status': True,
                 'suggested_severity': 'info',

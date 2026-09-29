@@ -3,7 +3,7 @@
 ``ScanActivity.error_message`` carries whatever the failing layer produced:
 
 * ``repr()`` of the exception raised by ``_run_task``
-  (``reNgine/temporal/activities/__init__.py``), which for a task that simply
+  (``reNgine/temporal/activities/core.py``), which for a task that simply
   gave up reads ``Task <name> execution returned False/failed.`` or
   ``Task <name> failed: <reason from self.error>``;
 * the workflow-level text written onto every still-running row by

@@ -70,7 +70,7 @@ def capture_url(browser, url, scan_id, results_dir=None):
     page.route("**/*", block_resources)
 
     try:
-        logger.info(f"Navigating to {url}...")
+        logger.info("Navigating to %s...", url)
         response = page.goto(url, wait_until="networkidle", timeout=30000)
         
         if response:
@@ -94,7 +94,7 @@ def capture_url(browser, url, scan_id, results_dir=None):
             result["html_path"] = html_rel_path
             
     except Exception as e:
-        logger.error(f"Capture failed for {url}: {str(e)}")
+        logger.error("Capture failed for %s: %s", url, str(e))
         # Try a partial/lazy screenshot if we reached the page but failed networkidle
         try:
             page.screenshot(path=screenshot_full_path)

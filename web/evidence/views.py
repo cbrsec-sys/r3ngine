@@ -273,7 +273,7 @@ class EvidenceUploadView(APIView):
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"[EVIDENCE] Upload failed: {e}", exc_info=True)
+            logger.error("[EVIDENCE] Upload failed: %s", e, exc_info=True)
             return Response({'error': 'Upload failed. See server logs.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(EvidenceSerializer(evidence).data, status=status.HTTP_201_CREATED)

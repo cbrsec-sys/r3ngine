@@ -28,7 +28,7 @@ You are an expert in Python/Django/TypeScript/React/PostgreSQL/Neo4j development
 
 Keep the project modular and layered to avoid circular dependencies:
 
-- Leaf modules (like `common_func.py`, `definitions.py`, or utility helpers) sit at the bottom.
+- Leaf modules (like `common_func/`, `definitions.py`, or utility helpers) sit at the bottom.
 - Core business logic (task functions, activity implementations, graph utilities) sits in the middle.
 - Orchestration layers (Temporal workflows, HTTP views, Django Channels consumers) sit at the top.
 
@@ -63,4 +63,4 @@ Keep the project modular and layered to avoid circular dependencies:
 - Do not add new Python dependencies without approval; add them to `web/requirements.txt`.
 - Do not add new npm dependencies without approval; add them to `frontend/package.json`.
 - Do not modify `docker/docker-compose.yml` or `docker/web/Dockerfile` without understanding the full build pipeline (the Dockerfile builds the frontend in its own stage — see `r3ngine-frontend.md`).
-- Any change that touches `temporal/workflows/__init__.py` (or the shim `temporal_workflows.py`) must be reviewed for determinism violations (see `r3ngine-temporal.md`).
+- Any change that touches a module in `temporal/workflows/` (or the shim `temporal_workflows.py`) must be reviewed for determinism violations (see `r3ngine-temporal.md`).

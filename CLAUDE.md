@@ -16,10 +16,11 @@ Build a fast, accurate mental model without rescanning the whole repository.
 
 ## Key Facts
 - `frontend/`: UI
-- `web/api/`: HTTP API; views split into `web/api/views/` domain modules (scan, targets, vulns, recon, llm, tools, settings, etc.)
-- `web/reNgine/temporal/workflows/__init__.py`: orchestration (shim: `web/reNgine/temporal_workflows.py`)
-- `web/reNgine/temporal/activities/__init__.py`: workflow bridge (shim: `web/reNgine/temporal_activities.py`)
-- `web/reNgine/tasks/`: task execution package — domain modules: `scan_init`, `subdomain`, `crawl`, `vuln`, `osint`, `port_scan`, `persistence`, `notifications`, `geo`, `llm`, `waf`, `screenshot`, `parsers`, `acunetix`, `proxies` (shim: `web/reNgine/tasks/__init__.py`)
+- `web/api/`: HTTP API; views in `web/api/views/` domain modules (scan, scan_status, targets, subdomains, endpoints, vulns, recon, notes, llm, tools, settings, etc.), serializers in the `web/api/serializers/` package
+- `web/reNgine/temporal/workflows/`: orchestration — flat modules `_common` (retry presets, shared helpers), `master_scan`, `subscan`, `stress`, `jobs`, `recon`, `assessment_workflow`; `__init__.py` re-exports (shim: `web/reNgine/temporal_workflows.py`)
+- `web/reNgine/temporal/activities/`: workflow bridge — `core` (`_run_task`, `TemporalTaskProxy`, cancellation), `scan_lifecycle`, `discovery`, `enumeration`, `vuln_scan`, `post_processing`, `intel`, `proxies`, `maintenance`, `plugin_auth`, `stress`, plus assessment/graph/evidence/followups modules; `__init__.py` re-exports (shim: `web/reNgine/temporal_activities.py`)
+- `web/reNgine/common_func/`: shared helpers package (db queries, proxies, notifications, url utils, …); `__init__.py` keeps the old star-import surface
+- `web/reNgine/tasks/`: task execution package (`osint/` and `crawl/` are sub-packages) — domain modules: `scan_init`, `subdomain`, `crawl`, `vuln`, `osint`, `port_scan`, `persistence`, `notifications`, `geo`, `llm`, `waf`, `screenshot`, `parsers`, `acunetix`, `proxies` (shim: `web/reNgine/tasks/__init__.py`)
 - `web/startScan/`: persistence
 - `web/apme/`: graph and attack-path logic
 - `docker/`: compose files and the multi-stage `web/Dockerfile` (the frontend bundle is built there, not in the running container) — drive them with the Makefile: `make up`, `make build-web`, `make restart-apps`, `make migrate`, `make logs`

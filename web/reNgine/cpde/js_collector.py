@@ -166,7 +166,7 @@ def download_js_files(
                 attempt += 1
                 current_proxy_index += 1
             except Exception as e:
-                logger.debug(f"[CPDE:js_collector] JS downloader got non-network error for {url}: {e}")
+                logger.debug("[CPDE:js_collector] JS downloader got non-network error for %s: %s", url, e)
                 break
         return None
 

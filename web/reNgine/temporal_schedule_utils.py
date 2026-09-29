@@ -114,7 +114,7 @@ def _create_periodic_temporal_schedule(
         is_active=True,
         domain=domain,
     )
-    logger.info(f"[ScheduleUtils] Created periodic schedule '{schedule_id}' every {interval_seconds}s")
+    logger.info("[ScheduleUtils] Created periodic schedule '%s' every %ss", schedule_id, interval_seconds)
     return record
 
 
@@ -204,7 +204,7 @@ def _create_clocked_temporal_schedule(
         is_active=True,
         domain=domain,
     )
-    logger.info(f"[ScheduleUtils] Created clocked schedule '{schedule_id}' at {clocked_dt}")
+    logger.info("[ScheduleUtils] Created clocked schedule '%s' at %s", schedule_id, clocked_dt)
     return record
 
 
@@ -235,7 +235,7 @@ def _delete_temporal_schedule_by_id(schedule_id: str) -> None:
         loop.run_until_complete(_delete())
     finally:
         loop.close()
-    logger.info(f"[ScheduleUtils] Deleted schedule '{schedule_id}'")
+    logger.info("[ScheduleUtils] Deleted schedule '%s'", schedule_id)
 
 
 def _pause_temporal_schedule(schedule_id: str) -> None:
@@ -251,7 +251,7 @@ def _pause_temporal_schedule(schedule_id: str) -> None:
         loop.run_until_complete(_pause())
     finally:
         loop.close()
-    logger.info(f"[ScheduleUtils] Paused schedule '{schedule_id}'")
+    logger.info("[ScheduleUtils] Paused schedule '%s'", schedule_id)
 
 
 def _unpause_temporal_schedule(schedule_id: str) -> None:
@@ -267,7 +267,7 @@ def _unpause_temporal_schedule(schedule_id: str) -> None:
         loop.run_until_complete(_unpause())
     finally:
         loop.close()
-    logger.info(f"[ScheduleUtils] Unpaused schedule '{schedule_id}'")
+    logger.info("[ScheduleUtils] Unpaused schedule '%s'", schedule_id)
 
 
 _MONITORING_FREQUENCY_SECONDS = {
@@ -342,8 +342,7 @@ def _upsert_monitoring_temporal_schedule(domain) -> object:
         ),
     )
     logger.info(
-        f"[ScheduleUtils] Upserted monitoring schedule '{schedule_id}' "
-        f"every {interval_seconds}s for domain={domain.name}"
+        "[ScheduleUtils] Upserted monitoring schedule '%s' every %ss for domain=%s", schedule_id, interval_seconds, domain.name
     )
     return record
 
@@ -374,4 +373,4 @@ def _delete_monitoring_temporal_schedule(domain) -> None:
         loop.close()
 
     TemporalSchedule.objects.filter(schedule_id=schedule_id).delete()
-    logger.info(f"[ScheduleUtils] Deleted monitoring schedule '{schedule_id}' for domain={domain.name}")
+    logger.info("[ScheduleUtils] Deleted monitoring schedule '%s' for domain=%s", schedule_id, domain.name)

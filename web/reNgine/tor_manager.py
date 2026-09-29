@@ -48,7 +48,7 @@ class TorManager:
                 networks[0] if networks else 'r3ngine_r3ngine_network'
             )
         except Exception as e:
-            logger.debug(f"[TorManager] Could not discover network, using fallback: {e}")
+            logger.debug("[TorManager] Could not discover network, using fallback: %s", e)
             return 'r3ngine_r3ngine_network'
 
     def _build_image(self, client):
@@ -93,12 +93,12 @@ class TorManager:
         try:
             client.images.get(TOR_IMAGE_NAME)
         except docker.errors.ImageNotFound:
-            logger.info(f"[TorManager] Image '{TOR_IMAGE_NAME}' not found locally. Attempting to pull...")
+            logger.info("[TorManager] Image '%s' not found locally. Attempting to pull...", TOR_IMAGE_NAME)
             try:
                 client.images.pull(TOR_IMAGE_NAME)
-                logger.info(f"[TorManager] Image '{TOR_IMAGE_NAME}' pulled successfully.")
+                logger.info("[TorManager] Image '%s' pulled successfully.", TOR_IMAGE_NAME)
             except docker.errors.APIError:
-                logger.info(f"[TorManager] Pull failed or image is local-only. Building from source...")
+                logger.info("[TorManager] Pull failed or image is local-only. Building from source...")
                 self._build_image(client)
 
         # Generate a fresh random control password for this session
@@ -177,5 +177,5 @@ class TorManager:
                 ctrl.signal(Signal.NEWNYM)
                 time.sleep(2)
         except Exception as e:
-            logger.warning(f"[TorManager] Failed to rotate circuit: {e}")
+            logger.warning("[TorManager] Failed to rotate circuit: %s", e)
             raise

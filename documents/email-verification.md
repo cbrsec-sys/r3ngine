@@ -20,7 +20,7 @@ Scan detail timeline: `InitializeScanTasksActivity` pre-creates a **Mailbox Veri
 |---|---|
 | `web/reNgine/tasks/email_verification.py` | Candidates, CLI/HTTP verify, catch-all, persist, findings |
 | `web/reNgine/tasks/email_security.py` | SPF/DMARC/DKIM/relay/STARTTLS/cert only |
-| `web/reNgine/temporal/activities/__init__.py` | `_run_email_security_sync` calls `verify_domain_mailboxes` |
+| `web/reNgine/temporal/activities/intel.py` | `_run_email_security_sync` calls `verify_domain_mailboxes` |
 | `web/reNgine/task_plan.py` | Pre-populates the Mailbox Verification timeline item |
 | `docker/web/Dockerfile` | Official `check_if_email_exists` v0.11.7 CLI |
 | `web/tests/test_email_verification.py` | Unit tests (mocked, no live MX) |

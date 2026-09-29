@@ -34,7 +34,7 @@ class OllamaManager:
                 networks[0] if networks else 'r3ngine_r3ngine_network'
             )
         except Exception as e:
-            logger.debug(f"[OllamaManager] Could not discover network, using fallback: {e}")
+            logger.debug("[OllamaManager] Could not discover network, using fallback: %s", e)
             return 'r3ngine_r3ngine_network'
 
     def start(self):
@@ -50,10 +50,10 @@ class OllamaManager:
         try:
             client.images.get(OLLAMA_IMAGE_NAME)
         except docker.errors.ImageNotFound:
-            logger.info(f"[OllamaManager] Image '{OLLAMA_IMAGE_NAME}' not found locally. Attempting to pull...")
+            logger.info("[OllamaManager] Image '%s' not found locally. Attempting to pull...", OLLAMA_IMAGE_NAME)
             try:
                 client.images.pull(OLLAMA_IMAGE_NAME)
-                logger.info(f"[OllamaManager] Image '{OLLAMA_IMAGE_NAME}' pulled successfully.")
+                logger.info("[OllamaManager] Image '%s' pulled successfully.", OLLAMA_IMAGE_NAME)
             except docker.errors.APIError as e:
                 raise OllamaStartError(f"Failed to pull Ollama image: {e}")
 

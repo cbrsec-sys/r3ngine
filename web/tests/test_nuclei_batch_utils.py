@@ -150,7 +150,7 @@ class TestGatherNucleiTagsActivity(DjangoTestCase):
             [f'/root/nuclei-templates/wp-{i}.yaml' for i in range(50)]
         )
 
-        with patch('reNgine.temporal.activities.Subdomain') as mock_sub:
+        with patch('reNgine.temporal.activities.vuln_scan.Subdomain') as mock_sub:
             mock_qs = MagicMock()
             mock_qs.__iter__ = MagicMock(return_value=iter([]))
             mock_sub.objects.filter.return_value = mock_qs
@@ -180,7 +180,7 @@ class TestGatherNucleiTagsActivity(DjangoTestCase):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ''
 
-        with patch('reNgine.temporal.activities.Subdomain') as mock_sub:
+        with patch('reNgine.temporal.activities.vuln_scan.Subdomain') as mock_sub:
             mock_qs = MagicMock()
             mock_qs.__iter__ = MagicMock(return_value=iter([]))
             mock_sub.objects.filter.return_value = mock_qs
@@ -198,7 +198,7 @@ class TestGatherNucleiTagsActivity(DjangoTestCase):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ''
 
-        with patch('reNgine.temporal.activities.Subdomain') as mock_sub:
+        with patch('reNgine.temporal.activities.vuln_scan.Subdomain') as mock_sub:
             mock_qs = MagicMock()
             mock_qs.__iter__ = MagicMock(return_value=iter([]))
             mock_sub.objects.filter.return_value = mock_qs
@@ -231,7 +231,7 @@ class TestGatherNucleiTagsActivity(DjangoTestCase):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ''
 
-        with patch('reNgine.temporal.activities.Subdomain') as mock_sub:
+        with patch('reNgine.temporal.activities.vuln_scan.Subdomain') as mock_sub:
             mock_qs = MagicMock()
             mock_qs.__iter__ = MagicMock(return_value=iter([]))
             mock_sub.objects.filter.return_value = mock_qs

@@ -97,7 +97,7 @@ def abort_scan_history(scan, aborted_by=None):
                 te.ended_at = timezone.now()
                 te.save()
             except Exception as e:
-                logger.error(f"Failed to cancel workflow {te.workflow_id} for scan {scan.id}: {e}")
+                logger.error("Failed to cancel workflow %s for scan %s: %s", te.workflow_id, scan.id, e)
 
         for subscan in SubScan.objects.filter(scan_history=scan, status__in=[RUNNING_TASK, PAUSED_TASK]):
             abort_subscan(subscan)

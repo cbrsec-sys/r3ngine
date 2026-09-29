@@ -32,7 +32,7 @@ def run_jwt_scan(self, ctx, url, subdomain, results_dir):
     cmd = (
         f'python3 {_JWT_TOOL_PATH} -t {shlex.quote(url)} -M at -np 2>&1 | tee {shlex.quote(output_file)}'
     )
-    logger.warning(f'Running jwt_tool on {url}')
+    logger.warning("Running jwt_tool on %s", url)
     run_command(
         cmd,
         shell=True,
@@ -48,7 +48,7 @@ def run_jwt_scan(self, ctx, url, subdomain, results_dir):
         with open(output_file, 'r') as f:
             lines = f.readlines()
     except Exception as e:
-        logger.error(f'jwt_tool output read error for {url}: {e}')
+        logger.error("jwt_tool output read error for %s: %s", url, e)
         return
 
     for line in lines:
@@ -95,7 +95,7 @@ def run_graphql_cop(self, ctx, url, subdomain):
             f'{self.results_dir}/graphqlcop_{graphql_url.replace("://", "_").replace("/", "_")[:80]}.json'
         )
         cmd = f'python3 /usr/src/github/graphql-cop/graphql-cop.py -t {shlex.quote(graphql_url)} -o json 2>/dev/null | tee {shlex.quote(output_file)}'
-        logger.warning(f'Running graphql-cop on {graphql_url}')
+        logger.warning("Running graphql-cop on %s", graphql_url)
         run_command(
             cmd,
             shell=True,
@@ -111,7 +111,7 @@ def run_graphql_cop(self, ctx, url, subdomain):
             with open(output_file, 'r') as f:
                 findings = json.load(f)
         except Exception as e:
-            logger.error(f'graphql-cop JSON parse error for {graphql_url}: {e}')
+            logger.error("graphql-cop JSON parse error for %s: %s", graphql_url, e)
             continue
 
         if not isinstance(findings, list):
@@ -142,7 +142,6 @@ def resolve_wordlist_path(config, default_path):
     if os.path.isfile(FFUF_DEFAULT_API_WORDLIST_PATH):
         return FFUF_DEFAULT_API_WORDLIST_PATH
     logger.warning(
-        f'API wordlist not found at {FFUF_DEFAULT_API_WORDLIST_PATH}; '
-        'falling back to default wordlist.'
+        "API wordlist not found at %s; falling back to default wordlist.", FFUF_DEFAULT_API_WORDLIST_PATH
     )
     return default_path

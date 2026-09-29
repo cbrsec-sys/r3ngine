@@ -36,7 +36,7 @@ web/
 │   ├── temporal_client.py      # Temporal connection provider
 │   ├── temporal_schedule_utils.py  # Schedule creation helpers
 │   ├── definitions.py          # Global constants and tool definitions
-│   ├── common_func.py          # Shared utility functions
+│   ├── common_func/            # Shared utility package (db_queries, proxy_pool, url_utils, notify, …); __init__ re-exports everything
 │   ├── correlation.py          # Vulnerability correlation engine
 │   ├── consumers.py            # WebSocket consumers (Django Channels)
 │   ├── llm.py                  # LLM/AI integration

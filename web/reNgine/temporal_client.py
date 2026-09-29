@@ -59,7 +59,7 @@ class TemporalClientProvider:
             )
         except asyncio.TimeoutError:
             logger.error(
-                f"Connection to Temporal host '{temporal_host}' timed out after 10 seconds."
+                "Connection to Temporal host '%s' timed out after 10 seconds.", temporal_host
             )
             raise TemporalConnectionError(
                 f"Temporal connection to '{temporal_host}' timed out after 10s."

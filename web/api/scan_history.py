@@ -66,13 +66,13 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
                     try:
                         TemporalClientProvider.pause_workflow(wf_id)
                     except Exception as e:
-                        logger.error(f"Failed to pause subscan workflow {wf_id}: {e}")
+                        logger.error("Failed to pause subscan workflow %s: %s", wf_id, e)
 
             for te in scan.temporal_executions.filter(status="RUNNING"):
                 try:
                     TemporalClientProvider.pause_workflow(te.workflow_id)
                 except Exception as e:
-                    logger.error(f"Failed to pause workflow {te.workflow_id} for scan {scan.id}: {e}")
+                    logger.error("Failed to pause workflow %s for scan %s: %s", te.workflow_id, scan.id, e)
 
             from reNgine.tasks import create_scan_activity
             create_scan_activity(scan.id, "Scan paused", PAUSED_TASK)
@@ -101,13 +101,13 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
                     try:
                         TemporalClientProvider.resume_workflow(wf_id)
                     except Exception as e:
-                        logger.error(f"Failed to resume subscan workflow {wf_id}: {e}")
+                        logger.error("Failed to resume subscan workflow %s: %s", wf_id, e)
 
             for te in scan.temporal_executions.filter(status="RUNNING"):
                 try:
                     TemporalClientProvider.resume_workflow(te.workflow_id)
                 except Exception as e:
-                    logger.error(f"Failed to resume workflow {te.workflow_id} for scan {scan.id}: {e}")
+                    logger.error("Failed to resume workflow %s for scan %s: %s", te.workflow_id, scan.id, e)
 
             from reNgine.tasks import create_scan_activity
             create_scan_activity(scan.id, "Scan resumed", RUNNING_TASK)

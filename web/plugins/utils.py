@@ -68,7 +68,7 @@ class MarketplaceManager:
                             i_ver = packaging.version.parse(str(installed_ver))
                             plugin['update_available'] = m_ver > i_ver
                         except Exception as e:
-                            logger.error(f"Version parsing error for plugin {slug}: {e}")
+                            logger.error("Version parsing error for plugin %s: %s", slug, e)
                             plugin['update_available'] = False
                     else:
                         plugin['is_installed'] = False
@@ -81,7 +81,7 @@ class MarketplaceManager:
             else:
                 raise Exception(f"Marketplace unreachable: {response.status_code}")
         except Exception as e:
-            logger.error(f"Failed to fetch marketplace: {str(e)}")
+            logger.error("Failed to fetch marketplace: %s", str(e))
             return []
 
     @classmethod
@@ -299,14 +299,14 @@ class AtomicInstaller:
             if db_config.get('PASSWORD'):
                 env['PGPASSWORD'] = str(db_config.get('PASSWORD'))
             
-            logger.info(f"Creating database backup: {backup_file}")
+            logger.info("Creating database backup: %s", backup_file)
             subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
             return backup_file
         except subprocess.CalledProcessError as e:
-            logger.error(f"Database backup failed: {e.stderr}")
+            logger.error("Database backup failed: %s", e.stderr)
             raise Exception(f"Database backup failed: {e.stderr}")
         except Exception as e:
-            logger.error(f"Unexpected error during backup: {str(e)}")
+            logger.error("Unexpected error during backup: %s", str(e))
             raise e
 
     @classmethod
@@ -330,12 +330,12 @@ class AtomicInstaller:
             if db_config.get('PASSWORD'):
                 env['PGPASSWORD'] = str(db_config.get('PASSWORD'))
             
-            logger.info(f"Rolling back database from: {backup_file}")
+            logger.info("Rolling back database from: %s", backup_file)
             subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
         except subprocess.CalledProcessError as e:
-            logger.error(f"CRITICAL: Rollback failed! {e.stderr}")
+            logger.error("CRITICAL: Rollback failed! %s", e.stderr)
         except Exception as e:
-            logger.error(f"CRITICAL: Rollback failed! {str(e)}")
+            logger.error("CRITICAL: Rollback failed! %s", str(e))
 
     @classmethod
     def install(cls, zip_path: str, install_id: str = None):
@@ -447,7 +447,7 @@ class AtomicInstaller:
                             pass
 
                 app_label = f"{plugin_slug}_backend"
-                logger.info(f"Running migrations for plugin app: {app_label}")
+                logger.info("Running migrations for plugin app: %s", app_label)
                 cls._emit(install_id, 'migrations', 'in_progress')
                 try:
                     import sys
@@ -459,7 +459,7 @@ class AtomicInstaller:
                         text=True,
                         check=True
                     )
-                    logger.info(f"Subprocess makemigrations stdout: {makemigrate_res.stdout}")
+                    logger.info("Subprocess makemigrations stdout: %s", makemigrate_res.stdout)
                     
                     # Run migrate in a clean subprocess
                     migrate_res = subprocess.run(
@@ -469,14 +469,14 @@ class AtomicInstaller:
                         text=True,
                         check=True
                     )
-                    logger.info(f"Subprocess migrate stdout: {migrate_res.stdout}")
-                    logger.info(f"Successfully migrated plugin: {plugin_slug}")
+                    logger.info("Subprocess migrate stdout: %s", migrate_res.stdout)
+                    logger.info("Successfully migrated plugin: %s", plugin_slug)
                     cls._emit(install_id, 'migrations', 'completed')
                 except subprocess.CalledProcessError as e:
-                    logger.error(f"Failed to run migrations for {plugin_slug} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
+                    logger.error("Failed to run migrations for %s (exit %s):\nStdout: %s\nStderr: %s", plugin_slug, e.returncode, e.stdout, e.stderr)
                     raise Exception(f"Migration subprocess failed for {app_label}: {e.stderr or e.stdout}")
                 except Exception as e:
-                    logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
+                    logger.error("Unexpected error running migrations for %s: %s", plugin_slug, str(e))
                     raise e
             else:
                 # Plugin has no models — migrations not needed
@@ -487,7 +487,7 @@ class AtomicInstaller:
             for file in os.listdir(final_dir):
                 if file.endswith('_engine.yaml'):
                     fixture_path = os.path.join(final_dir, file)
-                    logger.info(f"Ingesting engine fixture: {fixture_path}")
+                    logger.info("Ingesting engine fixture: %s", fixture_path)
                     try:
                         with open(fixture_path, 'r') as f:
                             fixture_data = yaml.safe_load(f)
@@ -501,17 +501,17 @@ class AtomicInstaller:
                                                 engine_name=name,
                                                 defaults=fields
                                             )
-                                            logger.info(f"{'Created' if created else 'Updated'} engine: {name}")
+                                            logger.info("%s engine: %s", 'Created' if created else 'Updated', name)
                                         else:
-                                            logger.warning(f"Engine fixture item missing engine_name: {item}")
+                                            logger.warning("Engine fixture item missing engine_name: %s", item)
                                     else:
                                         # Fallback for other models (e.g. Wordlist, etc.)
                                         call_command('loaddata', fixture_path, format='yaml')
-                                        logger.info(f"Fallback loaddata used for: {file}")
+                                        logger.info("Fallback loaddata used for: %s", file)
                             else:
-                                logger.error(f"Invalid fixture format in {file}")
+                                logger.error("Invalid fixture format in %s", file)
                     except Exception as e:
-                        logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
+                        logger.error("CRITICAL: Failed to ingest engine fixture %s: %s", file, str(e))
 
             # 6. Parse tools.yaml — save in its own short transaction with a fresh connection.
             tools_path = os.path.join(final_dir, 'tools.yaml')
@@ -535,7 +535,7 @@ class AtomicInstaller:
                         if _tool_name:
                             cache.delete(f"plugin_{plugin_slug}_tool_{_tool_name}_verified")
                 except Exception as e:
-                    logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
+                    logger.error("Failed to parse tools.yaml for %s: %s", plugin_slug, str(e))
 
             # Set needs_restart to True in cache
             cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
@@ -583,7 +583,7 @@ class AtomicInstaller:
             return Plugin.objects.get(slug=plugin_slug)
                 
         except Exception as e:
-            logger.error(f"Installation failed for {plugin_slug}: {str(e)}")
+            logger.error("Installation failed for %s: %s", plugin_slug, str(e))
             # Mark the current in-progress step as failed and update overall status
             if install_id:
                 data = cache.get(f'plugin:install:{install_id}') or {'steps': [], 'status': 'running'}

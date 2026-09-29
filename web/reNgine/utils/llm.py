@@ -54,7 +54,7 @@ class LLMModelManager:
             
             return all_models
         except Exception as e:
-            logger.error(f"Error fetching Ollama models: {str(e)}")
+            logger.error("Error fetching Ollama models: %s", str(e))
             return SUGGESTED_OLLAMA_MODELS # Return suggestions even if Ollama is down
 
     def fetch_openai_models(self, api_key):
@@ -73,7 +73,7 @@ class LLMModelManager:
                 chat_models = [m['id'] for m in models if 'gpt' in m['id']]
                 return [{'name': m, 'is_local': True, 'expertise': 'Summarization & Analysis'} for m in sorted(chat_models)]
         except Exception as e:
-            logger.error(f"Error fetching OpenAI models: {str(e)}")
+            logger.error("Error fetching OpenAI models: %s", str(e))
         return []
 
     def fetch_anthropic_models(self, api_key):
@@ -103,5 +103,5 @@ class LLMModelManager:
                 gemini_models = [m['name'].replace('models/', '') for m in models if 'generateContent' in m.get('supportedGenerationMethods', [])]
                 return [{'name': m, 'is_local': True, 'expertise': 'Multimodal Analysis'} for m in sorted(gemini_models)]
         except Exception as e:
-            logger.error(f"Error fetching Gemini models: {str(e)}")
+            logger.error("Error fetching Gemini models: %s", str(e))
         return []

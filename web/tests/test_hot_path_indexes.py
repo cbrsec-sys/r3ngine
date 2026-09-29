@@ -66,7 +66,7 @@ class TestVulnerabilityIndexes(TestCase):
         )
 
     def test_subdomain_severity_index(self):
-        """api/serializers.py buckets a per-subdomain queryset by severity."""
+        """api/serializers/hosts.py buckets a per-subdomain queryset by severity."""
         self.assertEqual(
             self.indexes.get('vuln_subdomain_sev_idx'),
             ('subdomain', 'severity'),
@@ -82,7 +82,7 @@ class TestVulnerabilityIndexes(TestCase):
 
 
 class TestVulnWritePathLookupIndexes(TestCase):
-    """``get_or_create`` lookup columns in reNgine/common_func.py."""
+    """``get_or_create`` lookup columns in reNgine/common_func/vuln_helpers.py."""
 
     def test_vulnerability_tag_name_indexed(self):
         self.assertTrue(VulnerabilityTags._meta.get_field('name').db_index)

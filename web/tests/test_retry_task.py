@@ -305,7 +305,7 @@ class SingleTaskRetryWorkflowSourceTests(TestCase):
             / "reNgine"
             / "temporal"
             / "workflows"
-            / "__init__.py"
+            / "jobs.py"
         ).read_text(encoding="utf-8")
         self.assertIn('task_name == "generate_impact_assessment"', source)
         self.assertIn(

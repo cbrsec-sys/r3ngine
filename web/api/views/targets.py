@@ -715,4 +715,94 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 		return super().list(request, *args, **kwargs)
 
 
+class ListOrganizations(APIView):
+	permission_classes = [IsAuthenticated, IsAuditor]
+	def get(self, request, format=None):
+		req = self.request
+		organizations = Organization.objects.all()
+		organization_serializer = OrganizationSerializer(organizations, many=True)
+		return Response({'organizations': organization_serializer.data})
 
+
+class CreateOrganization(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		name = data.get('name')
+		description = data.get('description', '')
+		domains = data.get('domains', [])
+		slug = data.get('slug')
+
+		if not name or not slug:
+			return Response({'status': False, 'message': 'Name and project slug are required'}, status=400)
+
+		try:
+			project = Project.objects.get(slug=slug)
+			organization = Organization.objects.create(
+				name=name,
+				description=description,
+				project=project,
+				insert_date=timezone.now()
+			)
+			for domain_id in domains:
+				domain = Domain.objects.get(id=domain_id)
+				organization.domains.add(domain)
+			return Response({'status': True, 'message': 'Organization created successfully', 'id': organization.id})
+		except Exception:
+			logger.exception('Failed to create organization')
+			return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=500)
+
+
+class UpdateOrganization(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		org_id = data.get('id')
+		name = data.get('name')
+		description = data.get('description', '')
+		domains = data.get('domains', [])
+
+		if not org_id or not name:
+			return Response({'status': False, 'message': 'ID and Name are required'}, status=400)
+
+		try:
+			organization = Organization.objects.get(id=org_id)
+			organization.name = name
+			organization.description = description
+			organization.save()
+			
+			# Update domains
+			organization.domains.clear()
+			for domain_id in domains:
+				domain = Domain.objects.get(id=domain_id)
+				organization.domains.add(domain)
+				
+			return Response({'status': True, 'message': 'Organization updated successfully'})
+		except Exception:
+			logger.exception('Failed to update organization')
+			return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=500)
+
+
+class ListTargetsInOrganization(APIView):
+	permission_classes = [IsAuthenticated, HasPermission]
+	def get(self, request, format=None):
+		req = self.request
+		organization_id = req.query_params.get('organization_id')
+		organization = Organization.objects.filter(id=organization_id)
+		targets = Domain.objects.filter(domains__in=organization)
+		organization_serializer = OrganizationSerializer(organization, many=True)
+		targets_serializer = OrganizationTargetsSerializer(targets, many=True)
+		return Response({'organization': organization_serializer.data, 'domains': targets_serializer.data})
+
+
+class ListTargetsWithoutOrganization(APIView):
+	permission_classes = [IsAuditor]
+	def get(self, request, format=None):
+		req = self.request
+		targets = Domain.objects.exclude(domains__in=Organization.objects.all())
+		targets_serializer = OrganizationTargetsSerializer(targets, many=True)
+		return Response({'domains': targets_serializer.data})

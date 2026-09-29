@@ -91,17 +91,12 @@ python manage.py sync_cve_data --all --limit 500
 0 2 * * * cd /app && python manage.py sync_cve_data --all
 ```
 
-### Celery Task Usage (If Configured)
+### Background Sync
 
-```python
-from reNgine.celery_tasks import sync_cve_data_task
-
-# Enrich new CVEs in background
-sync_cve_data_task.delay(sync_type='unenriched', limit=100)
-
-# Sync KEV catalog
-sync_cve_data_task.delay(sync_type='kev')
-```
+There is no Celery task any more. The Python orchestrator runs `sync_cve_data` as a one-shot
+startup sync about five minutes after it starts (see `_STARTUP_SYNC_TASKS` in
+`web/scanEngine/management/commands/run_temporal_orchestrator.py`), and scans enrich their own
+CVEs through `enrich_scan_cves_activity`. For anything else, use the management command above.
 
 ---
 

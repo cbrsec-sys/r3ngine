@@ -50,7 +50,7 @@ def amass_intel_discovery(self, host, ctx={}, description=None):
 				domain_name = line.strip()
 				if domain_name and domain_name != host:
 					discovered_count += 1
-					logger.info(f"Discovered associated domain: {domain_name}")
+					logger.info("Discovered associated domain: %s", domain_name)
 					
 	if discovered_count > 0:
 		self.notify(fields={'Infrastructure Discovery': f'Discovered {discovered_count} associated domains/assets via Amass Intel.'})
@@ -76,7 +76,7 @@ def subdomain_discovery(
 		host = self.subdomain.name if self.subdomain else self.domain.name
 
 	if self.starting_point_path:
-		logger.warning(f'Ignoring subdomains scan as an URL path filter was passed ({self.starting_point_path}).')
+		logger.warning("Ignoring subdomains scan as an URL path filter was passed (%s).", self.starting_point_path)
 		return
 
 	# Config
@@ -113,7 +113,7 @@ def subdomain_discovery(
 	for tool in tools:
 		cmd = None
 		results_file = None
-		logger.info(f'Scanning subdomains for {host} with {tool}')
+		logger.info("Scanning subdomains for %s with %s", host, tool)
 		proxy = get_random_proxy()
 		if tool in default_subdomain_tools:
 			if tool == 'amass-passive':
@@ -194,15 +194,15 @@ def subdomain_discovery(
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
 			if not tool_query.exists():
-				logger.error(f'{tool} configuration does not exists. Skipping.')
+				logger.error("%s configuration does not exists. Skipping.", tool)
 				continue
 			custom_tool = tool_query.first()
 			cmd = custom_tool.subdomain_gathering_command
 			if '{TARGET}' not in cmd:
-				logger.error(f'Missing {{TARGET}} placeholders in {tool} configuration. Skipping.')
+				logger.error("Missing {TARGET} placeholders in %s configuration. Skipping.", tool)
 				continue
 			if '{OUTPUT}' not in cmd:
-				logger.error(f'Missing {{OUTPUT}} placeholders in {tool} configuration. Skipping.')
+				logger.error("Missing {OUTPUT} placeholders in %s configuration. Skipping.", tool)
 				continue
 
 			results_file = f'{self.results_dir}/subdomains_{tool}.txt'
@@ -211,7 +211,7 @@ def subdomain_discovery(
 			cmd = cmd.replace('{PATH}', custom_tool.github_clone_path) if '{PATH}' in cmd else cmd
 		else:
 			logger.warning(
-				f'Subdomain discovery tool "{tool}" is not supported by reNgine. Skipping.')
+				'Subdomain discovery tool "%s" is not supported by reNgine. Skipping.', tool)
 			continue
 
 		# Apply OpSec stealth
@@ -219,7 +219,7 @@ def subdomain_discovery(
 
 		# Run tool (with empty-file retry up to 3 attempts)
 		try:
-			logger.warning(f'Running {tool} with command: {cmd}')
+			logger.warning("Running %s with command: %s", tool, cmd)
 			run_command_with_retry(
 				cmd,
 				results_file=results_file,
@@ -265,14 +265,14 @@ def subdomain_discovery(
 						with open(extracted_file, 'w') as f_out:
 							for sub in sorted(discovered_subs):
 								f_out.write(f'{sub}\n')
-						logger.info(f"Extracted {len(discovered_subs)} subdomains from baddns output: {discovered_subs}")
+						logger.info("Extracted %s subdomains from baddns output: %s", len(discovered_subs), discovered_subs)
 				except Exception as parse_err:
-					logger.error(f"Error parsing baddns output to extract subdomains: {parse_err}")
+					logger.error("Error parsing baddns output to extract subdomains: %s", parse_err)
 					logger.exception(parse_err)
 
 		except Exception as e:
 			logger.error(
-				f'Subdomain discovery tool "{tool}" raised an exception')
+				'Subdomain discovery tool "%s" raised an exception', tool)
 			logger.exception(e)
 
 	# Gather all the tools' results in one single file. Write subdomains into
@@ -312,14 +312,14 @@ def subdomain_discovery(
 			valid_url
 		)
 		if not valid_domain:
-			logger.error(f'Subdomain {subdomain_name} is not a valid domain, IP or URL. Skipping.')
+			logger.error("Subdomain %s is not a valid domain, IP or URL. Skipping.", subdomain_name)
 			continue
 
 		if valid_url:
 			subdomain_name = urlparse(subdomain_name).netloc
 
 		if subdomain_scope_checker.is_out_of_scope(subdomain_name):
-			logger.error(f'Subdomain {subdomain_name} is out of scope. Skipping.')
+			logger.error("Subdomain %s is out of scope. Skipping.", subdomain_name)
 			continue
 
 		# Add subdomain
@@ -447,7 +447,7 @@ def save_imported_subdomains(subdomains, ctx={}):
 	if not subdomains:
 		return
 
-	logger.warning(f'Found {len(subdomains)} imported subdomains.')
+	logger.warning("Found %s imported subdomains.", len(subdomains))
 	with open(f'{results_dir}/from_imported.txt', 'w+') as output_file:
 		for name in subdomains:
 			subdomain_name = name.strip()

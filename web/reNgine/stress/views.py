@@ -73,11 +73,10 @@ class StressTestControlAPI(APIView):
             # Primary: Temporal signal
             try:
                 async_to_sync(_signal_stress_workflow)(scan_id)
-                logger.info(f"[StressTestControlAPI] Temporal kill_switch sent for scan {scan_id}")
+                logger.info("[StressTestControlAPI] Temporal kill_switch sent for scan %s", scan_id)
             except Exception as e:
                 logger.warning(
-                    f"[StressTestControlAPI] Temporal signal failed for scan {scan_id}: {e} "
-                    "— falling back to Redis kill switch only."
+                    "[StressTestControlAPI] Temporal signal failed for scan %s: %s — falling back to Redis kill switch only.", scan_id, e
                 )
 
             # Secondary: Redis key checked by both the Celery task and RunStressToolActivity
@@ -106,12 +105,12 @@ class StressTestControlAPI(APIView):
             try:
                 async_to_sync(_start_stress_workflow)(ctx, scan_id)
                 logger.info(
-                    f"[StressTestControlAPI] StressTestWorkflow started for scan {scan_id}"
+                    "[StressTestControlAPI] StressTestWorkflow started for scan %s", scan_id
                 )
                 return Response({"status": "started"}, status=status.HTTP_200_OK)
             except Exception as e:
                 logger.error(
-                    f"[StressTestControlAPI] Temporal start failed for scan {scan_id}: {e}"
+                    "[StressTestControlAPI] Temporal start failed for scan %s: %s", scan_id, e
                 )
                 return Response(
                     {"error": "Failed to start stress test"},

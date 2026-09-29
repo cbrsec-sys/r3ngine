@@ -1044,3 +1044,10 @@ class DeleteVulnerability(APIView):
 		Vulnerability.objects.filter(id__in=ids).delete()
 		return Response({'status': True})
 
+
+class VulnerabilityReport(APIView):
+	permission_classes = [IsPenetrationTester]
+	def get(self, request):
+		req = self.request
+		vulnerability_id = req.query_params.get('vulnerability_id')
+		return Response({"status": send_hackerone_report(vulnerability_id)})

@@ -96,7 +96,7 @@ class EvidenceService:
             next_action_at=timezone.now() + timezone.timedelta(days=retention_days) if retention_days > 0 else None,
         )
 
-        logger.info(f"[EVIDENCE] Created collection '{name}' for assessment {assessment.uuid}")
+        logger.info("[EVIDENCE] Created collection '%s' for assessment %s", name, assessment.uuid)
         return collection
 
     # ------------------------------------------------------------------ #
@@ -203,7 +203,7 @@ class EvidenceService:
             scopes = AssessmentScope.objects.filter(id__in=scope_ids)
             evidence.scopes.set(scopes)
 
-        logger.info(f"[EVIDENCE] Created evidence item {evidence.uuid} ({evidence_type}) in collection {collection.uuid}")
+        logger.info("[EVIDENCE] Created evidence item %s (%s) in collection %s", evidence.uuid, evidence_type, collection.uuid)
         return evidence
 
     # ------------------------------------------------------------------ #
@@ -294,7 +294,7 @@ class EvidenceService:
             note=note or 'Evidence archived',
             timestamp=timezone.now(),
         )
-        logger.info(f"[EVIDENCE] Archived evidence {evidence.uuid}")
+        logger.info("[EVIDENCE] Archived evidence %s", evidence.uuid)
         return evidence
 
     @staticmethod
@@ -324,12 +324,12 @@ class EvidenceService:
                 storage = get_storage_backend()
                 storage.delete(evidence.file_path)
             except Exception as e:
-                logger.warning(f"[EVIDENCE] Failed to delete file for {evidence.uuid}: {e}")
+                logger.warning("[EVIDENCE] Failed to delete file for %s: %s", evidence.uuid, e)
 
         evidence.status = 'Purged'
         evidence.file_path = None
         evidence.save(update_fields=['status', 'file_path', 'updated_at'])
-        logger.info(f"[EVIDENCE] Purged evidence {evidence.uuid}")
+        logger.info("[EVIDENCE] Purged evidence %s", evidence.uuid)
 
     @staticmethod
     @transaction.atomic
@@ -349,5 +349,5 @@ class EvidenceService:
 
         collection.status = 'Archived'
         collection.save(update_fields=['status', 'updated_at'])
-        logger.info(f"[EVIDENCE] Archived collection {collection.uuid} ({active_items.count()} items)")
+        logger.info("[EVIDENCE] Archived collection %s (%s items)", collection.uuid, active_items.count())
         return collection

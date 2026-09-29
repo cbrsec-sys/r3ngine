@@ -333,7 +333,7 @@ def four_oh_four(request):
     try:
         return render(request, 'dashboard/v3_index.html') # Or a specific 404 page if SPA handles it
     except Exception as e:
-        logger.error(f"Error in 404 handler: {str(e)}")
+        logger.error("Error in 404 handler: %s", str(e))
         import traceback
         logger.error(traceback.format_exc())
         from django.http import HttpResponse

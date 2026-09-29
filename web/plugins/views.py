@@ -184,7 +184,7 @@ class PluginViewSet(viewsets.ModelViewSet):
                     with open(os.path.join(docs_dir, file), 'r', encoding='utf-8') as f:
                         docs[file] = f.read()
                 except Exception as e:
-                    logger.error(f"Failed to read doc file {file}: {e}")
+                    logger.error("Failed to read doc file %s: %s", file, e)
 
         if not docs:
             return Response({'error': 'No markdown files found'}, status=status.HTTP_404_NOT_FOUND)

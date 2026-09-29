@@ -40,20 +40,20 @@ class ToolCommandViewTests(TestCase):
         os.makedirs(self.bin_dir)
         os.makedirs(self.github_dir)
         for name, value in (('GO_BIN_DIR', self.bin_dir), ('GITHUB_TOOLS_DIR', self.github_dir)):
-            patcher = patch(f'api.views.{name}', value)
+            patcher = patch(f'api.views.tools.{name}', value)
             patcher.start()
             self.addCleanup(patcher.stop)
 
     def test_session_get_is_refused_without_running_anything(self):
         tool = _tool()
-        with patch('api.views.run_command') as run:
+        with patch('api.views.tools.run_command') as run:
             resp = self.client.get('/api/tool/update/', {'tool_id': tool.id})
         self.assertEqual(resp.status_code, 405)
         run.assert_not_called()
 
     def test_post_update_runs_the_update_command(self):
         tool = _tool()
-        with patch('api.views.run_command', return_value=(0, '')) as run:
+        with patch('api.views.tools.run_command', return_value=(0, '')) as run:
             resp = self.client.post('/api/tool/update/', {'tool_id': tool.id}, format='json')
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.data['status'])
@@ -65,7 +65,7 @@ class ToolCommandViewTests(TestCase):
         token = str(RefreshToken.for_user(self.admin).access_token)
         client = APIClient()
         client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
-        with patch('api.views.run_command', return_value=(0, '')):
+        with patch('api.views.tools.run_command', return_value=(0, '')):
             resp = client.get('/mapi/tool/update/', {'tool_id': tool.id})
         self.assertEqual(resp.status_code, 200)
 

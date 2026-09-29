@@ -1056,7 +1056,7 @@ def test_llm_connection(request, slug):
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def api_vault(request, slug):
-    logger.info(f"api_vault view hit! Method: {request.method}, Slug: {slug}, User: {request.user}")
+    logger.info("api_vault view hit! Method: %s, Slug: %s, User: %s", request.method, slug, request.user)
     context = {}
     if request.method == "POST":
         

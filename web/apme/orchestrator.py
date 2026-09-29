@@ -62,7 +62,7 @@ class APMEOrchestrator:
                 except Exception:
                     pass
 
-        logger.info(f"APME Orchestrator: Starting for scan_history_id={scan_history_id}")
+        logger.info("APME Orchestrator: Starting for scan_history_id=%s", scan_history_id)
 
         # Resolve Target Domain from ScanHistory to ensure we ingest ALL historical and current scan data
         from startScan.models import ScanHistory
@@ -118,7 +118,7 @@ class APMEOrchestrator:
         all_nodes.extend(goal_nodes)
 
         logger.info(
-            f"APME [1/7] Done. Nodes={len(all_nodes)}, Edges={len(all_edges)}"
+            "APME [1/7] Done. Nodes=%s, Edges=%s", len(all_nodes), len(all_edges)
         )
 
         if not all_nodes:
@@ -135,7 +135,7 @@ class APMEOrchestrator:
             builder.add_nodes(all_nodes, scan_history_id)
             builder.add_edges(all_edges, scan_history_id)
         except Exception as exc:
-            logger.error(f"APME: Graph build failed: {exc}")
+            logger.error("APME: Graph build failed: %s", exc)
             builder.close()
             return {"total_paths": 0, "returned_paths": 0, "paths": [], "error": str(exc)}
 
@@ -145,7 +145,7 @@ class APMEOrchestrator:
         logger.info("APME [3/7] Enriching graph via rules engine...")
         enricher = GraphEnricher(builder)
         derived_edges = enricher.enrich(all_nodes, scan_history_id)
-        logger.info(f"APME [3/7] Derived {len(derived_edges)} new edges from rules.")
+        logger.info("APME [3/7] Derived %s new edges from rules.", len(derived_edges))
 
         # Diagnostic: check goal node reachability immediately after enrichment.
         # If all goal nodes have zero incoming edges, no path algorithm can find anything.
@@ -161,12 +161,12 @@ class APMEOrchestrator:
             # internally; it returns all deduplicated candidates for the scorer.
             paths = pathfinder.find_all_paths(scan_history_id, top_n=self.top_n)
         except Exception as exc:
-            logger.error(f"APME: Pathfinding failed: {exc}")
+            logger.error("APME: Pathfinding failed: %s", exc)
             paths = []
         finally:
             pathfinder.close()
 
-        logger.info(f"APME [4/7] Found {len(paths)} candidate paths (pre-scoring).")
+        logger.info("APME [4/7] Found %s candidate paths (pre-scoring).", len(paths))
         _heartbeat("step 4/7 pathfinding complete")
 
         if not paths:
@@ -189,7 +189,7 @@ class APMEOrchestrator:
         _heartbeat("step 5/7 scoring complete")
 
         # ── Step 7: Persist & Return ──────────────────────────────────────────
-        logger.info(f"APME [6/7] Persisting top {self.top_n} paths...")
+        logger.info("APME [6/7] Persisting top %s paths...", self.top_n)
         top_paths = scored_paths[: self.top_n]
         node_index = {n.id: n for n in all_nodes}
         self._persist_paths(top_paths, scan_history_id, node_index)
@@ -198,9 +198,7 @@ class APMEOrchestrator:
 
         result = serialize_paths(scored_paths, node_index=node_index, top_n=self.top_n)
         logger.info(
-            f"APME [7/7] Complete. "
-            f"total_paths={result['total_paths']}, "
-            f"returned={result['returned_paths']}"
+            "APME [7/7] Complete. total_paths=%s, returned=%s", result['total_paths'], result['returned_paths']
         )
         return result
 
@@ -418,7 +416,7 @@ class APMEOrchestrator:
                     for key, val in defaults.items():
                         setattr(matched_assessment, key, val)
                     matched_assessment.save()
-                    logger.debug(f"APME: Updated existing path {path.id} with narrative.")
+                    logger.debug("APME: Updated existing path %s with narrative.", path.id)
                 else:
                     # Create new
                     new_ea = ImpactAssessment.objects.create(
@@ -430,10 +428,10 @@ class APMEOrchestrator:
                         existing_by_vuln[vuln_id] = new_ea
                     path_fp = path.fingerprint
                     existing_by_fingerprint[path_fp] = new_ea
-                    logger.debug(f"APME: Created new path {path.id} with narrative.")
+                    logger.debug("APME: Created new path %s with narrative.", path.id)
 
         except Exception as exc:
-            logger.error(f"APME: Failed to persist paths: {exc}")
+            logger.error("APME: Failed to persist paths: %s", exc)
 
     @staticmethod
     def _find_representative_vuln(path: AttackPath, scan_history_id: int):

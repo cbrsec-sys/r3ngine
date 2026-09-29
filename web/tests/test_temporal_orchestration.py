@@ -559,11 +559,13 @@ class TestWorkflowStructuralInvariants(TestCase):
     No Temporal server or Django ORM is required — they inspect source only.
     """
 
-    _SOURCE_PATH = "reNgine/temporal/workflows/__init__.py"
+    # MasterScanWorkflow and SubScanWorkflow live in separate flat modules.
+    _MASTER_SOURCE_PATH = "reNgine/temporal/workflows/master_scan.py"
+    _SUBSCAN_SOURCE_PATH = "reNgine/temporal/workflows/subscan.py"
 
-    @classmethod
-    def _source(cls):
-        with open(cls._SOURCE_PATH) as f:
+    @staticmethod
+    def _source(path):
+        with open(path) as f:
             return f.read()
 
     def test_masterscan_vulnerability_scan_not_in_assessment_futures(self):
@@ -575,7 +577,7 @@ class TestWorkflowStructuralInvariants(TestCase):
         child workflow, causing it to run unmanaged (orphaned).
         """
         import ast
-        source = self._source()
+        source = self._source(self._MASTER_SOURCE_PATH)
         tree = ast.parse(source)
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and node.name == "MasterScanWorkflow":
@@ -590,14 +592,14 @@ class TestWorkflowStructuralInvariants(TestCase):
                             "before the concurrent gather of other T6 activities."
                         )
                         return
-        self.fail("MasterScanWorkflow.run() not found in temporal/workflows/__init__.py")
+        self.fail("MasterScanWorkflow.run() not found in temporal/workflows/master_scan.py")
 
     def test_subscan_nuclei_future_variable_present(self):
         """SubScanWorkflow tier loop must declare 'nuclei_future' to separate
         vulnerability_scan from the concurrent tier_futures gather."""
         self.assertIn(
             "nuclei_future",
-            self._source(),
+            self._source(self._SUBSCAN_SOURCE_PATH),
             "SubScanWorkflow Tier 6 fix must introduce 'nuclei_future' variable "
             "to hold the vulnerability_scan coroutine separately from tier_futures."
         )
@@ -608,11 +610,11 @@ class TestWorkflowStructuralInvariants(TestCase):
         This ordering guarantees NucleiPlannerWorkflow completes before any
         concurrent T6 activity can raise — preventing the orphaned-child scenario.
         """
-        source = self._source()
+        source = self._source(self._SUBSCAN_SOURCE_PATH)
         nuclei_idx = source.find("await nuclei_future")
         gather_idx = source.find("await asyncio.gather(*tier_futures)")
         self.assertGreater(nuclei_idx, 0,
-                           "'await nuclei_future' not found in temporal/workflows/__init__.py")
+                           "'await nuclei_future' not found in temporal/workflows/subscan.py")
         self.assertGreater(gather_idx, 0,
                            "'await asyncio.gather(*tier_futures)' not found")
         self.assertLess(
@@ -624,7 +626,7 @@ class TestWorkflowStructuralInvariants(TestCase):
     def test_masterscan_has_success_flag(self):
         """MasterScanWorkflow.run() must declare 'success' and set it True/False."""
         import ast
-        source = self._source()
+        source = self._source(self._MASTER_SOURCE_PATH)
         tree = ast.parse(source)
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and node.name == "MasterScanWorkflow":
@@ -636,13 +638,13 @@ class TestWorkflowStructuralInvariants(TestCase):
                         self.assertIn("success = False", method_src,
                                       "MasterScanWorkflow.run() must initialise 'success = False'")
                         return
-        self.fail("MasterScanWorkflow.run() not found in temporal/workflows/__init__.py")
+        self.fail("MasterScanWorkflow.run() not found in temporal/workflows/master_scan.py")
 
     def test_masterscan_correlate_activity_in_finally_block(self):
         """CorrelateVulnerabilitiesActivity must appear inside a finally: block
         in MasterScanWorkflow.run(), not inline in the try: body."""
         import ast
-        source = self._source()
+        source = self._source(self._MASTER_SOURCE_PATH)
         tree = ast.parse(source)
 
         for node in ast.walk(tree):
@@ -666,19 +668,19 @@ class TestWorkflowStructuralInvariants(TestCase):
                         "in MasterScanWorkflow.run(), not inline in the try: body. "
                         "It must be guarded by 'if success:' so it only runs on clean completion."
                     )
-        self.fail("MasterScanWorkflow.run() not found in temporal/workflows/__init__.py")
+        self.fail("MasterScanWorkflow.run() not found in temporal/workflows/master_scan.py")
 
     def test_masterscan_nuclei_failure_does_not_raise(self):
         """NucleiPlannerWorkflow failure must be caught so Tier 7 still runs.
 
-        Reads temporal/workflows/__init__.py source and asserts the execute_child_workflow
+        Reads temporal/workflows/master_scan.py source and asserts the execute_child_workflow
         call for NucleiPlannerWorkflow is wrapped in a try-except block,
         confirming Tier 7 correlation/risk/Neo4j activities are not gated on it.
         """
         import ast
 
         src_path = os.path.join(
-            os.path.dirname(__file__), '..', 'reNgine', 'temporal', 'workflows', '__init__.py'
+            os.path.dirname(__file__), '..', 'reNgine', 'temporal', 'workflows', 'master_scan.py'
         )
         with open(src_path) as f:
             source = f.read()

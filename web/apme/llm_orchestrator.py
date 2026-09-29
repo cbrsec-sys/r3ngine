@@ -33,12 +33,12 @@ class LLMPathOrchestrator:
         Returns:
             Dict[str, Any]: A dictionary containing total paths found, details of each path, or an error message.
         """
-        logger.info(f"LLM APME: Starting for scan_history_id={scan_history_id}")
+        logger.info("LLM APME: Starting for scan_history_id=%s", scan_history_id)
         
         try:
             scan = ScanHistory.objects.get(id=scan_history_id)
         except ScanHistory.DoesNotExist:
-            logger.error(f"LLM APME: Scan {scan_history_id} not found.")
+            logger.error("LLM APME: Scan %s not found.", scan_history_id)
             return {"error": "Scan not found"}
 
         # 1. Gather Context
@@ -214,8 +214,8 @@ class LLMPathOrchestrator:
             return parsed_paths
 
         except Exception as e:
-            logger.error(f"LLM APME: Failed to parse or save paths: {str(e)}")
-            logger.debug(f"Raw Output: {llm_output}")
+            logger.error("LLM APME: Failed to parse or save paths: %s", str(e))
+            logger.debug("Raw Output: %s", llm_output)
             return []
 
     def _persist_to_db(self, path: AttackPath, scan: ScanHistory):
@@ -282,13 +282,13 @@ class LLMPathOrchestrator:
                 for key, val in defaults.items():
                     setattr(matched_assessment, key, val)
                 matched_assessment.save()
-                logger.debug(f"LLM APME: Updated existing path {path.id} via fingerprint/vuln matching.")
+                logger.debug("LLM APME: Updated existing path %s via fingerprint/vuln matching.", path.id)
             else:
                 ImpactAssessment.objects.create(**defaults)
-                logger.debug(f"LLM APME: Created new path {path.id}.")
+                logger.debug("LLM APME: Created new path %s.", path.id)
 
         except Exception as e:
-            logger.error(f"LLM APME: Database persistence failed: {str(e)}")
+            logger.error("LLM APME: Database persistence failed: %s", str(e))
 
     def _risk_to_priority(self, risk: str) -> int:
         """Map a risk severity level string to an integer remediation priority.

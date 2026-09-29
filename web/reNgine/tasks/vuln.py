@@ -415,7 +415,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	if is_wordpress_detected and wordfence_exists:
 		# Wordfence templates live at /root/nuclei-templates/wordfence — already included
 		# in the default -t /root/nuclei-templates recursive scan; no extra -t needed.
-		logger.info(f'[nuclei] WordPress detected; Wordfence templates active at /root/nuclei-templates/wordfence')
+		logger.info("[nuclei] WordPress detected; Wordfence templates active at /root/nuclei-templates/wordfence")
 	logger.info("Running Nuclei vulnerabilities scan")
 	if hasattr(self, 'activity') and self.activity:
 		self.activity.title = "Nuclei Scan"
@@ -628,7 +628,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 					elif hackerone.send_medium and severity_value == 'medium':
 						send_hackerone_report(vuln.id)
 				except Exception as e:
-					logger.warning(f"HackerOne report send failed for vuln {vuln.id}: {e}")
+					logger.warning("HackerOne report send failed for vuln %s: %s", vuln.id, e)
 
 		if not proxy_dead:
 			break
@@ -702,7 +702,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {gpt}: {e}")
+					logger.error("Exception for Vulnerability %s: %s", gpt, e)
 
 	logger.info('Vulnerability scan completed...')
 	return None
@@ -851,7 +851,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {gpt}: {e}")
+					logger.error("Exception for Vulnerability %s: %s", gpt, e)
 	return results
 
 
@@ -988,7 +988,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {gpt}: {e}")
+					logger.error("Exception for Vulnerability %s: %s", gpt, e)
 
 	return results
 
@@ -1002,7 +1002,7 @@ def s3scanner(self, ctx={}, description=None):
 	"""
 	input_path = f'{self.results_dir}/subdomain_discovery.txt'
 	if not os.path.isfile(input_path):
-		logger.warning(f's3scanner: subdomain list not found at {input_path}, skipping.')
+		logger.warning("s3scanner: subdomain list not found at %s, skipping.", input_path)
 		return
 	vuln_config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
 	s3_config = vuln_config.get(S3SCANNER) or {}
@@ -1024,7 +1024,7 @@ def s3scanner(self, ctx={}, description=None):
 				result = parse_s3scanner_result(line)
 				s3bucket, created = S3Bucket.objects.get_or_create(**result)
 				scan_history.buckets.add(s3bucket)
-				logger.info(f"s3 bucket added {result['provider']}-{result['name']}-{result['region']}")
+				logger.info("s3 bucket added %s-%s-%s", result['provider'], result['name'], result['region'])
 
 
 def sync_cisa_kev_catalog():
@@ -1041,9 +1041,9 @@ def sync_cisa_kev_catalog():
 			cve_list = [v.get("cveID") for v in data.get("vulnerabilities", [])]
 			if cve_list:
 				CveId.objects.filter(name__in=cve_list).update(is_cisa_kev=True)
-				logger.info(f"Successfully synced CISA KEV catalog. Updated {len(cve_list)} records.")
+				logger.info("Successfully synced CISA KEV catalog. Updated %s records.", len(cve_list))
 	except Exception as e:
-		logger.error(f"Error syncing CISA KEV catalog: {e}")
+		logger.error("Error syncing CISA KEV catalog: %s", e)
 
 
 def sync_semgrep_rules():
@@ -1068,16 +1068,16 @@ def sync_semgrep_rules():
 		target_path = os.path.join(rules_dir, filename)
 		url = f"https://semgrep.dev/c/{config}"
 		try:
-			logger.info(f"Syncing Semgrep rule set: {config} -> {filename}")
+			logger.info("Syncing Semgrep rule set: %s -> %s", config, filename)
 			response = requests.get(url, timeout=60)
 			if response.status_code == 200:
 				with open(target_path, 'wb') as f:
 					f.write(response.content)
-				logger.info(f"Successfully synced Semgrep rule set: {config}")
+				logger.info("Successfully synced Semgrep rule set: %s", config)
 			else:
-				logger.error(f"Failed to download Semgrep rule set {config}: HTTP {response.status_code}")
+				logger.error("Failed to download Semgrep rule set %s: HTTP %s", config, response.status_code)
 		except Exception as e:
-			logger.error(f"Failed to sync Semgrep rule set {config}: {e}")
+			logger.error("Failed to sync Semgrep rule set %s: %s", config, e)
 
 
 def clean_and_validate_url(url, base_domain=None):
@@ -1330,13 +1330,13 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 					# Proxy connection/auth issues, cycle and retry
 					raise requests.exceptions.ProxyError(f"Proxy returned status code {resp.status_code}")
 				else:
-					logger.debug(f"Semgrep downloader got status {resp.status_code} for {full_url}")
+					logger.debug("Semgrep downloader got status %s for %s", resp.status_code, full_url)
 					break
 			except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
 				attempt += 1
 				current_proxy_index += 1
 			except Exception as e:
-				logger.debug(f"Semgrep downloader got non-network error for {full_url}: {e}")
+				logger.debug("Semgrep downloader got non-network error for %s: %s", full_url, e)
 				break
 		return False, None
 
@@ -1441,7 +1441,7 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir, file_to_url_map=No
 		}
 		save_vulnerability(vuln_data, scan_history=scan, target_domain=domain)
 	except Exception as e:
-		logger.error(f"Error saving Semgrep vulnerability: {e}")
+		logger.error("Error saving Semgrep vulnerability: %s", e)
 
 
 def save_semgrep_secret_finding(result, ctx, base_dir, file_to_url_map=None):
@@ -1484,7 +1484,7 @@ def save_semgrep_secret_finding(result, ctx, base_dir, file_to_url_map=None):
 		}
 		save_secret_leak(**leak_data)
 	except Exception as e:
-		logger.error(f"Error saving Semgrep secret: {e}")
+		logger.error("Error saving Semgrep secret: %s", e)
 
 def smugglex_scan(self, urls=[], ctx={}, description=None):
 	"""Smugglex Scan"""
@@ -1536,7 +1536,7 @@ def smugglex_scan(self, urls=[], ctx={}, description=None):
 					except json.JSONDecodeError:
 						pass
 		except Exception as e:
-			logger.error(f"Smugglex parse error: {e}")
+			logger.error("Smugglex parse error: %s", e)
 
 def second_order_scan(self, urls=[], ctx={}, description=None):
 	"""Second Order Scan — runs the second-order Go tool against each target URL.

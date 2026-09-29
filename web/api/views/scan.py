@@ -802,7 +802,7 @@ class ScanActivityRetryAPIView(APIView):
 #: makes the workflow raise a non-retryable ``ApplicationError``, so the tier
 #: retry endpoint filters those rows out and reports them instead of queueing a
 #: workflow that is guaranteed to fail. Kept in sync with the dispatch chain in
-#: ``reNgine/temporal/workflows/__init__.py`` (see test_tier_retry.py).
+#: ``reNgine/temporal/workflows/jobs.py`` (see test_tier_retry.py).
 RETRYABLE_TASK_NAMES = frozenset({
     'subdomain_discovery',
     'amass_intel_discovery',

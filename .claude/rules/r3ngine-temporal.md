@@ -17,8 +17,8 @@ Use this rule when working on features that interact with Temporal:
 
 | File | Role |
 |------|------|
-| `web/reNgine/temporal/workflows/__init__.py` | Workflow definitions (deterministic orchestrators only) |
-| `web/reNgine/temporal/activities/__init__.py` | Activity definitions (all side-effecting work) |
+| `web/reNgine/temporal/workflows/*.py` | Workflow definitions (deterministic orchestrators only): `_common.py` (retry presets, shared helpers), `master_scan.py`, `subscan.py`, `stress.py`, `jobs.py`, `recon.py`, `assessment_workflow.py`; `__init__.py` only re-exports |
+| `web/reNgine/temporal/activities/*.py` | Activity definitions (all side-effecting work): `core.py` (`_run_task`, `TemporalTaskProxy`, cancellation), then one module per domain; `__init__.py` only re-exports |
 | `web/reNgine/temporal_workflows.py` | Backward-compatible shim → re-exports from `temporal/workflows/` |
 | `web/reNgine/temporal_activities.py` | Backward-compatible shim → re-exports from `temporal/activities/` |
 | `web/reNgine/temporal_client.py` | Client for starting and cancelling workflows from Django |
@@ -40,7 +40,7 @@ Use this rule when working on features that interact with Temporal:
 ## Determinism violations — never do these in a workflow
 
 ```python
-# ❌ All forbidden in temporal/workflows/__init__.py
+# ❌ All forbidden in any temporal/workflows/*.py module
 import datetime
 datetime.datetime.now()          # use workflow.now() instead
 random.choice(items)             # non-deterministic
@@ -62,7 +62,7 @@ default is *unlimited* attempts with a 100s maximum interval. Scan tasks report 
 returning `False`, which `_run_task` turns into an exception, so one unreachable backend
 produced 200+ failed timeline rows over 13 hours before anyone noticed.
 
-Use the presets at the top of `temporal/workflows/__init__.py` — do not inline a new
+Use the presets in `temporal/workflows/_common.py` — do not inline a new
 `RetryPolicy` when one of these fits:
 
 | Preset | Attempts | Use for |
@@ -166,9 +166,9 @@ Cancel is tracked via `TemporalWorkflowExecution` FK on `ScanHistory`.
 
 ## Adding a new scanning activity
 
-1. Add the activity function to `web/reNgine/temporal/activities/__init__.py` (decorate with `@activity.defn`).
+1. Add the activity function to the matching domain module in `web/reNgine/temporal/activities/` (decorate with `@activity.defn`) and re-export it from `activities/__init__.py`.
 2. Register it in the worker in `run_temporal_orchestrator.py` (add to `activities=[]`).
-3. Call it from the appropriate tier in `MasterScanWorkflow` or `SubScanWorkflow` in `temporal/workflows/__init__.py`, **with an explicit `retry_policy`** (see "Retry policies" above).
+3. Call it from the appropriate tier in `MasterScanWorkflow` (`temporal/workflows/master_scan.py`) or `SubScanWorkflow` (`temporal/workflows/subscan.py`), **with an explicit `retry_policy`** (see "Retry policies" above).
 4. Add the task name to `_TASK_TIER` in `web/reNgine/task_plan.py`, otherwise its retry rows land in Tier 7 in the timeline.
 5. If the activity shells out to a tool, consider using the Go executor (`go-executor-queue`) for subprocess management.
 
@@ -218,12 +218,12 @@ Every activity **must** emit a START log and a COMPLETE (or ERROR) log. This is 
 
 Activity log output goes to both `temporal.log` (file, via `temporal_file` handler) and the console (via propagation to the `reNgine` catch-all).
 
-Scan task helpers called from activities (`tasks.py`, `common_func.py`, `*_tasks.py`) use plain `logging.getLogger(__name__)` — their output goes to the `task` handler (stdout, `module.funcName | LEVEL | message` format). Do not mix the two patterns within a single file.
+Scan task helpers called from activities (`tasks/` package, `common_func/` package, `*_tasks.py`) use plain `logging.getLogger(__name__)` — their output goes to the `task` handler (stdout, `module.funcName | LEVEL | message` format). Do not mix the two patterns within a single file.
 
 ## Integration guidelines
 
 - Orchestrate scans from `temporal_client.py`; avoid mixing workflow start logic directly into views.
 - Validate all user input before passing it into workflow arguments (target URLs, scan config).
-- Do not duplicate activity logic — reuse shared helpers in the `tasks/` package and `common_func.py`.
+- Do not duplicate activity logic — reuse shared helpers in the `tasks/` and `common_func/` packages.
 - All activities must be idempotent by design (Temporal may retry them).
 - All activities must log START and COMPLETE/ERROR — see logging section above.

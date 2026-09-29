@@ -67,7 +67,7 @@ def _iter_jsonl(output_file):
             try:
                 yield json.loads(line)
             except json.JSONDecodeError:
-                logger.warning(f"vigolium: skipping non-JSON line: {line[:80]}")
+                logger.warning("vigolium: skipping non-JSON line: %s", line[:80])
 
 
 def _has_records(output_file) -> bool:
@@ -253,14 +253,14 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
     import os
 
     def run_cmd_and_check(current_cmd):
-        logger.info(f"Running Vigolium {phase_label}")
-        logger.warning(f"Command: {current_cmd}")
+        logger.info("Running Vigolium %s", phase_label)
+        logger.warning("Command: %s", current_cmd)
         for _ in stream_command(current_cmd, scan_id=task_instance.scan_id, activity_id=task_instance.activity_id, timeout=43200):
             pass
 
         # No output file means vigolium crashed or produced nothing — treat as proxy failure.
         if not os.path.exists(output_file):
-            logger.warning(f"Vigolium {phase_label} produced no output file.")
+            logger.warning("Vigolium %s produced no output file.", phase_label)
             return False
 
         # Look for the scan-summary record; if total_requests > 0 the proxy was fine.
@@ -285,9 +285,7 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
         # internal deadline and still emit findings — the proxy was not the cause.
         if _has_records(output_file):
             logger.info(
-                f"Vigolium {phase_label}: scan-summary absent or shows 0 requests but "
-                f"{output_file} contains records — treating as partial success, "
-                f"proxy retry suppressed."
+                "Vigolium %s: scan-summary absent or shows 0 requests but %s contains records — treating as partial success, proxy retry suppressed.", phase_label, output_file
             )
             return True
 
@@ -299,8 +297,7 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
         success = run_cmd_and_check(proxy_cmd)
         if not success:
             logger.warning(
-                f"Vigolium {phase_label} failed or made 0 requests using proxy {proxy}. "
-                f"Retrying without proxy..."
+                "Vigolium %s failed or made 0 requests using proxy %s. Retrying without proxy...", phase_label, proxy
             )
             # Only erase the output file before the no-proxy retry if it is genuinely
             # empty.  If records exist from phases that completed before the proxy
@@ -350,15 +347,14 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
                 parse_vigolium_finding(task_instance, data, subdomain)
                 findings_saved += 1
             else:
-                logger.warning(f"Vigolium {phase_label}: no subdomain found for '{hostname}', skipping finding.")
+                logger.warning("Vigolium %s: no subdomain found for '%s', skipping finding.", phase_label, hostname)
 
         elif record_type == 'http_record' and save_http_records:
             parse_vigolium_http_record(task_instance, data)
             endpoints_saved += 1
 
     logger.info(
-        f"Vigolium {phase_label} complete — {findings_saved} findings saved, "
-        f"{duplicates_skipped} in-file duplicates skipped, {endpoints_saved} endpoints saved"
+        "Vigolium %s complete — %s findings saved, %s in-file duplicates skipped, %s endpoints saved", phase_label, findings_saved, duplicates_skipped, endpoints_saved
     )
 
 

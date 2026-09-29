@@ -14,7 +14,7 @@ import unittest
 from reNgine.tasks.crawl import gqlspection_schema_dumped
 
 CRAWL_SOURCE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '..', 'reNgine', 'tasks', 'crawl.py'
+    os.path.dirname(os.path.abspath(__file__)), '..', 'reNgine', 'tasks', 'crawl', 'api_discovery.py'
 )
 
 
