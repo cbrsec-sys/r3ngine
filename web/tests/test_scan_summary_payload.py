@@ -27,8 +27,10 @@ from reNgine.definitions import (
     ABORTED_TASK, FAILED_TASK, INITIATED_TASK, RUNNING_TASK, SUCCESS_TASK,
 )
 from scanEngine.models import EngineType
-from startScan.models import Command, ScanActivity, ScanHistory, Vulnerability, SecretLeak
-from targetApp.models import Domain
+from startScan.models import Command, S3Bucket, ScanActivity, ScanHistory, Vulnerability, SecretLeak
+from targetApp.models import (
+    DNSRecord, DomainInfo, DomainRegistration, Domain, NameServer, Registrar, WhoisStatus,
+)
 
 User = get_user_model()
 
@@ -490,3 +492,149 @@ class SecretLeakScanScopeTests(ScanSummaryPayloadTestCase):
         self.assertEqual(payload['secret_leaks_count'], 1)
         self.assertEqual(len(payload['secret_leaks']), 1)
         self.assertEqual(payload['secret_leaks'][0]['match_content'], 'API_KEY=mine')
+
+
+class DomainInfoWhoisTests(ScanSummaryPayloadTestCase):
+    """The WHOIS tab reads `domain_info.whois`; the Domain Info tab keeps its keys."""
+
+    _EXISTING_KEYS = {
+        'dnssec', 'geolocation_iso', 'created', 'updated', 'expires', 'whois_server',
+        'registrar', 'dns_records', 'name_servers', 'nameservers', 'historical_ips',
+    }
+
+    def _attach_domain_info(self, **kwargs) -> DomainInfo:
+        info = DomainInfo.objects.create(**kwargs)
+        self.domain.domain_info = info
+        self.domain.save(update_fields=['domain_info'])
+        return info
+
+    def test_domain_info_is_null_without_a_lookup(self) -> None:
+        self.assertIsNone(self._payload()['domain_info'])
+
+    def test_whois_block_carries_what_the_lookup_stored(self) -> None:
+        info = self._attach_domain_info(
+            dnssec=True,
+            whois_server='whois.example.test',
+            registrar=Registrar.objects.create(
+                name='Example Registrar', url='https://registrar.example.test',
+                email='abuse@registrar.example.test', phone='+1.5550100',
+            ),
+            registrant=DomainRegistration.objects.create(
+                name='Jane Doe', organization='Example Org', country='ZZ',
+                email='jane@example.test',
+            ),
+            # The WHOIS lookup stores a nameless row when a contact is missing.
+            admin=DomainRegistration.objects.create(name=''),
+            whois_raw={'registrar': 'Example Registrar', 'dnssec': 'signedDelegation'},
+        )
+        info.status.add(
+            WhoisStatus.objects.create(name='clientTransferProhibited'),
+            WhoisStatus.objects.create(name='serverDeleteProhibited'),
+        )
+
+        domain_info = self._payload()['domain_info']
+
+        self.assertTrue(self._EXISTING_KEYS.issubset(domain_info))
+        self.assertIs(domain_info['dnssec'], True)
+        self.assertEqual(domain_info['registrar']['name'], 'Example Registrar')
+        self.assertEqual(domain_info['registrar']['url'], 'https://registrar.example.test')
+        whois = domain_info['whois']
+        self.assertCountEqual(
+            whois['statuses'], ['clientTransferProhibited', 'serverDeleteProhibited']
+        )
+        self.assertEqual(whois['registrant']['name'], 'Jane Doe')
+        self.assertEqual(whois['registrant']['organization'], 'Example Org')
+        self.assertEqual(whois['registrant']['email'], 'jane@example.test')
+        self.assertIsNone(whois['admin'], 'an all-empty contact row must read as no contact')
+        self.assertIsNone(whois['tech'])
+        self.assertEqual(whois['raw'], {'registrar': 'Example Registrar', 'dnssec': 'signedDelegation'})
+
+    def test_whois_block_is_empty_but_present_before_any_whois_lookup(self) -> None:
+        self._attach_domain_info()
+
+        whois = self._payload()['domain_info']['whois']
+        self.assertEqual(
+            whois, {'statuses': [], 'registrant': None, 'admin': None, 'tech': None, 'raw': None}
+        )
+
+    def test_name_server_lists_keep_both_shapes(self) -> None:
+        info = self._attach_domain_info()
+        info.name_servers.add(NameServer.objects.create(name='ns1.example.test'))
+
+        domain_info = self._payload()['domain_info']
+        self.assertEqual(domain_info['name_servers'], [{'name': 'ns1.example.test'}])
+        self.assertEqual(domain_info['nameservers'], ['ns1.example.test'])
+
+
+class BucketsTests(ScanSummaryPayloadTestCase):
+    """BUCKETS is gated on `buckets_count`; the count and the list are the same rows."""
+
+    def _bucket(self, scan: ScanHistory, name: str) -> S3Bucket:
+        bucket = S3Bucket.objects.create(name=name, provider='aws', region='zz-test-1')
+        scan.buckets.add(bucket)
+        return bucket
+
+    def test_count_and_list_are_scoped_to_the_scan(self) -> None:
+        sibling = ScanHistory.objects.create(
+            domain=self.domain, scan_type=self.engine, scan_status=SUCCESS_TASK,
+            start_scan_date=timezone.now(), tasks=['vulnerability_scan'],
+        )
+        self._bucket(self.scan, 'sp-assets')
+        self._bucket(self.scan, 'sp-backups')
+        self._bucket(sibling, 'sp-sibling-only')
+
+        payload = self._payload()
+        self.assertEqual(payload['buckets_count'], 2)
+        self.assertEqual([b['name'] for b in payload['buckets']], ['sp-assets', 'sp-backups'])
+
+    def test_count_is_zero_without_buckets(self) -> None:
+        payload = self._payload()
+        self.assertEqual(payload['buckets_count'], 0)
+        self.assertEqual(payload['buckets'], [])
+
+
+class SummaryBlocksQueryCountTests(ScanSummaryPayloadTestCase):
+    """Buckets, DNS records and WHOIS contacts must not add a query per row."""
+
+    def _cost(self) -> int:
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(self.url)
+            self.assertEqual(response.status_code, 200)
+        return len(captured)
+
+    def _add_rows(self, info: DomainInfo, start: int, count: int) -> None:
+        for index in range(start, start + count):
+            bucket = S3Bucket.objects.create(name=f'sp-bucket-{index}', provider='aws')
+            self.scan.buckets.add(bucket)
+            info.dns_records.add(DNSRecord.objects.create(name=f'192.0.2.{index}', type='a'))
+            info.status.add(WhoisStatus.objects.create(name=f'status{index}'))
+
+    def test_cost_does_not_grow_with_buckets_or_domain_rows(self) -> None:
+        info = DomainInfo.objects.create(registrar=Registrar.objects.create(name='R'))
+        self.domain.domain_info = info
+        self.domain.save(update_fields=['domain_info'])
+        self._add_rows(info, 1, 1)
+        self.client.get(self.url)
+        one = self._cost()
+
+        self._add_rows(info, 2, 9)
+        ten = self._cost()
+        self.assertEqual(one, ten, f'10 rows cost {ten} queries against {one} for 1')
+
+    def test_whois_contacts_are_joined_not_queried(self) -> None:
+        info = DomainInfo.objects.create()
+        self.domain.domain_info = info
+        self.domain.save(update_fields=['domain_info'])
+        self.client.get(self.url)
+        without_contacts = self._cost()
+
+        info.registrar = Registrar.objects.create(name='R')
+        for role in ('registrant', 'admin', 'tech'):
+            setattr(info, role, DomainRegistration.objects.create(name=f'{role} contact'))
+        info.save()
+        with_contacts = self._cost()
+
+        self.assertEqual(
+            without_contacts, with_contacts,
+            'registrar/registrant/admin/tech must come from select_related on the scan query',
+        )

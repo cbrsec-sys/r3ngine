@@ -86,7 +86,31 @@ export interface DomainInfoHistoricalIp {
   last_seen: string;
 }
 
-/** `domain_info` block built inline by the scan and target summary views. */
+/** A WHOIS contact (`DomainRegistration`); `null` when the lookup had none. */
+export interface WhoisContact {
+  name: string | null;
+  organization: string | null;
+  email: string | null;
+  phone: string | null;
+  fax: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  country: string | null;
+}
+
+/** `domain_info.whois`, read by the WHOIS tab (`api/summary_domain_info.py`). */
+export interface DomainWhoisSummary {
+  statuses: string[];
+  registrant: WhoisContact | null;
+  admin: WhoisContact | null;
+  tech: WhoisContact | null;
+  /** `DomainInfo.whois_raw`: jswhois / whoisdomain JSON, shape depends on the tool. */
+  raw: Record<string, unknown> | null;
+}
+
+/** `domain_info` block of the scan and target summary views (`api/summary_domain_info.py`). */
 export interface DomainInfoSummary {
   dnssec: boolean;
   geolocation_iso: string | null;
@@ -94,13 +118,12 @@ export interface DomainInfoSummary {
   updated: string | null;
   expires: string | null;
   whois_server: string | null;
-  registrar: { name: string | null; phone: string | null; email: string | null };
+  registrar: { name: string | null; phone: string | null; email: string | null; url: string | null };
   dns_records: DomainInfoDnsRecord[];
   name_servers: { name: string }[];
   nameservers: string[];
   historical_ips: DomainInfoHistoricalIp[];
-  /** Read by the WHOIS tab, but neither summary view sends it today. */
-  whois_data?: string | null;
+  whois: DomainWhoisSummary;
 }
 
 /** Known keys of `MonitoringDiscovery.content`, a JSONField written by `reNgine/tasks/monitor.py`. */
@@ -118,6 +141,31 @@ export type MonitoringDiscoveryEntry = Omit<components["schemas"]["MonitoringDis
 
 /** `monitoring_discoveries`: `values('id', 'discovery_type', 'content')`. */
 export type MonitoringDiscoverySummary = Pick<MonitoringDiscoveryEntry, "discovery_type" | "content"> & { id: number };
+
+/** Fields both vulnerability rows of the scan summary carry; `severity` is the model's -1..4. */
+export interface SummaryVulnerabilityBase {
+  id: number;
+  name: string;
+  severity: number;
+  http_url: string | null;
+  description: string | null;
+  impact: string | null;
+  remediation: string | null;
+  is_gpt_used: boolean;
+}
+
+/** `vulnerability_highlights`: the ten most severe, newest first. */
+export interface SummaryVulnerabilityHighlight extends SummaryVulnerabilityBase {
+  discovered_date: string | null;
+}
+
+/** `vulnerabilities`: up to 100 rows, most severe first. */
+export interface SummaryVulnerability extends SummaryVulnerabilityBase {
+  /** `discovered_date` under another name. */
+  matched_at: string | null;
+  /** The subdomain name, else the target name. */
+  domain_name: string;
+}
 
 export interface SummaryEndpoint {
   id: number;
@@ -297,10 +345,10 @@ export interface ScanSummaryResponse extends SummaryResponseBase {
   todo_notes: TodoNote[];
   important_subdomains: Subdomain[];
   target_info: { name: string; id: number };
-  vulnerability_highlights: Vulnerability[];
+  vulnerability_highlights: SummaryVulnerabilityHighlight[];
   subdomains: Subdomain[];
   endpoints: SummaryEndpoint[];
-  vulnerabilities: Vulnerability[];
+  vulnerabilities: SummaryVulnerability[];
   secret_leaks: SecretLeak[];
   scan_info: {
     id: number;

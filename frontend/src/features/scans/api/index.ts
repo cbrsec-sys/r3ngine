@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import type { operations, components } from '@/types/api';
 import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, ScanTierRetryResponse, SecretLeak, DirectoryFile } from '../types';
 import type { Domain } from '../../targets/types';
@@ -632,11 +632,13 @@ export const useStressTelemetry = (scanId: number | string | undefined) => {
     refetchInterval: 15000, // Refresh every 15s during test runs
   });
 };
-export const useFetchWhois = (projectSlug: string, scanId: number) => {
+/** Runs a fresh WHOIS lookup (stored on the target) and refetches the summary showing it. */
+export const useFetchWhois = (summaryQueryKey: QueryKey) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (target: string) => {
-      const response = await fetch(`/api/tools/whois/?target=${target}&is_reload=true`, {
+      const params = new URLSearchParams({ target, is_reload: 'true' });
+      const response = await fetch(`/api/tools/whois/?${params.toString()}`, {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -645,7 +647,7 @@ export const useFetchWhois = (projectSlug: string, scanId: number) => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scan-summary', projectSlug, scanId] });
+      queryClient.invalidateQueries({ queryKey: summaryQueryKey });
     },
   });
 };

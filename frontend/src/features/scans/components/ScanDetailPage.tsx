@@ -93,9 +93,8 @@ import type { LucideIcon } from 'lucide-react';
 import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useStopSubScan, useRetryScanTask, useRetryScanTier } from '../api';
 import { getFailureCategoryLabel, summariseTier } from '../utils/failureCategories';
 import { TimelineTierHeader } from './TimelineTierHeader';
-import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote, DiscoveredPort, DiscoveredTechnology } from '../types';
+import type { Command, SubScan, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote, DiscoveredPort, DiscoveredTechnology, SummaryVulnerability, SummaryVulnerabilityBase, SummaryVulnerabilityHighlight } from '../types';
 import type { Plugin } from '../../plugins/api/pluginsApi';
-import type { VulnerabilityWithReportReferences } from '../../vulnerabilities/types';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
 import { KpiCard } from '../../../components/KpiCard';
@@ -106,7 +105,7 @@ import { ParametersTab } from './ParametersTab';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { VulnerabilityTable } from '../../vulnerabilities/components/VulnerabilityTable';
-import { useGptVulnerabilityDetails } from '../../vulnerabilities/api';
+import { useGptVulnerabilityDetails, useVulnerability } from '../../vulnerabilities/api';
 import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
@@ -123,6 +122,8 @@ import PluginComponent from '../../plugins/components/PluginComponent';
 import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
 import PluginCardSlot from '../../plugins/components/PluginCardSlot';
 import { getSafeUrl } from '../../../utils/securityUtils';
+import { formatYesNo } from '../../../utils/displayFormat';
+import { WhoisPanel } from './WhoisPanel';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const { tokens } = useThemeTokens();
@@ -145,38 +146,51 @@ const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   );
 };
 
+/** AI analysis text shown instead of the stored fields for the vulnerability the modal is keyed to. */
+interface GptOverride {
+  description?: string;
+  impact?: string;
+  remediation?: string;
+  references: string[];
+}
+
+/**
+ * Opens from a scan summary row, which carries only the text fields. The CVSS, source,
+ * tags and references come from the full record, loaded while the modal is open; the
+ * severity stays the row's numeric one (the full record sends a label).
+ * The parent keys it by vulnerability id, so the AI override resets per vulnerability.
+ */
 const VulnerabilityInfoModal: React.FC<{
   open: boolean;
   onClose: () => void;
-  vulnerability: Vulnerability | null;
-}> = ({ open, onClose, vulnerability }) => {
+  vulnerability: SummaryVulnerabilityBase;
+  projectSlug: string;
+}> = ({ open, onClose, vulnerability, projectSlug }) => {
   const { tokens, isLight } = useThemeTokens();
   const gptMutation = useGptVulnerabilityDetails();
-  const [localVuln, setLocalVuln] = useState<VulnerabilityWithReportReferences | null>(null);
+  const { data: detail } = useVulnerability(open ? vulnerability.id : null, projectSlug);
+  const [gptOverride, setGptOverride] = useState<GptOverride | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    setLocalVuln(vulnerability);
-    setError(null);
-  }, [vulnerability]);
-
-  if (!localVuln) return null;
-
-  const severityColor = getSemanticSeverityColor(String(localVuln.severity ?? 'info'), tokens);
+  const severityColor = getSemanticSeverityColor(vulnerability.severity, tokens);
+  const description = gptOverride?.description ?? detail?.description ?? vulnerability.description;
+  const impact = gptOverride?.impact ?? detail?.impact ?? vulnerability.impact;
+  const remediation = gptOverride?.remediation ?? detail?.remediation ?? vulnerability.remediation;
+  const referenceUrls = gptOverride?.references.length
+    ? gptOverride.references
+    : (detail?.references ?? []).map((ref) => ref.url);
 
   const handleFetchGpt = async () => {
-    if (!localVuln) return;
     setError(null);
     try {
-      const result = await gptMutation.mutateAsync({ id: localVuln.id!, name: localVuln.name });
+      const result = await gptMutation.mutateAsync({ id: vulnerability.id, name: vulnerability.name });
       if (result.status) {
-        setLocalVuln((prev) => prev && ({
-          ...prev,
+        setGptOverride({
           description: result.description,
           impact: result.impact,
           remediation: result.remediation,
-          references: result.references?.join('\n') || prev.references || ''
-        }));
+          references: result.references ?? [],
+        });
       } else {
         setError(result.error || 'Failed to generate GPT description');
       }
@@ -213,9 +227,9 @@ const VulnerabilityInfoModal: React.FC<{
           <Bug size={24} color={severityColor} />
           <Box>
             <Typography sx={{ color: 'text.primary', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 1, fontFamily: 'Orbitron' }}>
-              {localVuln.name}
+              {vulnerability.name}
             </Typography>
-            <SeverityBadge severity={Number(localVuln.severity)} />
+            <SeverityBadge severity={vulnerability.severity} />
           </Box>
         </Stack>
         <IconButton onClick={onClose} sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary', bgcolor: 'action.hover' } }}>
@@ -237,20 +251,20 @@ const VulnerabilityInfoModal: React.FC<{
             <Grid container spacing={2}>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS SCORE</Typography>
-                <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 900 }}>{localVuln.cvss_score || 'N/A'}</Typography>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 900 }}>{detail?.cvss_score ?? 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS METRICS</Typography>
-                <Typography sx={{ color: 'text.primary', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{localVuln.cvss_metrics || 'N/A'}</Typography>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{detail?.cvss_metrics || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>SOURCE</Typography>
-                <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 700 }}>{localVuln.source || 'N/A'}</Typography>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 700 }}>{detail?.source || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>TAGS</Typography>
                 <Stack direction="row" sx={{ spacing: 0.5, flexWrap: "wrap" }}>
-                  {localVuln.tags?.map((tag, i: number) => (
+                  {detail?.tags?.map((tag, i: number) => (
                     <Chip
                       key={i}
                       label={tag.name}
@@ -275,42 +289,42 @@ const VulnerabilityInfoModal: React.FC<{
               Description
             </Typography>
             <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-              {localVuln.description || 'No description provided.'}
+              {description || 'No description provided.'}
             </Typography>
           </Box>
 
           {/* Impact Section */}
-          {localVuln.impact && (
+          {impact && (
             <Box>
               <Typography sx={{ color: isLight ? tokens.accent.error : '#ff003c', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 Impact
               </Typography>
               <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {localVuln.impact}
+                {impact}
               </Typography>
             </Box>
           )}
 
           {/* Remediation Section */}
-          {localVuln.remediation && (
+          {remediation && (
             <Box>
               <Typography sx={{ color: isLight ? tokens.accent.success : '#00ff62', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 Remediation
               </Typography>
               <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {localVuln.remediation}
+                {remediation}
               </Typography>
             </Box>
           )}
 
           {/* References Section */}
-          {typeof localVuln.references === 'string' && localVuln.references && (
+          {referenceUrls.length > 0 && (
             <Box>
               <Typography sx={{ color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 References
               </Typography>
               <Stack spacing={1}>
-                {localVuln.references.split('\n').filter(Boolean).map((ref: string, i: number) => (
+                {referenceUrls.map((ref: string, i: number) => (
                   <Link
                     key={i}
                     href={getSafeUrl(ref) ?? '#'}
@@ -1180,7 +1194,7 @@ const SubScanWidget: React.FC<{
 };
 
 const FULL_HEIGHT_SX = { height: '100%' } as const;
-const EMPTY_VULNERABILITIES: Vulnerability[] = [];
+const EMPTY_VULNERABILITIES: SummaryVulnerability[] = [];
 const EMPTY_SUBDOMAINS: Subdomain[] = [];
 const EMPTY_PARTIAL_SUBDOMAINS: Partial<Subdomain>[] = [];
 
@@ -1274,7 +1288,7 @@ const VulnerabilityBreakdown = React.memo(function VulnerabilityBreakdown({ coun
   );
 });
 
-const VulnHighlights = React.memo(function VulnHighlights({ highlights, onVulnClick }: { highlights: Vulnerability[], onVulnClick: (v: Vulnerability) => void }) {
+const VulnHighlights = React.memo(function VulnHighlights({ highlights, onVulnClick }: { highlights: SummaryVulnerabilityHighlight[], onVulnClick: (v: SummaryVulnerabilityBase) => void }) {
   const { tokens, isLight } = useThemeTokens();
   return (
     <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color={tokens.accent.error} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -1289,7 +1303,7 @@ const VulnHighlights = React.memo(function VulnHighlights({ highlights, onVulnCl
             </TableRow>
           </TableHead>
           <TableBody>
-            {(highlights || []).map((v: Vulnerability, idx: number) => (
+            {(highlights || []).map((v, idx: number) => (
               <TableRow
                 key={idx}
                 onClick={() => onVulnClick(v)}
@@ -1315,7 +1329,7 @@ const VulnHighlights = React.memo(function VulnHighlights({ highlights, onVulnCl
                     display: 'inline-block',
                     textTransform: 'lowercase'
                   }}>
-                    {Number(v.severity) === 0 ? 'info' : 'vuln'}
+                    {v.severity === 0 ? 'info' : 'vuln'}
                   </Box>
                 </TableCell>
                 <TableCell>
@@ -1325,7 +1339,7 @@ const VulnHighlights = React.memo(function VulnHighlights({ highlights, onVulnCl
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <SeverityBadge severity={Number(v.severity)} />
+                  <SeverityBadge severity={v.severity} />
                 </TableCell>
                 <TableCell>
                   <Typography sx={{
@@ -1360,21 +1374,21 @@ interface SubdomainVulnCounts {
   total: number;
 }
 
-const MostVulnerableSubdomain = React.memo(function MostVulnerableSubdomain({ vulnerabilities = EMPTY_VULNERABILITIES, sx = FULL_HEIGHT_SX }: { vulnerabilities: Vulnerability[], sx?: SxProps<Theme> }) {
+const MostVulnerableSubdomain = React.memo(function MostVulnerableSubdomain({ vulnerabilities = EMPTY_VULNERABILITIES, sx = FULL_HEIGHT_SX }: { vulnerabilities: SummaryVulnerability[], sx?: SxProps<Theme> }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
   const rows = useMemo(() => {
-    const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
+    const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => v.severity > 0) : vulnerabilities;
     const subdomainMap = filteredVulns.reduce(
-      (acc: Record<string, SubdomainVulnCounts>, v: Vulnerability) => {
+      (acc: Record<string, SubdomainVulnCounts>, v: SummaryVulnerability) => {
         try {
           if (!v.http_url) return acc;
           const normalizedUrl = v.http_url.match(/^https?:\/\//) ? v.http_url : `http://${v.http_url}`;
           const host = new URL(normalizedUrl).hostname;
           if (!host) return acc;
           if (!acc[host]) acc[host] = { host, critical: 0, high: 0, medium: 0, low: 0, total: 0 };
-          const sev = Number(v.severity);
+          const sev = v.severity;
           if (sev === 4) acc[host].critical += 1;
           else if (sev === 3) acc[host].high += 1;
           else if (sev === 2) acc[host].medium += 1;
@@ -1460,18 +1474,18 @@ const MostVulnerableSubdomain = React.memo(function MostVulnerableSubdomain({ vu
 interface CommonVulnerabilityRow {
   name: string;
   count: number;
-  severity: Vulnerability['severity'];
-  vulnerability: Vulnerability;
+  severity: number;
+  vulnerability: SummaryVulnerability;
 }
 
-const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulnerabilities = EMPTY_VULNERABILITIES, onVulnClick, sx = FULL_HEIGHT_SX }: { vulnerabilities: Vulnerability[], onVulnClick: (v: Vulnerability) => void, sx?: SxProps<Theme> }) {
+const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulnerabilities = EMPTY_VULNERABILITIES, onVulnClick, sx = FULL_HEIGHT_SX }: { vulnerabilities: SummaryVulnerability[], onVulnClick: (v: SummaryVulnerabilityBase) => void, sx?: SxProps<Theme> }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
   const data = useMemo(() => {
-    const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
+    const filtered = ignoreInfo ? vulnerabilities.filter(v => v.severity !== 0) : vulnerabilities;
     // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
-    const commonMap = filtered.reduce((acc: Record<string, CommonVulnerabilityRow>, v: Vulnerability) => {
+    const commonMap = filtered.reduce((acc: Record<string, CommonVulnerabilityRow>, v: SummaryVulnerability) => {
       acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity, vulnerability: v };
       acc[v.name].count += 1;
       return acc;
@@ -1522,7 +1536,7 @@ const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulner
                   </Box>
                 </TableCell>
                 <TableCell align="right">
-                  <SeverityBadge severity={typeof v.severity === 'string' ? (v.severity === 'Critical' ? 4 : v.severity === 'High' ? 3 : v.severity === 'Medium' ? 2 : v.severity === 'Low' ? 1 : 0) : Number(v.severity)} />
+                  <SeverityBadge severity={v.severity} />
                 </TableCell>
               </TableRow>
             ))}
@@ -1653,7 +1667,7 @@ export const ScanDetailPage = () => {
   const { theme, isLight, tokens } = useThemeTokens();
   const { projectSlug, scanId } = useParams({ from: '/$projectSlug/scan/detail/$scanId' });
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
-  const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
+  const fetchWhois = useFetchWhois(['scan-summary', projectSlug, parseInt(scanId)]);
   const stopScanMutation = useStopScan(projectSlug);
   const stopSubScanMutation = useStopSubScan(projectSlug);
   const retryScanTaskMutation = useRetryScanTask(projectSlug, parseInt(scanId));
@@ -1675,11 +1689,11 @@ export const ScanDetailPage = () => {
     severity: 'success' | 'error' | 'info' | 'warning';
   }>({ open: false, message: '', severity: 'success' });
 
-  const [selectedVulnForInfo, setSelectedVulnForInfo] = useState<Vulnerability | null>(null);
+  const [selectedVulnForInfo, setSelectedVulnForInfo] = useState<SummaryVulnerabilityBase | null>(null);
   const [vulnInfoModalOpen, setVulnInfoModalOpen] = useState(false);
 
   // Stable identity so the memoised summary widgets do not re-render on every poll.
-  const handleVulnClick = useCallback((v: Vulnerability) => {
+  const handleVulnClick = useCallback((v: SummaryVulnerabilityBase) => {
     setSelectedVulnForInfo(v);
     setVulnInfoModalOpen(true);
   }, []);
@@ -2093,7 +2107,7 @@ export const ScanDetailPage = () => {
                       </Box>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.primary' }}>{data.domain_info?.dnssec || 'N/A'}</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.primary' }}>{formatYesNo(data.domain_info?.dnssec)}</Typography>
                       </Box>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Geolocation</Typography>
@@ -2126,51 +2140,11 @@ export const ScanDetailPage = () => {
                 </Grid>
               )}
               {infoTab === 1 && (
-                <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                  {!data.domain_info?.whois_data ? (
-                    <Box sx={{ p: 4, textAlign: 'center' }}>
-                      <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 2 }}>
-                        No WHOIS data available for this target.
-                      </Typography>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={fetchWhois.isPending ? <CircularProgress size={12} /> : <Search size={12} />}
-                        disabled={fetchWhois.isPending}
-                        onClick={() => fetchWhois.mutate(data.target_info.name)}
-                        sx={{
-                          color: tokens.accent.primary,
-                          borderColor: `${tokens.accent.primary}4D`,
-                          fontSize: '0.65rem',
-                          fontWeight: 900,
-                          '&:hover': {
-                            borderColor: tokens.accent.primary,
-                            bgcolor: `${tokens.accent.primary}0D`
-                          }
-                        }}
-                      >
-                        {fetchWhois.isPending ? 'FETCHING...' : 'FETCH WHOIS DATA'}
-                      </Button>
-                    </Box>
-                  ) : (
-                    <Box>
-                      <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 1 }}>
-                        <Button
-                          size="small"
-                          startIcon={fetchWhois.isPending ? <CircularProgress size={10} /> : <RefreshCw size={10} />}
-                          disabled={fetchWhois.isPending}
-                          onClick={() => fetchWhois.mutate(data.target_info.name)}
-                          sx={{ color: 'text.disabled', fontSize: '0.6rem', '&:hover': { color: tokens.accent.primary } }}
-                        >
-                          Refresh
-                        </Button>
-                      </Stack>
-                      <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                        {data.domain_info?.whois_data}
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
+                <WhoisPanel
+                  domainInfo={data.domain_info}
+                  onFetch={() => fetchWhois.mutate(data.target_info.name)}
+                  isFetching={fetchWhois.isPending}
+                />
               )}
               {infoTab === 2 && (
                 <Stack spacing={1}>
@@ -2286,11 +2260,15 @@ export const ScanDetailPage = () => {
         </Grid>
       </Grid>
 
-      <VulnerabilityInfoModal
-        open={vulnInfoModalOpen}
-        onClose={() => setVulnInfoModalOpen(false)}
-        vulnerability={selectedVulnForInfo}
-      />
+      {selectedVulnForInfo && (
+        <VulnerabilityInfoModal
+          key={selectedVulnForInfo.id}
+          open={vulnInfoModalOpen}
+          onClose={() => setVulnInfoModalOpen(false)}
+          vulnerability={selectedVulnForInfo}
+          projectSlug={projectSlug}
+        />
+      )}
 
       {/* Row 5: Contextual Assets */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>

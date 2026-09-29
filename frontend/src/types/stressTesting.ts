@@ -132,6 +132,4 @@ export interface AggregatedStressMetrics {
   rtt_min?: number;
   rtt_avg?: number;
   rtt_max?: number;
-  /** Read by the Stressor dashboard; no parser emits it and it is not aggregated above. */
-  protocol_breakdown?: Record<string, number>;
 }

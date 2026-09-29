@@ -36,14 +36,6 @@
       "count": 1
     }
   },
-  "src/components/scan/StressTab/ErrorDistribution.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
   "src/components/scan/StressTab/LatencyChart.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
@@ -596,9 +588,6 @@
   "src/features/scans/components/ScanDetailPage.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 17
-    },
-    "react-hooks/set-state-in-effect": {
-      "count": 1
     }
   },
   "src/features/scans/components/ScanHistoryDrawer.tsx": {

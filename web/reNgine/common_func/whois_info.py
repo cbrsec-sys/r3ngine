@@ -325,13 +325,21 @@ def parse_registrar_info(domain_info, registrar):
 	})
 
 
+# WHOIS contact fields -> the DomainRegistration field names save_domain_info_to_db reads.
+_REGISTRATION_KEYS = {
+	'name': 'name', 'id': 'id', 'organization': 'organization', 'street': 'address',
+	'city': 'city', 'province': 'state', 'postal_code': 'zip_code', 'country': 'country',
+	'phone': 'phone', 'fax': 'fax',
+}
+
+
 def parse_registration_info(domain_info, registration, role):
 	"""Parse registration information for registrant, admin, and tech contacts."""
 	role_prefix = role if role != 'administrative' else 'admin'
 	domain_info.update({
-		f'{role_prefix}_{key}': value
+		f'{role_prefix}_{_REGISTRATION_KEYS[key]}': value
 		for key, value in registration.items()
-		if key in ['name', 'id', 'organization', 'street', 'city', 'province', 'postal_code', 'country', 'phone', 'fax']
+		if key in _REGISTRATION_KEYS
 	})
 
 	# Handle email separately to apply regex

@@ -65,7 +65,9 @@ import {
 } from 'lucide-react';
 import { useTargetSummary } from '../api';
 import { StartScanModal } from '../../scans/components/StartScanModal';
-import { useStopScan } from '../../scans/api';
+import { useFetchWhois, useStopScan } from '../../scans/api';
+import { WhoisPanel } from '../../scans/components/WhoisPanel';
+import { formatYesNo } from '../../../utils/displayFormat';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
 import { KpiCard } from '../../../components/KpiCard';
@@ -138,6 +140,7 @@ export const TargetSummary = () => {
   const [targetReportModalOpen, setTargetReportModalOpen] = useState(false);
   const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
   const stopScanMutation = useStopScan(projectSlug || 'default');
+  const fetchWhois = useFetchWhois(['target-summary', projectSlug || 'default', parseInt(targetId || '0')]);
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
 
@@ -399,7 +402,7 @@ export const TargetSummary = () => {
                     gap: 3
                   }}>
                     <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: cRed }}>{data.target_info.name}</Typography></Box>
-                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{formatYesNo(data.domain_info?.dnssec)}</Typography></Box>
                     <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Box>
                     <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Box>
                     <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Box>
@@ -407,7 +410,13 @@ export const TargetSummary = () => {
                     <Box sx={{ gridColumn: 'span 3' }}><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: cPrimary }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Box>
                   </Box>
                 )}
-                {infoTab === 1 && <Typography sx={{ p: 2, fontSize: '0.7rem', color: theme.palette.text.secondary, opacity: 0.7 }}>Loading WHOIS Data...</Typography>}
+                {infoTab === 1 && (
+                  <WhoisPanel
+                    domainInfo={data.domain_info}
+                    onFetch={() => fetchWhois.mutate(data.target_info.name)}
+                    isFetching={fetchWhois.isPending}
+                  />
+                )}
                 {infoTab === 2 && (
                   <Stack spacing={1}>
                     {data.domain_info?.dns_records?.map((r, idx: number) => (

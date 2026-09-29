@@ -20,7 +20,7 @@ import { Globe, Plus } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip as LeafletTooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { scaleLinear } from 'd3-scale';
+import { scaleLinear } from 'd3';
 import { countryCentroids } from '../types/countryCentroids';
 
 // Pulsing Dot is now handled via global CSS .map-marker-pulse in index.css

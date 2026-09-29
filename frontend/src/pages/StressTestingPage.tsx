@@ -898,7 +898,6 @@ export const StressTestingPage: React.FC = () => {
           bpsPeak={(latestMetrics.bps_peak || 0)}
           rpsPeak={(latestMetrics.rps_peak || 0)}
           statusCodes={(latestMetrics.response_codes || {})}
-          protocolBreakdown={(latestMetrics.protocol_breakdown || {})}
           responseRate={(latestMetrics.response_rate || 0)}
           blockRate={(latestMetrics.block_rate || 0)}
         />
