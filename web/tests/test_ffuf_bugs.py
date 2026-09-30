@@ -29,10 +29,10 @@ def _make_proxy(yaml_config=None, results_dir='/tmp/test_ffuf'):
     return proxy
 
 
-def _prepare(yaml_config, ctx_override=None, wordlist_path=None, results_dir='/tmp/test_ffuf'):
+def _prepare(yaml_config, ctx_override=None, wordlist_path=None, results_dir='/tmp/test_ffuf', extra_ctx=None):
     """Call dir_file_fuzz with prepare_only=True, returning the built command dict."""
     proxy = _make_proxy(yaml_config, results_dir=results_dir)
-    ctx = {"urls_override": ctx_override or ["http://example.com/"]}
+    ctx = {"urls_override": ctx_override or ["http://example.com/"], **(extra_ctx or {})}
 
     def _fake_ensure(task_proxy, func, ctx, description=None):
         return func(ctx=ctx, description=description)

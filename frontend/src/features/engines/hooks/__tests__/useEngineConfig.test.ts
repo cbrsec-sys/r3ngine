@@ -99,6 +99,31 @@ web_api_discovery:
   });
 });
 
+describe('useEngineConfig dir_file_fuzz tool switches', () => {
+  it('turns ffuf on when run_ffuf is absent, like the backend', () => {
+    const { result } = renderHook(() => useEngineConfig('dir_file_fuzz:\n  threads: 10\n'));
+    expect(result.current.config.dir_file_fuzz.config.run_ffuf).toBe(true);
+  });
+
+  it('round-trips run_ffuf: false through the YAML', () => {
+    const { result } = renderHook(() => useEngineConfig('dir_file_fuzz:\n  run_ffuf: false\n  run_dirsearch: true\n'));
+    expect(result.current.config.dir_file_fuzz.config.run_ffuf).toBe(false);
+
+    const section = mappingAt(loadMapping(serialiseConfigToYaml(result.current.config)), 'dir_file_fuzz');
+    expect(section.run_ffuf).toBe(false);
+    expect(section.run_dirsearch).toBe(true);
+
+    const { result: reparsed } = renderHook(() => useEngineConfig(serialiseConfigToYaml(result.current.config)));
+    expect(reparsed.current.config.dir_file_fuzz.config.run_ffuf).toBe(false);
+  });
+
+  it('always writes run_ffuf, even at its default', () => {
+    const { result } = renderHook(() => useEngineConfig('dir_file_fuzz: {}\n'));
+    const section = mappingAt(loadMapping(serialiseConfigToYaml(result.current.config)), 'dir_file_fuzz');
+    expect(section.run_ffuf).toBe(true);
+  });
+});
+
 describe('useEngineConfig secret scanning section', () => {
   it('reads secret_scanning so saving a built-in engine keeps it', () => {
     const yaml = `

@@ -33,6 +33,7 @@ from reNgine.definitions import (
 	CUSTOM_HEADERS,
 	CUSTOM_HEADER,
 	FFUF_DEFAULT_WORDLIST_PATH,
+	RUN_FFUF,
 	RUN_DIRSEARCH,
 	RUN_FEROXBUSTER,
 )
@@ -491,21 +492,52 @@ def _flush_ferox_batch(batch, dirscan, ctx, scan, subdomain_id=0, max_repeat=10)
 		dirscan.directory_files.add(*dfiles)
 
 
+def selected_fuzzers(config: dict, ctx: Optional[dict] = None) -> tuple[bool, bool, bool]:
+	"""Return ``(run_ffuf, run_dirsearch, run_feroxbuster)`` for a dir_file_fuzz config.
+
+	ffuf is on unless ``run_ffuf`` is explicitly false; dirsearch and feroxbuster are
+	opt-in. A singular tool run of dir_file_fuzz always runs ffuf: its CLI arguments
+	are validated against ffuf's schema (``tool_args.PIPELINE_BINARIES``) and
+	appended to the ffuf command, whatever the engine says.
+	"""
+	ffuf_value = config.get(RUN_FFUF)
+	run_ffuf = True if ffuf_value is None else bool(ffuf_value)
+	if (ctx or {}).get('singular_tool_run'):
+		run_ffuf = True
+	return run_ffuf, bool(config.get(RUN_DIRSEARCH, False)), bool(config.get(RUN_FEROXBUSTER, False))
+
+
 def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_only=None):
-	"""Perform directory and file fuzzing using FFUF and Dirsearch.
+	"""Perform directory and file fuzzing with ffuf, dirsearch and/or feroxbuster.
 
 	This wrapper ensures that any endpoints are crawled first by delegating to
-	ensure_endpoints_crawled_and_execute.
+	ensure_endpoints_crawled_and_execute. When the engine turns all three tools
+	off the step is a no-op and returns an empty result.
 
 	Args:
 		ctx (dict, optional): Task context containing scan information.
 		description (str, optional): Task description shown in UI.
 
 	Returns:
-		list: List of URLs/lines discovered during fuzzing.
+		list: ffuf result lines discovered during fuzzing.
 	"""
 	if ctx is None:
 		ctx = {}
+
+	if not any(selected_fuzzers(self.yaml_configuration.get(DIR_FILE_FUZZ) or {}, ctx)):
+		logger.warning(
+			'Directory fuzzing skipped for scan %s: run_ffuf, run_dirsearch and run_feroxbuster are all off',
+			getattr(self, 'scan_id', None),
+		)
+		if prepare_only:
+			return {
+				"urls": [],
+				"ffuf_base_cmd": None,
+				"dirsearch_base_cmd": None,
+				"ferox_base_cmd": None,
+				"enable_http_crawl": False,
+			}
+		return []
 
 	def _execute_dir_file_fuzz(ctx, description, prepare_only=False, parse_only=None):
 		"""Inner execution logic for FFUF and Dirsearch fuzzing."""
@@ -537,8 +569,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		auto_calibration = config.get(AUTO_CALIBRATION, True)
 		delay = rate_limit / (threads * 100) if threads else 0
 		custom_headers = config.get(CUSTOM_HEADERS) or config.get(CUSTOM_HEADER) or []
-		run_dirsearch = config.get(RUN_DIRSEARCH, False)
-		run_feroxbuster = config.get(RUN_FEROXBUSTER, False)
+		run_ffuf, run_dirsearch, run_feroxbuster = selected_fuzzers(config, ctx)
 
 		custom_headers_list = parse_custom_header_to_list(custom_headers)
 
@@ -554,40 +585,48 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		wordlist_path = resolve_wordlist_path(config, wordlist_path)
 
 		# dirsearch expands %EXT% itself; ffuf and feroxbuster get a pre-expanded copy instead of -e.
-		ffuf_wordlist_path, wordlist_expanded = expand_ext_wordlist(wordlist_path, extensions, self.results_dir)
+		if run_ffuf or run_feroxbuster:
+			ffuf_wordlist_path, wordlist_expanded = expand_ext_wordlist(wordlist_path, extensions, self.results_dir)
+		else:
+			ffuf_wordlist_path, wordlist_expanded = wordlist_path, False
 		append_extensions = bool(extensions) and not wordlist_expanded
 
 		input_path = f'{self.results_dir}/input_endpoints_dir_file_fuzz.txt'
 
-		ffuf_base_cmd = 'ffuf'
-		ffuf_base_cmd += f' -w {ffuf_wordlist_path}'
-		ffuf_base_cmd += f' -e {extensions_str}' if append_extensions else ''
-		ffuf_base_cmd += f' -maxtime {max_time}' if max_time > 0 else ''
-		ffuf_base_cmd += f' -rate {rate_limit}' if rate_limit > 0 else ''
-		if recursive_level > 0:
-			ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level}'
-			if max_time > 0:
-				job_time = max(30, max_time // (recursive_level + 1))
-				ffuf_base_cmd += f' -maxtime-job {job_time}'
-		ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
-		ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
-		ffuf_base_cmd += ' -se' if stop_on_error else ''
-		ffuf_base_cmd += ' -r' if follow_redirect else ''
-		ffuf_base_cmd += ' -ac' if auto_calibration else ''
-		if not auto_calibration and mc:
-			ffuf_base_cmd += f' -mc {mc}'
-		if ctx and ctx.get('singular_tool_run') and ctx.get('extra_cli_args'):
-			from reNgine.tool_args import append_extra_cli_args
-			ffuf_base_cmd = append_extra_cli_args(ffuf_base_cmd, ctx.get('extra_cli_args') or [])
-
 		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
-		if not has_ua:
-			ffuf_base_cmd += " -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'"
 
-		for header in custom_headers_list:
-			ffuf_base_cmd += f" -H '{header}'"
-			if 'cookie' in header.lower() or 'authorization' in header.lower():
-				logger.warning('Authenticated FFUF fuzzing enabled via header: %s', header)
+		ffuf_base_cmd = None
+		if run_ffuf:
+			ffuf_base_cmd = 'ffuf'
+			ffuf_base_cmd += f' -w {ffuf_wordlist_path}'
+			ffuf_base_cmd += f' -e {extensions_str}' if append_extensions else ''
+			ffuf_base_cmd += f' -maxtime {max_time}' if max_time > 0 else ''
+			ffuf_base_cmd += f' -rate {rate_limit}' if rate_limit > 0 else ''
+			if recursive_level > 0:
+				ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level}'
+				if max_time > 0:
+					job_time = max(30, max_time // (recursive_level + 1))
+					ffuf_base_cmd += f' -maxtime-job {job_time}'
+			ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
+			ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
+			ffuf_base_cmd += ' -se' if stop_on_error else ''
+			ffuf_base_cmd += ' -r' if follow_redirect else ''
+			ffuf_base_cmd += ' -ac' if auto_calibration else ''
+			if not auto_calibration and mc:
+				ffuf_base_cmd += f' -mc {mc}'
+			if ctx and ctx.get('singular_tool_run') and ctx.get('extra_cli_args'):
+				from reNgine.tool_args import append_extra_cli_args
+				ffuf_base_cmd = append_extra_cli_args(ffuf_base_cmd, ctx.get('extra_cli_args') or [])
+
+			if not has_ua:
+				ffuf_base_cmd += " -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'"
+
+			for header in custom_headers_list:
+				ffuf_base_cmd += f" -H '{header}'"
+				if 'cookie' in header.lower() or 'authorization' in header.lower():
+					logger.warning('Authenticated FFUF fuzzing enabled via header: %s', header)
+		else:
+			logger.info('ffuf disabled (run_ffuf is off).')
 
 		dirsearch_base_cmd = None
 		if run_dirsearch:
@@ -963,14 +1002,16 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 							dirscan_ferox.dir_subscan_ids.add(self.subscan)
 					dirscan_ferox.save()
 
-				# Run ffuf first
-				logger.info('Starting sequential execution: ffuf first, then dirsearch for %s', target_url)
-				_run_ffuf()
+				logger.info(
+					'Fuzzing %s sequentially: ffuf=%s dirsearch=%s feroxbuster=%s',
+					target_url, run_ffuf, run_dirsearch, run_feroxbuster,
+				)
+				if run_ffuf and ffuf_base_cmd:
+					_run_ffuf()
 
 				if ffuf_exc[0]:
 					raise ffuf_exc[0]
 
-				# Run dirsearch after ffuf completes
 				if run_dirsearch and dirsearch_base_cmd:
 					_run_dirsearch()
 

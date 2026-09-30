@@ -93,7 +93,7 @@ export const FORM_OWNED_KEYS: Readonly<Record<SectionKey | keyof GlobalConfig | 
   ),
   param_discovery: owned('enabled', 'min_confidence'),
   dir_file_fuzz: owned(
-    'run_dirsearch', 'run_feroxbuster', 'auto_calibration', 'enable_http_crawl', 'extensions',
+    'run_ffuf', 'run_dirsearch', 'run_feroxbuster', 'auto_calibration', 'enable_http_crawl', 'extensions',
     'wordlist_name', 'rate_limit', 'threads', 'timeout', 'max_time', 'recursive_level',
     'match_http_status', 'follow_redirect', 'stop_on_error', 'max_repeat_by_signature',
   ),
@@ -298,7 +298,7 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
   if (config.dir_file_fuzz.enabled) {
     const c = config.dir_file_fuzz.config;
     writeSection('dir_file_fuzz', {
-      run_dirsearch: c.run_dirsearch, run_feroxbuster: c.run_feroxbuster,
+      run_ffuf: c.run_ffuf, run_dirsearch: c.run_dirsearch, run_feroxbuster: c.run_feroxbuster,
       auto_calibration: c.auto_calibration, enable_http_crawl: c.enable_http_crawl,
       extensions: c.extensions, wordlist_name: c.wordlist_name,
       rate_limit: c.rate_limit, threads: c.threads, timeout: c.timeout,
@@ -553,6 +553,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     }), def.param_discovery.config) as EngineConfig['param_discovery'],
 
     dir_file_fuzz: section('dir_file_fuzz', (r) => ({
+      run_ffuf: (r.run_ffuf as boolean) ?? true,
       run_dirsearch: (r.run_dirsearch as boolean) ?? false,
       run_feroxbuster: (r.run_feroxbuster as boolean) ?? false,
       auto_calibration: (r.auto_calibration as boolean) ?? true,

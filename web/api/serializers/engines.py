@@ -63,13 +63,17 @@ class EngineSerializer(serializers.ModelSerializer):
 				('waf_bypass', 'use_nuclei'),
 				('waf_bypass', 'use_benchmarking'),
 				('dir_file_fuzz', 'run_dirsearch'),
+				('dir_file_fuzz', 'run_feroxbuster'),
 			]
 			# Add section-level default tools
 			if 'spiderfoot_scan' in config:
 				tools.add('spiderfoot')
 			if 'screenshot' in config:
 				tools.add('playwright')
-			if 'dir_file_fuzz' in config:
+			dir_file_fuzz_cfg = config.get('dir_file_fuzz')
+			if 'dir_file_fuzz' in config and not (
+				isinstance(dir_file_fuzz_cfg, dict) and dir_file_fuzz_cfg.get('run_ffuf') is False
+			):
 				tools.add('ffuf')
 
 			for section_name, section_data in config.items():

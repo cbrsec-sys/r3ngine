@@ -231,6 +231,7 @@ POST_CRAWL_OSINT = 'post_crawl_osint'
 METAGOOFIL = 'metagoofil'
 AMASS_INTEL = 'amass_intel'
 DIRSEARCH = 'dirsearch'
+RUN_FFUF = 'run_ffuf'
 RUN_DIRSEARCH = 'run_dirsearch'
 RUN_FEROXBUSTER = 'run_feroxbuster'
 

@@ -257,6 +257,7 @@ fetch_url:
 # ---------------------------------------------------------------------------
 dir_file_fuzz:
   auto_calibration: true
+  run_ffuf: true
   run_dirsearch: true
   enable_http_crawl: true
   rate_limit: 150
