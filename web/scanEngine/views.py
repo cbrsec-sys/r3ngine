@@ -391,28 +391,14 @@ def proxy_settings(request, slug):
             else:
                 message = 'Proxies updated.'
             proxy_instance.save()
-            # TOR container lifecycle — start or stop on change
-            new_use_tor = proxy_instance.use_tor
-            if new_use_tor != old_use_tor:
-                from reNgine.tor_manager import TorManager, TorStartError, TorUnavailableError
-                tor = TorManager()
-                try:
-                    if new_use_tor:
-                        tor.start()
-                    else:
-                        tor.stop()
-                except TorStartError as e:
+            # TOR Mode needs the optional `tor` compose service; the app cannot
+            # start it, so refuse the toggle with the enable hint when it is down.
+            if proxy_instance.use_tor and not old_use_tor:
+                from reNgine.tor_manager import TorManager
+                if not TorManager().is_running():
                     proxy_instance.use_tor = False
                     proxy_instance.save(update_fields=['use_tor'])
-                    err_msg = f'TOR failed to start: {e}'
-                    if request.headers.get('Accept') == 'application/json':
-                        return http.JsonResponse({'status': 'error', 'message': err_msg}, status=500)
-                    messages.add_message(request, messages.ERROR, err_msg)
-                    return http.HttpResponseRedirect(reverse('proxy_settings', kwargs={'slug': slug}))
-                except TorUnavailableError as e:
-                    proxy_instance.use_tor = False
-                    proxy_instance.save(update_fields=['use_tor'])
-                    err_msg = f'Docker socket not available: {e}'
+                    err_msg = TorManager.enable_hint()
                     if request.headers.get('Accept') == 'application/json':
                         return http.JsonResponse({'status': 'error', 'message': err_msg}, status=503)
                     messages.add_message(request, messages.ERROR, err_msg)
@@ -838,35 +824,29 @@ def get_ollama_pull_status(request, slug):
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def get_ollama_service_status(request, slug):
-    from reNgine.ollama_manager import OllamaManager, OllamaUnavailableError
-    manager = OllamaManager()
-    is_running = manager.is_running()
-    return http.JsonResponse({'status': 'success', 'running': is_running})
+    from reNgine.ollama_manager import OllamaManager
+    return http.JsonResponse({'status': 'success', **OllamaManager().status()})
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def start_ollama_service(request, slug):
+    """Ollama is a compose service the app cannot start; answer with the status and how to enable it."""
     if request.method != 'POST':
         return http.JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
-    
-    from reNgine.ollama_manager import OllamaManager, OllamaStartError
+
+    from reNgine.ollama_manager import OllamaManager
     manager = OllamaManager()
-    try:
-        manager.start()
-        return http.JsonResponse({'status': 'success', 'message': 'Ollama service started.'})
-    except OllamaStartError:
-        # Wraps docker errors, which are not for the browser.
-        logger.exception('Failed to start Ollama')
-        return http.JsonResponse({'status': 'error', 'message': 'Failed to start Ollama; see server logs.'}, status=500)
+    if manager.is_running():
+        return http.JsonResponse({'status': 'success', 'message': 'Ollama is already running.'})
+    return http.JsonResponse({'status': 'error', 'message': manager.enable_hint()}, status=503)
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def stop_ollama_service(request, slug):
+    """Ollama is a compose service the app cannot stop; answer with how to do it from the host."""
     if request.method != 'POST':
         return http.JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
-    
+
     from reNgine.ollama_manager import OllamaManager
-    manager = OllamaManager()
-    manager.stop()
-    return http.JsonResponse({'status': 'success', 'message': 'Ollama service stopped.'})
+    return http.JsonResponse({'status': 'error', 'message': OllamaManager.stop_hint()}, status=501)
 
 
 def _test_llm_provider(provider: str, api_key: str, model: str) -> dict:

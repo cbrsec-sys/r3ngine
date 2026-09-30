@@ -198,6 +198,7 @@ from reNgine.temporal.activities.stress import (  # noqa: E402
 )
 from reNgine.temporal.activities.maintenance import (  # noqa: E402
     run_startup_sync_activity,
+    tool_probe_activity,
     run_monitoring_check_activity,
     setup_scheduled_scan_activity,
     import_hackerone_programs_activity,

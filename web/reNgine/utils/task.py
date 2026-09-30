@@ -26,6 +26,7 @@ from reNgine.common_func import (
     sanitize_url,
 )
 from reNgine.utilities import SubdomainScopeChecker, replace_nulls
+from reNgine.utils.task_queues import go_executor_queue, python_orchestrator_queue
 from reNgine.settings import RENGINE_RESULTS
 
 logger = logging.getLogger(__name__)
@@ -74,11 +75,18 @@ def _execute_go_workflow(cmd, scan_id, command_obj_id, tool):
     async def _start():
         from reNgine.temporal_client import TemporalClientProvider
         client = await TemporalClientProvider.get_client()
+        # Both queues belong to this host: the executor that runs the tool must
+        # share this process's scan_results volume.
         await client.start_workflow(
             "GoExecutorTaskWorkflow",
-            {"command": [cmd], "scan_id": scan_id or 0, "command_id": command_obj_id or 0},
+            {
+                "command": [cmd],
+                "scan_id": scan_id or 0,
+                "command_id": command_obj_id or 0,
+                "executor_task_queue": go_executor_queue(),
+            },
             id=wf_id,
-            task_queue="python-orchestrator-queue",
+            task_queue=python_orchestrator_queue(),
         )
 
     async def _fetch_result():
@@ -326,8 +334,9 @@ def run_command(
             from reNgine.temporal_client import TemporalClientProvider
             # Connect to the Temporal cluster
             client = await TemporalClientProvider.get_client()
-            # Execute GoExecutorTaskWorkflow on the python-orchestrator task queue which routes
-            # the subprocess activity to the go-executor-queue
+            # GoExecutorTaskWorkflow runs on this host's Python queue and hands the
+            # subprocess to this host's Go executor queue, so the tool output
+            # lands in the scan_results volume this process reads.
             result = await client.execute_workflow(
                 "GoExecutorTaskWorkflow",
                 {
@@ -336,9 +345,10 @@ def run_command(
                     "command_id": command_rec_id or 0,
                     "working_dir": cwd or "",
                     "timeout_seconds": timeout,
+                    "executor_task_queue": go_executor_queue(),
                 },
                 id=f"go-exec-{tool}-{command_rec_id or int(time.time())}",
-                task_queue="python-orchestrator-queue"
+                task_queue=python_orchestrator_queue()
             )
             return result
 
@@ -1047,6 +1057,8 @@ def stream_command(
 			client = await TemporalClientProvider.get_client()
 			workflow_id = f"go-exec-{tool}-{command_rec_id or int(time.time())}"
 
+			# Same host for both queues: the executor that runs the tool must
+			# share this process's scan_results volume.
 			handle = await client.start_workflow(
 				"GoExecutorTaskWorkflow",
 				{
@@ -1055,9 +1067,10 @@ def stream_command(
 					"command_id": command_rec_id or 0,
 					"working_dir": cwd or "",
 					"timeout_seconds": timeout,
+					"executor_task_queue": go_executor_queue(),
 				},
 				id=workflow_id,
-				task_queue="python-orchestrator-queue"
+				task_queue=python_orchestrator_queue()
 			)
 			# Create a single task to await the workflow result.
 			# This avoids creating multiple handle.result() coroutines on every iteration,

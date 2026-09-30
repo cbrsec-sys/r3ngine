@@ -6,7 +6,7 @@ scan setup and HackerOne program synchronisation.
 from temporalio import activity
 from reNgine.temporal.heartbeat import keep_alive
 
-from reNgine.utils.logger import get_module_logger
+from reNgine.utils.logger import get_module_logger, format_exception_for_log
 from reNgine.common_func import merge_imported_subdomains
 
 logger = get_module_logger(__name__)
@@ -52,6 +52,29 @@ def run_startup_sync_activity(task_name: str) -> None:
         raise ValueError(f"[RunStartupSyncActivity] Unknown task: {task_name}")
     activity.logger.info("[RunStartupSyncActivity] Completed: %s", task_name)
     logger.log_line("[TEMPORAL]", "COMPLETE", "task=run_startup_sync task_name=%s" % task_name)
+
+
+@activity.defn(name="ToolProbeActivity")
+@keep_alive
+def tool_probe_activity(op: str, payload: dict) -> dict:
+    """Run a tool inventory probe on this worker (see ``reNgine.tool_workers``).
+
+    The web container has no Docker socket and cannot exec into this
+    container, so it asks through ToolProbeWorkflow instead. ``op`` selects
+    resolve / version / help / summary / sync; ``payload`` carries the op's
+    arguments and the result is the op's JSON-serialisable answer.
+    """
+    from reNgine.tool_workers import run_probe_op
+
+    logger.log_line("[TEMPORAL]", "START", "task=tool_probe op=%s" % op)
+    try:
+        result = run_probe_op(op, payload)
+    except Exception as exc:
+        logger.log_line("[TEMPORAL]", "ERROR", "task=tool_probe op=%s %s" % (op, format_exception_for_log(exc)),
+                        level="error", exc_info=True)
+        raise
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=tool_probe op=%s" % op)
+    return result
 
 
 @activity.defn(name="RunMonitoringCheckActivity")

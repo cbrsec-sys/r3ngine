@@ -148,6 +148,13 @@ Flags:
 
 
 class ToolInventorySyncTests(TestCase):
+    def setUp(self):
+        # Probe as the tool host itself; the remote path (web -> orchestrator
+        # over Temporal) is covered in tests/test_tool_workers.py.
+        env = patch.dict(os.environ, {'R3NGINE_WORKER_ROLE': 'python'})
+        env.start()
+        self.addCleanup(env.stop)
+
     def test_sync_marks_missing_and_present(self):
         from reNgine.tool_inventory import sync_installed_tools
 
@@ -258,11 +265,11 @@ class ToolArgsApiTests(TestCase):
 
 class ExternalToolsFixtureArgCacheTests(TransactionTestCase):
     """Load fixtures/external_tools.yaml and populate ToolArgSchemaCache by
-    probing *real* binaries on go-executor / python-orchestrator via docker
+    probing *real* binaries on the python-orchestrator through Temporal
     (no help mocks; kr and friends stay on workers — not the web image).
 
-    TransactionTestCase: long docker probes would trip Postgres
-    idle-in-transaction timeouts under a wrapping TestCase atomic block.
+    TransactionTestCase: long probes would trip Postgres idle-in-transaction
+    timeouts under a wrapping TestCase atomic block.
     """
 
     # Secondaries not required in the fixture (primary still covers the cache key).
@@ -308,7 +315,7 @@ class ExternalToolsFixtureArgCacheTests(TransactionTestCase):
             'PIPELINE_BINARIES primaries must exist in fixtures/external_tools.yaml',
         )
 
-    # Probes the running go-executor / python-orchestrator containers via docker.
+    # Probes the running python-orchestrator through ToolProbeWorkflow.
     @tag('integration')
     def test_populate_arg_cache_from_real_installed_binaries(self):
         from reNgine.tool_args import (
@@ -321,18 +328,19 @@ class ExternalToolsFixtureArgCacheTests(TransactionTestCase):
         from reNgine.tool_workers import decode_worker_path, worker_probe_summary
 
         workers = worker_probe_summary()
-        self.assertTrue(
-            workers.get('docker_available'),
-            'docker socket/SDK required to probe go/python worker tools',
+        self.assertIn(
+            workers.get('mode'),
+            ('local', 'remote'),
+            f'a running python-orchestrator (Temporal) is required to probe worker tools; got {workers}',
         )
         self.assertGreaterEqual(
             len(workers.get('workers') or []),
-            2,
-            f'expected go-executor + python-orchestrator running; got {workers}',
+            1,
+            f'expected the python-orchestrator to report itself; got {workers}',
         )
 
-        # One pass: sync (resolve on workers) + help refresh. Skip version probes —
-        # they add docker round-trips without improving schema coverage.
+        # One pass: sync (resolve on the worker) + help refresh. Skip version probes —
+        # they add round-trips without improving schema coverage.
         result = refresh_all_present_schemas(probe_versions=False)
         sync_result = result.get('sync') or {}
         self.assertIsInstance(sync_result, dict)
@@ -489,7 +497,7 @@ class ExternalToolsFixtureArgCacheTests(TransactionTestCase):
             f'expected >=8 help-sourced schemas from worker tools; dump={dump}',
         )
 
-        print('\n=== REAL ToolArgSchemaCache (from go/python workers) ===')
+        print('\n=== REAL ToolArgSchemaCache (from the python-orchestrator) ===')
         for row in dump:
             print(
                 f"  {row['pipeline_tool']:22} {row.get('binary_name') or '-':12} "

@@ -721,7 +721,7 @@
   },
   "src/features/settings/components/LlmToolkitPage.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
+      "count": 3
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 6

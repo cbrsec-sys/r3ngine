@@ -14,12 +14,19 @@ r3ngine uses **Temporal** as its durable workflow engine, replacing the previous
 
 ## Task Queues
 
-r3ngine uses two task queues:
+r3ngine uses two task queues per host:
 
 | Queue Name | Worker | Purpose |
 |---|---|---|
-| `python-orchestrator-queue` | `temporal-orchestrator` (Python) | Workflow hosting, Django DB reads/writes, Neo4j sync, LLM calls |
+| `python-orchestrator-queue` | `temporal-python-orchestrator` (Python) | Workflow hosting, Django DB reads/writes, Neo4j sync, LLM calls |
 | `go-executor-queue` | `temporal-go-executor` (Go) | Heavy CLI tool subprocesses (Nuclei, Nmap, Httpx, Ffuf, etc.) |
+
+Those are the master's names. A remote worker host (`docker/docker-compose.worker.yml`,
+`WORKER_NAME=<name>`) runs the same two services on `<name>` and
+`go-executor-queue-<name>`, so its tool runs stay on the host whose
+`scan_results` volume the Python side reads. `reNgine.utils.task_queues` is the
+single place that derives the names in Python (`web/executor/queue.go` in Go);
+see `tool-distribution.md`, "Queue names per host".
 
 ### Why Two Queues?
 

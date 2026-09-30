@@ -773,6 +773,13 @@ export const ProxySettingsPage: React.FC = () => {
               without TOR routing. Scanning will be significantly slower than normal.
             </Alert>
 
+            {/* Tor is a compose service started from the host; saving with TOR Mode on is refused while it is down. */}
+            {torStatus && !torStatus.running && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {torStatus.hint ?? 'Tor is an optional compose service; enable the "tor" profile and run make up.'}
+              </Alert>
+            )}
+
             <FormControlLabel
               control={
                 <Switch

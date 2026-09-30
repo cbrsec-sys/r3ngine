@@ -505,24 +505,21 @@ class TorStatusAPIView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request):
-		from reNgine.tor_manager import TorManager, TorUnavailableError
+		from reNgine.tor_manager import TorManager
 		try:
-			running = TorManager().is_running()
-			return Response({'running': running})
-		except TorUnavailableError:
-			return Response({'running': False})
+			return Response(TorManager().status())
 		except Exception as e:
-			# A docker socket that errors or times out should read as "tor is
-			# not running", not as a 500 on a status probe the UI polls.
+			# A probe that errors should read as "tor is not running", not as
+			# a 500 on a status endpoint the UI polls.
 			logger.warning('[TorStatus] Could not determine TOR state: %s', e)
-			return Response({'running': False})
+			return Response({'running': False, 'hint': TorManager.enable_hint()})
 
 
 class TorExitIPAPIView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request):
-		from reNgine.tor_manager import TorManager, TorUnavailableError
+		from reNgine.tor_manager import TorManager
 		try:
 			if not TorManager().is_running():
 				return Response({'ip': None})

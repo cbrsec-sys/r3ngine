@@ -71,6 +71,7 @@ from reNgine.temporal_workflows import (
     HackerOneImportWorkflow,
     HackerOneSyncBookmarkedWorkflow,
     ProxyFetchWorkflow,
+    ToolProbeWorkflow,
     SingleTaskRetryWorkflow,
     FollowupPlanWorkflow,
     # Phase 2 — rengine-ng standalone workflows
@@ -210,6 +211,8 @@ from reNgine.temporal_activities import (
 
     # Startup sync
     run_startup_sync_activity,
+    # Tool inventory probes requested by the web container
+    tool_probe_activity,
 
     # Scheduled scan setup
     setup_scheduled_scan_activity,
@@ -397,10 +400,27 @@ class Command(BaseCommand):
         parser.add_argument('--r3ngine-url', type=str, help='URL of the central r3ngine instance')
 
     def handle(self, *args, **options):
-        worker_name = options.get('worker_name')
+        from django.core.management.base import CommandError
+        from reNgine.utils.task_queues import configure_worker_name, go_executor_queue, python_orchestrator_queue
+
+        # --worker-name wins over WORKER_NAME and is exported to it, so the
+        # tool-routing helpers (reNgine.utils.task_queues) used by activities in
+        # this process target this host's Go executor, not the master's.
+        try:
+            worker_name = configure_worker_name(options.get('worker_name'))
+        except ValueError as name_err:
+            raise CommandError(str(name_err))
         worker_token = options.get('worker_token')
         r3ngine_url = options.get('r3ngine_url')
-        task_queue = worker_name if worker_name else "python-orchestrator-queue"
+        task_queue = python_orchestrator_queue(worker_name)
+        logger.info(
+            "Worker name %r: Python queue %s, routed tools go to %s",
+            worker_name, task_queue, go_executor_queue(worker_name),
+        )
+        # This container hosts the scan tools: inventory probes (reNgine.tool_workers)
+        # run locally here instead of being sent to the orchestrator queue.
+        from reNgine.tool_workers import WORKER_ROLE_ENV
+        os.environ.setdefault(WORKER_ROLE_ENV, 'python')
         # Install plugin tools in THIS container before starting the worker.
         # Tools must be present in the orchestrator — not the web container — because
         # activities (swaks, smtp-user-enum, etc.) run here. This is the only place
@@ -631,6 +651,7 @@ class Command(BaseCommand):
 
                 # Startup sync
                 run_startup_sync_activity,
+                tool_probe_activity,
 
                 # Scheduled scan setup (Phase 4C)
                 setup_scheduled_scan_activity,
@@ -737,7 +758,7 @@ class Command(BaseCommand):
                                  URLVulnWorkflow, URLAuthExtractWorkflow, AssessmentWorkflow,
                                  DiscoveryWorkflow, EnumerationWorkflow, AnalysisWorkflow,
                                  ValidationWorkflow, ReportingWorkflow]
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow, FollowupPlanWorkflow] + _p2_workflows + plugin_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, ToolProbeWorkflow, SingleTaskRetryWorkflow, FollowupPlanWorkflow] + _p2_workflows + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
                 logger.error("Failed to load dynamic plugin temporal exports: %s", e)
@@ -748,7 +769,7 @@ class Command(BaseCommand):
                                  URLVulnWorkflow, URLAuthExtractWorkflow, AssessmentWorkflow,
                                  DiscoveryWorkflow, EnumerationWorkflow, AnalysisWorkflow,
                                  ValidationWorkflow, ReportingWorkflow]
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, SingleTaskRetryWorkflow, FollowupPlanWorkflow] + _p2_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, CertificateResyncWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow, ToolProbeWorkflow, SingleTaskRetryWorkflow, FollowupPlanWorkflow] + _p2_workflows
 
             # -------------------------------------------------------------------
             # Start the Temporal Worker

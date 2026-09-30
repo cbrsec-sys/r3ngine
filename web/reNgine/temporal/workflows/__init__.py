@@ -63,6 +63,7 @@ from reNgine.temporal.workflows.jobs import (
     ScheduledScanWorkflow,
     SingleTaskRetryWorkflow,
     StartupSyncWorkflow,
+    ToolProbeWorkflow,
 )
 from reNgine.temporal.workflows.recon import (
     CIDRReconWorkflow,

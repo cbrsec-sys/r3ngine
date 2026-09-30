@@ -21,6 +21,7 @@
 | [Neo4j Integration](neo4j-integration.md) | Graph database integration and APME |
 | [Configuration](configuration.md) | Environment variables and engine YAML configuration |
 | [Docker Setup](docker-setup.md) | Container architecture and service definitions |
+| [Upgrading Infrastructure](upgrading-infrastructure.md) | Pinned Redis/Neo4j/Temporal/nginx images, and how to move an existing install onto them |
 | [Open work](TODO.md) | Deferred issues, decisions taken and known follow-ups |
 
 ---

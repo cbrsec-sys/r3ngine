@@ -112,7 +112,7 @@ class GoExecutorTaskWorkflow:
 
     @workflow.run
     async def run(self, input_data: dict) -> dict:
-        """Run the remote subprocess activity on the go-executor-queue.
+        """Run the remote subprocess activity on the caller's Go executor queue.
 
         Args:
             input_data (dict): Dictionary containing command details:
@@ -120,13 +120,20 @@ class GoExecutorTaskWorkflow:
                 - scan_id (int): Associated Scan History ID
                 - command_id (int): Database record Command ID to log stdout/stderr to
                 - timeout_seconds (int, optional): Custom execution timeout in seconds
-                
+                - executor_task_queue (str, optional): Go executor queue of the host
+                  that started this workflow (``reNgine.utils.task_queues.go_executor_queue``).
+                  Defaults to the master's queue for inputs recorded before the
+                  key existed, so replays of those runs stay deterministic.
+
         Returns:
             dict: The output result of the subprocess execution, including stdout, stderr,
                   and exit code.
         """
         timeout_sec = input_data.get("timeout_seconds") or 43200
-        # Execute the activity on the dedicated go-executor-queue task queue
+        # The queue comes from the caller, never from this process's environment:
+        # a workflow must not read env vars, and the executor that runs the tool
+        # has to be the one co-located with the Python host that parses its output.
+        executor_queue = input_data.get("executor_task_queue") or "go-executor-queue"
         return await workflow.execute_activity(
             "RunToolSubprocessActivity",
             input_data,
@@ -137,7 +144,7 @@ class GoExecutorTaskWorkflow:
             schedule_to_close_timeout=timedelta(seconds=int(timeout_sec * 2.2)),
             heartbeat_timeout=timedelta(minutes=10),
             retry_policy=_RETRY_LONG_SCAN,
-            task_queue="go-executor-queue"
+            task_queue=executor_queue,
         )
 
 
@@ -217,6 +224,28 @@ class HackerOneSyncBookmarkedWorkflow:
             start_to_close_timeout=timedelta(hours=4),
             heartbeat_timeout=timedelta(minutes=5),
             retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
+
+@workflow.defn(name="ToolProbeWorkflow")
+class ToolProbeWorkflow:
+    """Run one tool inventory probe on the Python orchestrator and return its answer.
+
+    Started by ``reNgine.tool_workers.dispatch_probe`` from processes that do
+    not host the scan tools (the web container). The caller waits for the
+    result, so a failed probe surfaces at once rather than being retried while
+    a request or management command blocks on it.
+    """
+
+    @workflow.run
+    async def run(self, op: str, payload: dict) -> dict:
+        return await workflow.execute_activity(
+            "ToolProbeActivity",
+            args=[op, payload],
+            start_to_close_timeout=timedelta(minutes=15),
+            heartbeat_timeout=timedelta(minutes=2),
+            retry_policy=RetryPolicy(maximum_attempts=1),
             task_queue="python-orchestrator-queue",
         )
 

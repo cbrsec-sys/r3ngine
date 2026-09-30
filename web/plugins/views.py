@@ -118,11 +118,15 @@ class PluginViewSet(viewsets.ModelViewSet):
     def restart_server(self, request):
         """
         User-triggered restart of the orchestrator and web container after plugin install.
-        The web container restart is delayed 3 s so this HTTP response can reach the client
-        before the connection is severed.
+
+        The orchestrator is told over Redis and exits itself; this process is
+        terminated a few seconds later (so the response reaches the client) and
+        compose's ``restart: always`` starts the web container again. Neither
+        needs the Docker API.
         """
         import redis
         from django.conf import settings
+        from reNgine.utils.process_restart import schedule_service_restart
 
         try:
             rdb = redis.StrictRedis(
@@ -135,19 +139,8 @@ class PluginViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.warning("Could not send orchestrator restart signal: %s", e)
 
-        def _restart_web():
-            import time
-            time.sleep(3)
-            try:
-                import docker
-                client = docker.from_env()
-                web_container = client.containers.get('r3ngine-web-1')
-                logger.info("User-triggered web container restart.")
-                web_container.restart()
-            except Exception as _e:
-                logger.error("Failed to restart web container: %s", _e)
-
-        threading.Thread(target=_restart_web, daemon=True).start()
+        logger.info("User-triggered web service restart.")
+        schedule_service_restart(reason='plugin install')
         return Response({'success': True, 'message': 'Server restart initiated.'})
 
     @action(detail=False, methods=['get'], url_path='registry')

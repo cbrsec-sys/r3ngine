@@ -302,7 +302,7 @@ def _probe_help_text(
     primary: str,
     encoded_or_local_path: Optional[str],
 ) -> tuple[str, str, Optional[str]]:
-    """Fetch --help from go/python workers first; local path only as last resort.
+    """Fetch --help from the tool host first; a local path only as last resort.
 
     Returns (help_text, flag_used, resolved_encoded_or_local_path).
     """
@@ -455,7 +455,7 @@ def get_or_refresh_schema(
         else:
             schema = _seed_schema(pipeline_tool)
 
-        # Worker docker exec can drop the idle DB handle; reconnect only if needed.
+        # A slow worker probe can drop the idle DB handle; reconnect only if needed.
         ensure_db_connection()
         cache, _ = ToolArgSchemaCache.objects.update_or_create(
             pipeline_tool=pipeline_tool,

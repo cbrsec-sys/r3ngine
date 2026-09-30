@@ -48,7 +48,6 @@ neo4j==5.23.1
 cryptography==46.0.5
 pyOpenSSL>=24.0.0
 locust==2.32.8
-docker>=7.1.0
 esprima==4.0.1
 stem>=1.8.0
 setuptools==70.0.0

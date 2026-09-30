@@ -67,7 +67,7 @@ r3ngine is a modular, containerized reconnaissance and vulnerability assessment 
 ### `temporal-go-executor` (Go Worker)
 
 - **Language:** Go
-- **Task Queue:** `go-executor-queue`
+- **Task Queue:** `go-executor-queue` (master) or `go-executor-queue-<WORKER_NAME>` on a remote worker — see `tool-distribution.md`, "Queue names per host"
 - **Responsibilities:**
   - Executes heavy security tool subprocesses (Nuclei, Nmap, Ffuf, Httpx, Aquatone, etc.)
   - Reports stdout/stderr to the Python orchestrator via the shared PostgreSQL database
@@ -91,6 +91,53 @@ Used for:
 Graph database for:
 - Attack Path Modeling Engine (APME) — nodes are scan findings, edges are attack paths
 - Active Directory plugin — AD domain/trust/exposure graph
+
+---
+
+## Optional Services (compose profiles)
+
+Two services are opt-in and sit behind compose `profiles` in
+`docker/docker-compose.yml`. Set `COMPOSE_PROFILES=tor,ollama` in `.env` and the
+Makefile includes them in `make up`, `make stop`, `make logs`, …; `make up-tor` /
+`make up-ollama` start one without editing `.env` (`make.bat` has the same
+targets, since it cannot read `.env`).
+
+| Service | Profile | Used by | The app's view of it |
+|---|---|---|---|
+| `tor` (built from `web/tor/`) | `tor` | "TOR Mode" in Settings → Proxy; `TorNewCircuitActivity` between scan phases | `reNgine/tor_manager.py` — TCP probe of `tor:9050`, NEWNYM over `tor:9051` with `TOR_CONTROL_PASSWORD` |
+| `ollama` (built from `docker/ollama/`, `OLLAMA_DOCKERFILE` picks the GPU variant) | `ollama` | LLM Toolkit local models (`http://ollama:11434`) | `reNgine/ollama_manager.py` — `GET /api/version` |
+
+The application never starts or stops these containers. When a service is
+down, the UI (TOR Mode card, Ollama service status) shows the `hint` from the
+status endpoint that says how to enable it, and turning TOR Mode on is refused
+until Tor answers. `TOR_CONTROL_PASSWORD` is shared by the `tor` service (which
+hashes it into its torrc and refuses to start without it), `web` and the
+orchestrator.
+
+---
+
+## No Docker Socket
+
+No container mounts `/var/run/docker.sock` (a guard test,
+`web/tests/test_compose_no_docker_socket.py`, keeps it that way). The three
+things that used it are done without the Docker API:
+
+- **Plugin install restart** (`POST /api/plugins/restart-server/`): the
+  orchestrator is told over the `orchestrator_control` Redis channel and exits;
+  the web process terminates its own service root a few seconds later
+  (`reNgine/utils/process_restart.py`: SIGTERM to the gunicorn master under
+  tini, graceful shutdown) and compose's `restart: always` starts the container
+  again from its entrypoint.
+- **Tool inventory** (Tool Arsenal, `/api/action/tool/<name>/args/`,
+  `manage.py sync_installed_tools`): probes run where the tools are installed.
+  Inside the Python orchestrator (`R3NGINE_WORKER_ROLE=python`, set by
+  `run_temporal_orchestrator`) `reNgine/tool_workers.py` resolves binaries, runs
+  `--version`/`--help` and syncs `InstalledExternalTool` locally; from `web`
+  the same calls start `ToolProbeWorkflow` → `ToolProbeActivity` on
+  `python-orchestrator-queue` and use the answer. Worker paths are stored as
+  `python:/usr/local/bin/kr`. If Temporal is unreachable the web process
+  falls back to its own filesystem (same image).
+- **Tor / Ollama**: compose profile services, see above.
 
 ---
 

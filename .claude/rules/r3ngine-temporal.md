@@ -176,7 +176,9 @@ Cancel is tracked via `TemporalWorkflowExecution` FK on `ScanHistory`.
 
 ## Go executor activities
 
-The Go executor (`web/executor/main.go`) handles tool subprocesses on `go-executor-queue`. Use it for tools with complex subprocess lifecycle (nmap, ffuf, nuclei, etc.).
+The Go executor (`web/executor/main.go`) handles tool subprocesses on `go-executor-queue` — on a remote worker, on `go-executor-queue-<WORKER_NAME>` (`queue.go`). Use it for tools with complex subprocess lifecycle (nmap, ffuf, nuclei, etc.).
+
+The queue name is host-specific, so never hard-code it: the activity/task side gets it from `reNgine.utils.task_queues.go_executor_queue()` (reads `WORKER_NAME`; `python_orchestrator_queue()` is its Python counterpart) and passes it into the workflow's input, and the workflow forwards that value — a workflow must not read the environment. `GoExecutorTaskWorkflow` (`input_data["executor_task_queue"]`) is the reference.
 
 To add a new Go activity:
 1. Add a handler in `main.go`.
@@ -186,8 +188,9 @@ To add a new Go activity:
 result = await workflow.execute_activity(
     "GoToolActivity",
     args=[tool_config],
-    task_queue="go-executor-queue",
+    task_queue=tool_config["executor_task_queue"],  # set by the caller from go_executor_queue()
     start_to_close_timeout=timedelta(hours=2),
+    retry_policy=_RETRY_LONG_SCAN,
 )
 ```
 

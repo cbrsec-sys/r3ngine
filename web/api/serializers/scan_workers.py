@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from reNgine.utils.secret_tokens import generate_token, hash_token
+from reNgine.utils.task_queues import validate_worker_name
 from scanEngine.models import WORKER_TOKEN_PREFIX, ScanWorker
 
 
@@ -16,6 +17,14 @@ class ScanWorkerSerializer(serializers.ModelSerializer):
 		# task_queue follows the name: run_temporal_orchestrator --worker-name
 		# listens on a queue named after the worker.
 		read_only_fields = ['id', 'task_queue', 'last_heartbeat', 'hostname', 'ip_address']
+
+	def validate_name(self, value: str) -> str:
+		# The name becomes two Temporal queue names and a CLI argument on the
+		# worker host; the Go executor rejects anything outside this charset.
+		try:
+			return validate_worker_name(value)
+		except ValueError as exc:
+			raise serializers.ValidationError(str(exc))
 
 	def create(self, validated_data):
 		token = generate_token(WORKER_TOKEN_PREFIX)

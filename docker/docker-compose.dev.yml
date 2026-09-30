@@ -29,7 +29,7 @@ services:
 
   redis:
     restart: always
-    image: "redis:alpine"
+    image: "redis:8.10-alpine"
     command: redis-server --requirepass "${REDIS_PASSWORD}"
     hostname: redis
     networks:
@@ -60,6 +60,7 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_HOST=${POSTGRES_HOST}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-}
     volumes:
       - ../web:/usr/src/app
       - ../frontend:/usr/src/app/frontend
@@ -73,7 +74,6 @@ services:
       - static_volume:/usr/src/app/staticfiles/
       #- plugins_data:/usr/src/app/plugins_data
       - ../secrets/certs/ca.crt:/usr/src/app/ca.crt:ro
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./web/entrypoint.sh:/usr/src/app/entrypoint.sh:ro
       - exploitdb:/usr/src/exploitdb
     ports:
@@ -121,7 +121,7 @@ services:
 
   proxy:
     restart: always
-    image: nginx:alpine
+    image: nginx:1.31-alpine
     ports:
       - 8082:8082/tcp
       - 443:443/tcp
@@ -150,8 +150,13 @@ services:
         reservations:
           memory: 256M
 
+  # Optional: COMPOSE_PROFILES=ollama in .env, or `make up-ollama`.
   ollama:
-    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    build:
+      context: ./ollama
+      dockerfile: ${OLLAMA_DOCKERFILE:-Dockerfile}
+    image: r3ngine-ollama:latest
     volumes:
       - ollama_data:/root/.ollama
     networks:
@@ -159,7 +164,7 @@ services:
     restart: always
 
   neo4j:
-    image: neo4j:5.12.0
+    image: neo4j:5.26-community
     restart: always
     ports:
       - "127.0.0.1:8474:7474"
@@ -187,13 +192,15 @@ services:
         reservations:
           memory: 1G
 
+  # Optional: COMPOSE_PROFILES=tor in .env, or `make up-tor`.
   tor:
+    profiles: ["tor"]
     build:
       context: ../web/tor
     image: r3ngine-tor:latest
-    container_name: tor
-    restart: "no"
-    profiles: ["tor"]
+    restart: always
+    environment:
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-}
     networks:
       - r3ngine_network
     deploy:
@@ -203,24 +210,46 @@ services:
         reservations:
           memory: 64M
 
+  # Same layout as docker-compose.yml: schema job, server, namespace job.
+  temporal-schema:
+    image: temporalio/admin-tools:1.31.3
+    restart: on-failure:5
+    entrypoint: [ "/bin/sh", "/scripts/setup-schema.sh" ]
+    environment:
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=db
+    volumes:
+      - ./temporal/setup-schema.sh:/scripts/setup-schema.sh:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - r3ngine_network
+
   temporal:
-    image: temporalio/auto-setup:1.22.4
+    image: temporalio/server:1.31.3
     restart: always
     ports:
       - "127.0.0.1:7233:7233"
     environment:
-      - DB=postgresql
+      - DB=postgres12
       - DB_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_SEEDS=db
+    volumes:
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      temporal-schema:
+        condition: service_completed_successfully
     networks:
       - r3ngine_network
     healthcheck:
-      test: [ "CMD", "tctl", "namespace", "list" ]
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://temporal:7243/api/v1/namespaces/default" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -232,8 +261,24 @@ services:
         reservations:
           memory: 1G
 
+  temporal-create-namespace:
+    image: temporalio/admin-tools:1.31.3
+    restart: on-failure:5
+    entrypoint: [ "/bin/sh", "/scripts/create-namespace.sh" ]
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - DEFAULT_NAMESPACE=default
+      - DEFAULT_NAMESPACE_RETENTION=24h
+    volumes:
+      - ./temporal/create-namespace.sh:/scripts/create-namespace.sh:ro
+    depends_on:
+      temporal:
+        condition: service_started
+    networks:
+      - r3ngine_network
+
   temporal-ui:
-    image: temporalio/ui:2.27.2
+    image: temporalio/ui:2.54.1
     restart: always
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
@@ -268,7 +313,11 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-}
     depends_on:
+      # Also what starts the job under `make devup`, which names its services.
+      temporal-create-namespace:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       neo4j:

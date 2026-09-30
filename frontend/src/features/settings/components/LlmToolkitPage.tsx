@@ -49,8 +49,6 @@ import {
   useOllamaPullStatus,
   useTestLlmConnection,
   useOllamaServiceStatus,
-  useStartOllamaService,
-  useStopOllamaService,
 } from '../api';
 import type { LLMConfig, LLMModel, TestLlmConnectionResult } from '../api';
 
@@ -65,8 +63,6 @@ export const LlmToolkitPage: React.FC = () => {
   const toggleLlmEnabled = useToggleLlmEnabled(projectSlug);
   const testConnection = useTestLlmConnection(projectSlug);
   const { data: ollamaStatus } = useOllamaServiceStatus(projectSlug);
-  const startOllama = useStartOllamaService(projectSlug);
-  const stopOllama = useStopOllamaService(projectSlug);
 
   const [selectedProvider, setSelectedProvider] = useState<string>('ollama');
   const [showKey, setShowKey] = useState(false);
@@ -230,44 +226,6 @@ export const LlmToolkitPage: React.FC = () => {
           severity: 'error',
         });
       },
-    });
-  };
-
-  const handleStartOllama = () => {
-    startOllama.mutate(undefined, {
-      onSuccess: (data) => {
-        setSnackbar({
-          open: true,
-          message: data.message || 'Ollama service starting...',
-          severity: 'success',
-        });
-      },
-      onError: (error: any) => {
-        setSnackbar({
-          open: true,
-          message: `Failed to start Ollama: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
-          severity: 'error',
-        });
-      }
-    });
-  };
-
-  const handleStopOllama = () => {
-    stopOllama.mutate(undefined, {
-      onSuccess: (data) => {
-        setSnackbar({
-          open: true,
-          message: data.message || 'Ollama service stopped.',
-          severity: 'info',
-        });
-      },
-      onError: (error: any) => {
-        setSnackbar({
-          open: true,
-          message: `Failed to stop Ollama: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
-          severity: 'error',
-        });
-      }
     });
   };
 
@@ -440,51 +398,23 @@ export const LlmToolkitPage: React.FC = () => {
                       ) : (
                         <AlertCircle size={16} color="#ff3131" />
                       )}
-                      <Typography sx={{ 
-                        fontSize: '0.85rem', 
+                      <Typography sx={{
+                        fontSize: '0.85rem',
                         fontWeight: 600,
-                        color: ollamaStatus?.running ? tokens.accent.primary : '#ff3131' 
+                        color: ollamaStatus?.running ? tokens.accent.primary : '#ff3131'
                       }}>
-                        {ollamaStatus?.running ? 'RUNNING' : 'STOPPED'}
+                        {ollamaStatus?.running
+                          ? `RUNNING${ollamaStatus.version ? ` (v${ollamaStatus.version})` : ''}`
+                          : 'STOPPED'}
                       </Typography>
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    {!ollamaStatus?.running ? (
-                      <Button
-                        variant="contained"
-                        onClick={handleStartOllama}
-                        disabled={startOllama.isPending}
-                        startIcon={startOllama.isPending ? <CircularProgress size={14} color="inherit" /> : <Database size={16} />}
-                        sx={{
-                          bgcolor: `${tokens.accent.primary}1A`,
-                          color: tokens.accent.primary,
-                          border: `1px solid ${tokens.accent.primary}4D`,
-                          fontFamily: 'Orbitron',
-                          fontSize: '0.75rem',
-                          '&:hover': { bgcolor: `${tokens.accent.primary}33` }
-                        }}
-                      >
-                        {startOllama.isPending ? 'STARTING...' : 'START LOCAL SERVICE'}
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outlined"
-                        onClick={handleStopOllama}
-                        disabled={stopOllama.isPending}
-                        startIcon={stopOllama.isPending ? <CircularProgress size={14} color="inherit" /> : <XCircle size={16} />}
-                        sx={{
-                          borderColor: 'rgba(255, 49, 49, 0.3)',
-                          color: '#ff3131',
-                          fontFamily: 'Orbitron',
-                          fontSize: '0.75rem',
-                          '&:hover': { borderColor: '#ff3131', bgcolor: 'rgba(255, 49, 49, 0.05)' }
-                        }}
-                      >
-                        {stopOllama.isPending ? 'STOPPING...' : 'STOP LOCAL SERVICE'}
-                      </Button>
-                    )}
-                  </Box>
+                  {/* The service is started from the host (compose profile), not from here. */}
+                  <Typography sx={{ color: 'text.secondary', fontSize: '0.8rem', flexBasis: '100%' }}>
+                    {ollamaStatus?.running
+                      ? `Compose service reachable at ${ollamaStatus.url ?? 'http://ollama:11434'}.`
+                      : (ollamaStatus?.hint ?? 'Ollama is an optional compose service; enable the "ollama" profile and run make up.')}
+                  </Typography>
                 </Box>
               )}
 

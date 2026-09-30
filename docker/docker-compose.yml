@@ -70,7 +70,10 @@ services:
   redis:
     restart: always
     logging: *default-logging
-    image: "redis:alpine"
+    # Pinned to the 8.10 line: Redis cannot load an RDB written by a newer
+    # release, so the tag only moves forward on purpose. Upgrading notes in
+    # documents/upgrading-infrastructure.md.
+    image: "redis:8.10-alpine"
     # maxmemory sits below the 768M cgroup limit so Redis evicts instead of
     # being OOM-killed: a kill plus `restart: always` brings it back empty,
     # which silently drops the live Channels groups and the Django cache.
@@ -137,6 +140,8 @@ services:
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
       - TEMPORAL_HOST=temporal:7233
       - TEMPORAL_NAMESPACE=default
+      # Control-port password of the optional tor service (profile "tor").
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-}
     volumes:
       - ../web:/usr/src/app
       - ../frontend:/usr/src/app/frontend
@@ -150,7 +155,8 @@ services:
       - static_volume:/usr/src/app/staticfiles/
       #- plugins_data:/usr/src/app/plugins_data
       - ../secrets/certs/ca.crt:/usr/src/app/ca.crt:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+      # No /var/run/docker.sock: plugin restarts exit the process (restart: always),
+      # tool probes run on the orchestrator, and Tor/Ollama are profile services.
       - ./web/entrypoint.sh:/usr/src/app/entrypoint.sh:ro
       - exploitdb:/usr/src/exploitdb
       - assessments_data:/usr/src/assessments
@@ -222,7 +228,7 @@ services:
   proxy:
     restart: always
     logging: *default-logging
-    image: nginx:alpine
+    image: nginx:1.31-alpine
     ports:
       - 8082:8082/tcp
       - 443:443/tcp
@@ -251,7 +257,9 @@ services:
           memory: 128M
 
   neo4j:
-    image: neo4j:5.12.0
+    # 5.26 is the Neo4j 5 LTS line. A store opened by 5.26 no longer starts on
+    # 5.12, so going back means restoring a backup taken before the upgrade.
+    image: neo4j:5.26-community
     restart: always
     logging: *default-logging
     # Override entrypoint to remove stale PID file before each start.
@@ -294,14 +302,21 @@ services:
         reservations:
           memory: 1G
 
+  # Optional services. Enable with COMPOSE_PROFILES=tor,ollama in .env (the
+  # Makefile then includes them in every target) or start one directly with
+  # `make up-tor` / `make up-ollama`. The application only checks that they
+  # answer on the compose network; it never starts or stops them.
   tor:
+    profiles: ["tor"]
     build:
       context: ../web/tor
     image: r3ngine-tor:latest
-    container_name: tor
-    restart: "no"
+    restart: always
     logging: *default-logging
-    profiles: ["tor"]
+    environment:
+      # Shared with web and the orchestrator, which authenticate on the control
+      # port to request new circuits. The entrypoint refuses to start without it.
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-}
     networks:
       - r3ngine_network
     deploy:
@@ -311,29 +326,80 @@ services:
         reservations:
           memory: 64M
 
-  temporal:
-    image: temporalio/auto-setup:1.22.4
+  ollama:
+    profiles: ["ollama"]
+    build:
+      context: ./ollama
+      # nvidia.Dockerfile / amd.Dockerfile select the GPU images; device
+      # passthrough still has to be configured on the host.
+      dockerfile: ${OLLAMA_DOCKERFILE:-Dockerfile}
+    image: r3ngine-ollama:latest
     restart: always
     logging: *default-logging
-    ports:
-      - "127.0.0.1:7233:7233"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - r3ngine_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # Temporal runs as three services: a one-shot schema job, the server, and a
+  # one-shot job that registers the "default" namespace. temporalio/auto-setup
+  # did all three in one container, but it is a development image and stopped
+  # at 1.29. An existing database is moved between releases with
+  # scripts/temporal_upgrade.sh — see documents/upgrading-infrastructure.md.
+  temporal-schema:
+    image: temporalio/admin-tools:1.31.3
+    restart: on-failure:5
+    logging: *default-logging
+    entrypoint: [ "/bin/sh", "/scripts/setup-schema.sh" ]
     environment:
-      - DB=postgresql
       - DB_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_SEEDS=db
+    volumes:
+      - ./temporal/setup-schema.sh:/scripts/setup-schema.sh:ro
     depends_on:
       db:
         condition: service_healthy
     networks:
       - r3ngine_network
+
+  temporal:
+    image: temporalio/server:1.31.3
+    restart: always
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:7233:7233"
+    environment:
+      # postgres12 selects the SQL advanced visibility store; the "postgresql"
+      # plugin meant standard visibility, which Temporal removed in 1.24.
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=db
+    volumes:
+      # The server refuses to start without a dynamic config file.
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      temporal-schema:
+        condition: service_completed_successfully
+    networks:
+      - r3ngine_network
     healthcheck:
-      # tctl defaults to 127.0.0.1:7233, but the frontend binds to the container's
-      # network address, not loopback — so the check answered "connection refused"
-      # against a perfectly healthy server and the container sat unhealthy forever.
-      test: [ "CMD", "tctl", "--address", "temporal:7233", "namespace", "list" ]
+      # The server image ships no CLI, so ask the frontend's HTTP API (port 7243)
+      # for the namespace the workers use: healthy means ready for them. It binds
+      # the container's network address, not loopback, hence "temporal:" rather
+      # than localhost.
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://temporal:7243/api/v1/namespaces/default" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -346,6 +412,23 @@ services:
         reservations:
           memory: 512M
 
+  temporal-create-namespace:
+    image: temporalio/admin-tools:1.31.3
+    restart: on-failure:5
+    logging: *default-logging
+    entrypoint: [ "/bin/sh", "/scripts/create-namespace.sh" ]
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - DEFAULT_NAMESPACE=default
+      # Same retention auto-setup gave the namespace.
+      - DEFAULT_NAMESPACE_RETENTION=24h
+    volumes:
+      - ./temporal/create-namespace.sh:/scripts/create-namespace.sh:ro
+    depends_on:
+      temporal:
+        condition: service_started
+    networks:
+      - r3ngine_network
 
   temporal-python-orchestrator:
     image: ${R3NGINE_IMAGE:-r3ngine:local}
@@ -369,9 +452,15 @@ services:
       - NEO4J_URI=${NEO4J_URI}
       - NEO4J_USER=${NEO4J_USER}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      # TorNewCircuitActivity rotates circuits from here (profile "tor").
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-}
     depends_on:
       temporal:
         condition: service_healthy
+      # Not needed for ordering (temporal turns healthy once the namespace
+      # exists), but `make up` names its services, and this is what starts the job.
+      temporal-create-namespace:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       neo4j:

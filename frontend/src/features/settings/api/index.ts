@@ -288,8 +288,16 @@ export const useProxyTaskStatus = (slug: string, taskId: string | null) => {
   });
 };
 
+export interface TorStatus {
+  running: boolean;
+  host?: string;
+  port?: number;
+  /** How to enable the optional `tor` compose service; null while it runs. */
+  hint?: string | null;
+}
+
 export const useTorStatus = () => {
-  return useQuery<{ running: boolean }>({
+  return useQuery<TorStatus>({
     queryKey: ['tor-status'],
     queryFn: async () => {
       const response = await axios.get('/api/rengine/tor-status/', {
@@ -657,8 +665,19 @@ export const useOllamaPullStatus = (slug: string, model: string | null) => {
   });
 };
 
+export interface OllamaServiceStatus {
+  status: string;
+  running: boolean;
+  url?: string;
+  version?: string | null;
+  /** How to enable the optional `ollama` compose service; null while it runs. */
+  hint?: string | null;
+}
+
+// Ollama is a compose service (profile `ollama`); the app only reports whether
+// it answers, so there are no start/stop mutations here.
 export const useOllamaServiceStatus = (slug: string) => {
-  return useQuery<{ status: string; running: boolean }>({
+  return useQuery<OllamaServiceStatus>({
     queryKey: ['ollama-service-status', slug],
     queryFn: async () => {
       const response = await axios.get(`/scanEngine/${slug}/ollama/service_status`, {
@@ -667,42 +686,6 @@ export const useOllamaServiceStatus = (slug: string) => {
       return response.data;
     },
     refetchInterval: 5000,
-  });
-};
-
-export const useStartOllamaService = (slug: string) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const response = await axios.post(`/scanEngine/${slug}/ollama/service_start`, {}, {
-        headers: {
-          'X-CSRFToken': getCsrfToken(),
-          'Accept': 'application/json'
-        }
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ollama-service-status', slug] });
-    },
-  });
-};
-
-export const useStopOllamaService = (slug: string) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const response = await axios.post(`/scanEngine/${slug}/ollama/service_stop`, {}, {
-        headers: {
-          'X-CSRFToken': getCsrfToken(),
-          'Accept': 'application/json'
-        }
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ollama-service-status', slug] });
-    },
   });
 };
 
