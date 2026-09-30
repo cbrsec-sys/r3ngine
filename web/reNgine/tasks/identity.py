@@ -77,7 +77,7 @@ def classify_url(url: str) -> Optional[Tuple[str, float]]:
     import urllib.parse
     try:
         parsed = urllib.parse.urlparse(url)
-    except Exception:
+    except ValueError:
         return None
 
     # LDAP scheme — direct scheme check per Rule 3.1

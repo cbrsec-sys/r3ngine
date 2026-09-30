@@ -28,6 +28,7 @@ import {
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { formatDistanceToNow } from 'date-fns';
+import type { ApiErrorLike } from '../../../types/errors';
 
 export const RemoteWorkersPage: React.FC = () => {
   const { tokens, theme } = useThemeTokens();
@@ -63,10 +64,11 @@ export const RemoteWorkersPage: React.FC = () => {
         message: 'Worker created successfully',
         severity: 'success',
       });
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as ApiErrorLike;
       setSnackbar({
         open: true,
-        message: err.response?.data?.message || 'Failed to create worker',
+        message: err?.response?.data?.message || 'Failed to create worker',
         severity: 'error',
       });
     }
@@ -91,10 +93,11 @@ export const RemoteWorkersPage: React.FC = () => {
           message: 'Worker deleted successfully',
           severity: 'success',
         });
-      } catch (err: any) {
+      } catch (caught) {
+        const err = caught as ApiErrorLike;
         setSnackbar({
           open: true,
-          message: err.response?.data?.message || 'Failed to delete worker',
+          message: err?.response?.data?.message || 'Failed to delete worker',
           severity: 'error',
         });
       }

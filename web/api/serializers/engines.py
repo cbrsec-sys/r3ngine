@@ -114,12 +114,6 @@ class WordlistSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
-class ConfigurationSerializer(serializers.ModelSerializer):
-	class Meta:
-		model = Configuration
-		fields = '__all__'
-
-
 class HardwareProfileSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = HardwareProfile

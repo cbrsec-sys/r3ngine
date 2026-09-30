@@ -393,7 +393,17 @@ export const updateBurpConfig = async (config: Partial<BurpConfig>): Promise<Bur
   return data;
 };
 
-export const fetchBurpHealth = async (): Promise<any> => {
+/**
+ * `GET /api/plugins/burpsuite_integration/health/`, served by the external plugin; only
+ * `status` (`'ok'` when Burp is reachable) and `message` are read.
+ */
+export interface BurpHealth {
+  status: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
+export const fetchBurpHealth = async (): Promise<BurpHealth> => {
   const { data } = await axios.get('/api/plugins/burpsuite_integration/health/');
   return data;
 };

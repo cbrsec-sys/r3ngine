@@ -16,6 +16,7 @@ import {
 import { Bug, X, ExternalLink } from 'lucide-react';
 import type { Subdomain } from './types';
 import { searchsploitForSubdomain, type ExploitResult } from './api';
+import type { ApiErrorLike } from '../../types/errors';
 
 interface SearchsploitModalProps {
   open: boolean;
@@ -63,8 +64,9 @@ export const SearchsploitModal: React.FC<SearchsploitModalProps> = ({ open, onCl
       } else {
         setErrorMsg(result.message || 'Search failed');
       }
-    } catch (error: any) {
-      setErrorMsg(error.response?.data?.message || 'Error running searchsploit');
+    } catch (caught) {
+      const error = caught as ApiErrorLike;
+      setErrorMsg(error?.response?.data?.message || 'Error running searchsploit');
     } finally {
       setLoading(false);
     }

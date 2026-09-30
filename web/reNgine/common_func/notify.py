@@ -236,8 +236,9 @@ def send_discord_message(
 			try:
 				msg_id = response.json().get('id', '')
 				DISCORD_WEBHOOKS_CACHE.set(title, msg_id)
-			except Exception:
-				pass
+			except (ValueError, AttributeError, redis.RedisError):
+				# Without the cached id the next update posts a new message instead of editing.
+				logger.warning("Could not cache Discord message id for %s", title, exc_info=True)
 
 	# Get status code
 	if response.status_code == 429:

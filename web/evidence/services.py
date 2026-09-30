@@ -302,29 +302,34 @@ class EvidenceService:
     def purge_evidence(evidence: Evidence, actor=None, delete_file: bool = False) -> None:
         """Purge evidence from the database (and optionally from storage).
 
-        Always writes a Purged chain-of-custody event before deletion,
-        so the audit trail survives even if the file is deleted.
+        Always writes a Purged chain-of-custody event recording what actually
+        happened to the stored file, so the audit trail does not claim a file
+        was destroyed when the storage backend failed to delete it.
 
         Args:
             evidence (Evidence): The evidence item to purge.
             actor: Optional User triggering the purge.
             delete_file (bool): If True, also delete the file from storage.
         """
-        # Record purge event before anything else
+        if not delete_file:
+            file_outcome = 'not requested'
+        elif not evidence.file_path:
+            file_outcome = 'no stored file'
+        else:
+            try:
+                deleted = get_storage_backend().delete(evidence.file_path)
+            except Exception:
+                logger.warning("[EVIDENCE] Failed to delete file for %s", evidence.uuid, exc_info=True)
+                deleted = False
+            file_outcome = 'deleted' if deleted else 'FAILED, file may remain in storage'
+
         EvidenceEvent.objects.create(
             evidence=evidence,
             event_type='Purged',
             actor=actor,
-            note=f"Purged. File deleted from storage: {delete_file}",
+            note=f"Purged. Stored file: {file_outcome}",
             timestamp=timezone.now(),
         )
-
-        if delete_file and evidence.file_path:
-            try:
-                storage = get_storage_backend()
-                storage.delete(evidence.file_path)
-            except Exception as e:
-                logger.warning("[EVIDENCE] Failed to delete file for %s: %s", evidence.uuid, e)
 
         evidence.status = 'Purged'
         evidence.file_path = None

@@ -207,31 +207,47 @@ function serialiseConfigToYaml(config: EngineConfig): string {
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
 
+/**
+ * Engine YAML is user-edited, so every value is `unknown` until read: mappings go through
+ * `asMapping`, and leaf values are taken at the type the engine schema declares for them.
+ */
+type YamlMapping = Record<string, unknown>;
+
+/** A YAML mapping node, or `{}` for a missing/null node or a list. */
+function asMapping(node: unknown): YamlMapping {
+  return typeof node === 'object' && node !== null && !Array.isArray(node) ? (node as YamlMapping) : {};
+}
+
 function parseYamlToConfig(yamlStr: string): EngineConfig {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw: any = yamlLoad(yamlStr) ?? {};
+  const doc: unknown = yamlLoad(yamlStr);
+  if (doc !== null && doc !== undefined && typeof doc !== 'object') {
+    throw new Error('Engine configuration must be a YAML mapping');
+  }
+  const raw = asMapping(doc);
   const def = DEFAULT_ENGINE_CONFIG;
 
   // Merge osint.leaks_and_secrets into top-level leaks_and_secrets
-  const osintLeaks = raw.osint?.leaks_and_secrets ?? {};
-  const topLeaks = raw.leaks_and_secrets ?? {};
+  const osintLeaks = asMapping(asMapping(raw.osint).leaks_and_secrets);
+  const topLeaks = asMapping(raw.leaks_and_secrets);
   const mergedLeaks = { ...osintLeaks, ...topLeaks };
 
   const g = def.global;
-  const global: EngineConfig['global'] = {
-    threads: raw.threads ?? g.threads,
-    timeout: raw.timeout ?? g.timeout,
-    rate_limit: raw.rate_limit ?? g.rate_limit,
-    retries: raw.retries ?? g.retries,
-    intensity: raw.intensity ?? g.intensity,
-    custom_headers: raw.custom_headers ?? [],
-    enable_http_crawl: raw.enable_http_crawl ?? g.enable_http_crawl,
+  type GlobalConfig = EngineConfig['global'];
+  const globalValue = <K extends keyof GlobalConfig>(key: K, fallback: GlobalConfig[K]): GlobalConfig[K] =>
+    (raw[key] as GlobalConfig[K] | undefined) ?? fallback;
+  const global: GlobalConfig = {
+    threads: globalValue('threads', g.threads),
+    timeout: globalValue('timeout', g.timeout),
+    rate_limit: globalValue('rate_limit', g.rate_limit),
+    retries: globalValue('retries', g.retries),
+    intensity: globalValue('intensity', g.intensity),
+    custom_headers: globalValue('custom_headers', []),
+    enable_http_crawl: globalValue('enable_http_crawl', g.enable_http_crawl),
   };
 
-  function section<T>(key: string, map: (r: Record<string, unknown>) => T, defConfig: T): { enabled: boolean; config: T } {
+  function section<T>(key: string, map: (r: YamlMapping) => T, defConfig: T): { enabled: boolean; config: T } {
     const present = key in raw && raw[key] !== null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const r: Record<string, unknown> = present ? (raw[key] as any) : {};
+    const r = present ? asMapping(raw[key]) : {};
     return { enabled: present, config: present ? map(r) : defConfig };
   }
 
@@ -399,14 +415,11 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     }), def.vigolium_analysis.config) as EngineConfig['vigolium_analysis'],
 
     vulnerability_scan: section('vulnerability_scan', (r) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const n: any = r.nuclei ?? {};
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cp: any = r.cpanel_scanner ?? {};
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vig: any = r.vigolium ?? {};
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ac: any = r.acunetix ?? {};
+      type VulnScan = EngineConfig['vulnerability_scan']['config'];
+      const n = asMapping(r.nuclei) as Partial<VulnScan['nuclei']>;
+      const cp = asMapping(r.cpanel_scanner) as Partial<VulnScan['cpanel_scanner']>;
+      const vig = asMapping(r.vigolium) as Partial<VulnScan['vigolium']>;
+      const ac = asMapping(r.acunetix) as Partial<NonNullable<VulnScan['acunetix']>>;
       return {
         run_nuclei: (r.run_nuclei as boolean) ?? true,
         run_dalfox: (r.run_dalfox as boolean) ?? false,
@@ -525,8 +538,7 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
     patch: Partial<EngineConfig[K]['config']>
   ) => {
     setConfig((prev) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const prevSection = prev[section] as any;
+      const prevSection = prev[section];
       const next: EngineConfig = {
         ...prev,
         [section]: {

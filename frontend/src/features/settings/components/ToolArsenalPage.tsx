@@ -49,6 +49,7 @@ import { useParams } from '@tanstack/react-router';
 import { ToolFormModal } from './ToolFormModal';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getSafeUrl } from '../../../utils/securityUtils';
+import type { ApiErrorLike } from '../../../types/errors';
 
 export const ToolArsenalPage: React.FC = () => {
   const { tokens } = useThemeTokens();
@@ -122,10 +123,11 @@ export const ToolArsenalPage: React.FC = () => {
           setVersionError(prev => ({ ...prev, [toolId]: data.message || 'ERROR' }));
         }
       },
-      onError: (error: any) => {
+      onError: (caught) => {
+        const error = caught as ApiErrorLike;
         clearTimeout(timeoutId);
         setLoadingTools(prev => ({ ...prev, [toolId]: false }));
-        setVersionError(prev => ({ ...prev, [toolId]: error.response?.data?.message || 'UNABLE TO CHECK VERSION' }));
+        setVersionError(prev => ({ ...prev, [toolId]: error?.response?.data?.message || 'UNABLE TO CHECK VERSION' }));
       }
     });
   };
@@ -165,8 +167,9 @@ export const ToolArsenalPage: React.FC = () => {
           setSnackbar({ open: true, message: data.message || 'Tool updated successfully', severity: 'success' });
           setModal({ open: false });
         },
-        onError: (error: any) => {
-          setSnackbar({ open: true, message: error.response?.data?.message || 'Failed to update tool', severity: 'error' });
+        onError: (caught) => {
+          const error = caught as ApiErrorLike;
+          setSnackbar({ open: true, message: error?.response?.data?.message || 'Failed to update tool', severity: 'error' });
         }
       });
     } else {
@@ -175,8 +178,9 @@ export const ToolArsenalPage: React.FC = () => {
           setSnackbar({ open: true, message: data.message || 'Tool added successfully', severity: 'success' });
           setModal({ open: false });
         },
-        onError: (error: any) => {
-          setSnackbar({ open: true, message: error.response?.data?.message || 'Failed to add tool', severity: 'error' });
+        onError: (caught) => {
+          const error = caught as ApiErrorLike;
+          setSnackbar({ open: true, message: error?.response?.data?.message || 'Failed to add tool', severity: 'error' });
         }
       });
     }
@@ -504,7 +508,7 @@ export const ToolArsenalPage: React.FC = () => {
       >
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity as any}
+          severity={snackbar.severity}
           sx={{
             width: '100%',
             bgcolor: snackbar.severity === 'success' ? '#00c853' : snackbar.severity === 'error' ? '#ff1744' : '#2979ff',

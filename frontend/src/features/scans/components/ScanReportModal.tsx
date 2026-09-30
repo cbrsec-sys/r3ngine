@@ -27,6 +27,7 @@ import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getDialogPaperSx, getFieldSx } from '../../../theme/semanticColors';
 import { createScanReport, fetchScanReportStatus } from '../api/reports';
 import { getSafeUrl } from '../../../utils/securityUtils';
+import type { ResolvedThemeTokens } from '../../../theme/tokens';
 
 const SectionTitle = ({ title, icon }: { title: string, icon?: React.ReactNode }) => {
   const { tokens } = useThemeTokens();
@@ -203,7 +204,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
   const handleDownload = () => initiateReport(true);
   const handlePreview = () => initiateReport(false);
 
-  const getFieldStyles = (isLight: boolean, tokens: any) => ({
+  const getFieldStyles = (isLight: boolean, tokens: ResolvedThemeTokens) => ({
     ...getFieldSx(isLight, tokens),
     '& .MuiOutlinedInput-root': {
       ...getFieldSx(isLight, tokens)['& .MuiOutlinedInput-root'],

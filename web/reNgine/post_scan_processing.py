@@ -100,7 +100,9 @@ def _fetch_and_parse_spec(candidate_url: str, proxy: str | None) -> list[dict]:
     Returns:
         List of parameter finding dicts (CPDE format), possibly empty.
     """
-    from reNgine.cpde.openapi_discoverer import _parse_spec
+    import yaml
+
+    from reNgine.cpde.openapi_discoverer import SPEC_PARSE_ERRORS, _parse_spec
 
     proxies = {'http': proxy, 'https': proxy} if proxy else None
     session = requests.Session()
@@ -128,15 +130,14 @@ def _fetch_and_parse_spec(candidate_url: str, proxy: str | None) -> list[dict]:
     if 'json' in content_type:
         try:
             spec = resp.json()
-        except Exception:
+        except SPEC_PARSE_ERRORS:
             pass
 
     # ── Case 2: Raw YAML spec ────────────────────────────────────────────────
     elif 'yaml' in content_type:
         try:
-            import yaml
             spec = yaml.safe_load(resp.text)
-        except Exception:
+        except SPEC_PARSE_ERRORS:
             pass
 
     # ── Case 3: HTML — Swagger UI page; extract embedded spec URL ───────────
@@ -153,11 +154,10 @@ def _fetch_and_parse_spec(candidate_url: str, proxy: str | None) -> list[dict]:
     else:
         try:
             spec = resp.json()
-        except Exception:
+        except SPEC_PARSE_ERRORS:
             try:
-                import yaml
                 spec = yaml.safe_load(resp.text)
-            except Exception:
+            except SPEC_PARSE_ERRORS:
                 # Last resort: check if it looks like HTML (Swagger UI page)
                 if '<html' in resp.text[:500].lower():
                     spec_url = _extract_spec_url_from_swagger_ui(resp.text, candidate_url)

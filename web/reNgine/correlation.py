@@ -29,9 +29,9 @@ class VulnerabilityCorrelationEngine:
 				config = yaml.safe_load(self.scan_history.scan_type.yaml_configuration)
 				if isinstance(config, dict):
 					self.tier7_config = config.get('tier_7', {})
-			except Exception:
-				pass
-				
+			except yaml.YAMLError:
+				logger.warning("Invalid engine YAML; tier_7 correlation settings use defaults", exc_info=True)
+
 		self.weights = {
 			'severity': 0.4,
 			'multi_tool_match': 0.25,

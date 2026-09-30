@@ -1,10 +1,14 @@
 import { useQuery, useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import type { operations, components } from '@/types/api';
-import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, ScanTierRetryResponse, SecretLeak, DirectoryFile } from '../types';
-import type { Domain } from '../../targets/types';
+import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, ScanTierRetryResponse, SecretLeak, DirectoryFile, DirectorySubdomainSummary, EmailBreach, ScanStatusResponse } from '../types';
+import type { Domain, DomainListResponse } from '../../targets/types';
 
+/**
+ * `GET /api/listDirectories/`: the endpoint files of one subdomain when `subdomain_id` is set,
+ * otherwise one summary row per subdomain of the scan that has endpoints.
+ */
 export const useDirectories = (params: { scan_id?: string | number, subdomain_id?: string | number, page?: number }) => {
-  return useQuery<{ count: number, next: string | null, previous: string | null, results: DirectoryFile[] }>({
+  return useQuery<{ count: number, next: string | null, previous: string | null, results: (DirectoryFile | DirectorySubdomainSummary)[] }>({
     queryKey: ['directories', params],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
@@ -34,7 +38,7 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["api_listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      const data: DomainListResponse = await response.json();
       return data.results || [];
     },
     enabled: !!projectSlug,
@@ -471,7 +475,7 @@ export const useSecretLeaks = (projectSlug: string, scanId: number) => {
 };
 
 export const useEmailBreaches = (scanId: number) => {
-  return useQuery<any[]>({
+  return useQuery<EmailBreach[]>({
     queryKey: ['email-breaches', scanId],
     queryFn: async () => {
       const response = await fetch(`/api/emailBreaches/?scan_id=${scanId}`, {
@@ -513,7 +517,7 @@ export const useCheckEmailBreach = () => {
 
 
 export const useScanStatus = (projectSlug: string, options: { enabled?: boolean } = {}) => {
-  return useQuery({
+  return useQuery<ScanStatusResponse>({
     queryKey: ['scan-status', projectSlug],
     queryFn: async () => {
       const response = await fetch(`/api/scan_status/?project=${projectSlug}`, {

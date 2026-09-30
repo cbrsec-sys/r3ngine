@@ -276,8 +276,8 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
                         # before concluding proxy failure (Nuclei deadline may have prevented
                         # the summary from being flushed correctly).
                         break
-                except Exception:
-                    pass
+                except (ValueError, AttributeError, TypeError):
+                    pass  # not a well-formed JSONL record
 
         # No valid scan-summary (or total_requests == 0).  Before blaming the proxy,
         # check whether the file already contains real findings from phases that ran
@@ -916,7 +916,7 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
     try:
         if os.path.exists(temp_db):
             os.unlink(temp_db)
-    except Exception:
-        pass
+    except OSError:
+        logger.warning("Could not remove vigolium temp db %s", temp_db, exc_info=True)
 
     return "Vigolium audit completed"

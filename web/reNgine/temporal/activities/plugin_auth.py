@@ -80,8 +80,8 @@ def extract_auth_for_url_activity(ctx: dict) -> dict:
                 redis_url = getattr(settings, 'REDIS_URL', 'redis://redis:6379/0')
                 client = redis.StrictRedis.from_url(redis_url)
                 client.xadd(f"auth:logs:{workflow_id}", {"data": json.dumps({"line": f"[{level}] {msg}"})})
-            except Exception:
-                pass
+            except redis.RedisError:
+                pass  # already logged above; only the live UI stream misses this line
 
     activity_heartbeat_safe("ExtractAuthForURLActivity starting for %s" % url)
     push_auth_log("START", "extracting auth from %s (scan %s)" % (url, scan_id))

@@ -23,6 +23,7 @@ import {
   Upload
 } from 'lucide-react';
 import Chart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import {
   useRengineSystemSettings,
   useDeleteAllScanResults,
@@ -187,7 +188,7 @@ export const ReNgineSettingsPage: React.FC = () => {
   const gaugeColor = isDanger ? '#ff1100' : (isWarning ? '#ffcc00' : tokens.accent.primary);
   const gradientColor = isDanger ? '#cc0000' : (isWarning ? '#997700' : tokens.accent.primary);
 
-  const chartOptions: any = {
+  const chartOptions: ApexOptions = {
     chart: {
       type: "radialBar",
       offsetY: -30,

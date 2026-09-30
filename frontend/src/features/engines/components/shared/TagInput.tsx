@@ -1,5 +1,5 @@
 import React from 'react';
-import { Autocomplete as MuiAutocomplete, TextField, Chip } from '@mui/material';
+import { Autocomplete, TextField, Chip } from '@mui/material';
 import { getFieldSx } from '../../../../theme/semanticColors';
 import { useThemeTokens } from '../../../../theme/useThemeTokens';
 
@@ -11,35 +11,35 @@ interface TagInputProps {
   helperText?: string;
 }
 
-const Autocomplete = MuiAutocomplete as any;
-
 export const TagInput: React.FC<TagInputProps> = ({ label, value, onChange, placeholder, helperText }) => {
   const { tokens, isLight } = useThemeTokens();
 
-  const renderTags = (tagValues: string[], getTagProps: any) =>
-    tagValues.map((option: string, index: number) => (
-      <Chip
-        {...getTagProps({ index })}
-        key={option}
-        label={option}
-        size="small"
-        sx={{
-          bgcolor: isLight ? tokens.accent.primary + '15' : tokens.accent.primary + '25',
-          color: tokens.accent.primary,
-          border: `1px solid ${tokens.accent.primary + '50'}`,
-        }}
-      />
-    ));
-
   return (
-    <Autocomplete
+    <Autocomplete<string, true, false, true>
       multiple
       freeSolo
       options={[]}
       value={value}
-      onChange={(_: any, next: string[]) => onChange(next)}
-      renderTags={renderTags}
-      renderInput={(params: any) => (
+      onChange={(_event, next) => onChange(next)}
+      renderValue={(tagValues, getItemProps) =>
+        tagValues.map((option, index) => {
+          const { key, ...itemProps } = getItemProps({ index });
+          return (
+            <Chip
+              key={key}
+              {...itemProps}
+              label={option}
+              size="small"
+              sx={{
+                bgcolor: isLight ? tokens.accent.primary + '15' : tokens.accent.primary + '25',
+                color: tokens.accent.primary,
+                border: `1px solid ${tokens.accent.primary + '50'}`,
+              }}
+            />
+          );
+        })
+      }
+      renderInput={(params) => (
         <TextField
           {...params}
           label={label}

@@ -60,7 +60,8 @@ class APMEOrchestrator:
                 try:
                     heartbeat_fn(detail)
                 except Exception:
-                    pass
+                    # A missed heartbeat must not abort the pipeline.
+                    logger.debug("APME heartbeat failed at %s", detail, exc_info=True)
 
         logger.info("APME Orchestrator: Starting for scan_history_id=%s", scan_history_id)
 
@@ -436,9 +437,9 @@ class APMEOrchestrator:
     @staticmethod
     def _find_representative_vuln(path: AttackPath, scan_history_id: int):
         """Find the most severe vulnerability mentioned in a path's steps."""
-        try:
-            from startScan.models import Vulnerability
+        from startScan.models import Vulnerability
 
+        try:
             for step in path.steps:
                 if step.from_id.startswith("vuln::"):
                     vuln_id = int(step.from_id.split("::")[-1])
@@ -446,7 +447,8 @@ class APMEOrchestrator:
                 if step.to_id.startswith("vuln::"):
                     vuln_id = int(step.to_id.split("::")[-1])
                     return Vulnerability.objects.get(id=vuln_id)
-        except Exception:
+        except (ValueError, Vulnerability.DoesNotExist):
+            # Malformed node id, or the vulnerability was deleted since graph build.
             pass
         return None
 

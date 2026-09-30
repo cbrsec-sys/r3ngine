@@ -70,10 +70,13 @@ export interface ProxySettings {
   skip_validation?: boolean;
 }
 
+/** `GET /scanEngine/<slug>/task_status/<id>` (`get_proxy_task_status`). */
 export interface ProxyTaskStatus {
   task_id: string;
-  status: 'PENDING' | 'PROGRESS' | 'SUCCESS' | 'FAILURE';
-  result: string | null;
+  /** `reNgine.job_tracker` state; `NOT_FOUND` when the job id expired or never existed. */
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILURE' | 'NOT_FOUND';
+  /** Set on `SUCCESS`: `fetch_proxies_task` stores the saved list and its size. */
+  result: string | { count: number; proxies: string } | null;
   message?: string;
   progress?: number;
 }
@@ -280,7 +283,7 @@ export const useProxyTaskStatus = (slug: string, taskId: string | null) => {
     enabled: !!taskId,
     refetchInterval: (query) => {
       const data = query.state.data as ProxyTaskStatus | undefined;
-      if (data && (data.status === 'SUCCESS' || data.status === 'FAILURE')) {
+      if (data && (data.status === 'SUCCESS' || data.status === 'FAILURE' || data.status === 'NOT_FOUND')) {
         return false;
       }
       return 2000;
@@ -850,6 +853,19 @@ export interface User {
   last_login_humanized: string;
 }
 
+/** Body of `POST /api/users/`. */
+export interface CreateUserPayload {
+  username: string;
+  password: string;
+  role: string;
+}
+
+/** Body of `POST /api/users/<id>/update_user/`; an omitted password is left unchanged. */
+export interface UpdateUserPayload {
+  role?: string;
+  password?: string;
+}
+
 export const useUsers = () => {
   return useQuery<User[]>({
     queryKey: ['users'],
@@ -863,7 +879,7 @@ export const useUsers = () => {
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateUserPayload) => {
       const response = await axios.post('/api/users/', data, {
         headers: {
           'X-CSRFToken': getCsrfToken(),
@@ -899,7 +915,7 @@ export const useToggleUserStatus = () => {
 export const useUpdateUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ userId, data }: { userId: number; data: any }) => {
+    mutationFn: async ({ userId, data }: { userId: number; data: UpdateUserPayload }) => {
       const response = await axios.post(`/api/users/${userId}/update_user/`, data, {
         headers: {
           'X-CSRFToken': getCsrfToken(),

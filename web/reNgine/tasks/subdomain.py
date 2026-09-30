@@ -362,8 +362,8 @@ def subdomain_discovery(
 									data = json.loads(b_line)
 									if data.get('description'):
 										description_text = f"baddns: {data.get('description')}"
-								except Exception:
-									pass
+								except (ValueError, AttributeError):
+									pass  # plain-text baddns line: keep the generic description
 								
 								save_vulnerability(
 									name=f"Subdomain Takeover on {subdomain_name}",

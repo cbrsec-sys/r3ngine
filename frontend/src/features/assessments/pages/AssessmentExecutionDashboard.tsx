@@ -30,7 +30,7 @@ export const AssessmentExecutionDashboard: React.FC = () => {
 
   // The latest state from WebSockets takes precedence, otherwise fallback to DB state
   const latestEvent = events.length > 0 ? events[events.length - 1] : null;
-  const currentStatus = latestEvent?.data?.status || assessment?.status || 'Draft';
+  const currentStatus = latestEvent?.data?.stage || assessment?.status || 'Draft';
   const progress = latestEvent?.data?.progress || 0;
 
   if (isLoading) return <Typography>Loading...</Typography>;

@@ -135,7 +135,8 @@ def download_js_files(
                     if content_length > _MAX_JS_SIZE_BYTES:
                         logger.warning('[CPDE:js_collector] Skipping %s — too large (%d bytes)', url, content_length)
                         return None
-                except Exception:
+                except (requests.RequestException, ValueError):
+                    # The HEAD size check is advisory; the GET below still streams with a cap.
                     pass
 
                 resp = session.get(url, timeout=_JS_DOWNLOAD_TIMEOUT, proxies=proxies, stream=True, verify=False)

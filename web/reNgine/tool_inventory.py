@@ -14,6 +14,7 @@ import shutil
 import subprocess
 from typing import Any, Optional
 
+from django.db import DatabaseError
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -342,8 +343,9 @@ def sync_installed_tools(*, probe_versions: bool = True) -> dict[str, Any]:
         if idx and idx % 8 == 0:
             try:
                 ensure_db_connection()
-            except Exception:
-                pass
+            except DatabaseError:
+                # Phase 3 reconnects before writing; note the outage meanwhile.
+                logger.warning('DB keepalive failed during tool sync', exc_info=True)
         try:
             path = resolve_binary_path(row['name'], row['github_clone_path'])
             version = None
@@ -415,7 +417,7 @@ def sync_installed_tools(*, probe_versions: bool = True) -> dict[str, Any]:
                 tool.last_sync_error = str(exc)[:500]
                 tool.save(update_fields=['last_sync_error'])
             except Exception:
-                pass
+                logger.warning('Could not record sync error on tool id=%s', tool_id, exc_info=True)
             errors += 1
 
     return {

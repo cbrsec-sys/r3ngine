@@ -56,8 +56,9 @@ export const useGraphNodeDetails = (projectSlug: string, nodeId: string | null) 
   });
 };
 
+/** Downstream subgraph of a node (`Neo4jManager.get_blast_radius`, same shape as the graph data). */
 export const useGraphBlastRadius = (projectSlug: string, nodeId: string | null) => {
-  return useQuery({
+  return useQuery<GraphData>({
     queryKey: ['graph-blast-radius', projectSlug, nodeId],
     queryFn: async () => {
       const response = await fetch(`/${projectSlug}/api/graph/blast-radius/${nodeId}/`, { credentials: 'include' });

@@ -10,6 +10,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { LoginPage } from "./features/auth/components/LoginPage";
 import { LogoutPage } from "./features/auth/components/LogoutPage";
 import { OnboardingPage } from "./features/auth/components/OnboardingPage";
+import type { CurrentUser } from "./features/auth/api";
 
 // Lazy Routes
 const DashboardPage = lazyRouteComponent(() => import("./features/dashboard").then(m => ({ default: m.DashboardPage })));
@@ -57,7 +58,7 @@ interface RouterContext {
   auth: {
     isAuthenticated: boolean;
     isLoading: boolean;
-    user: any;
+    user: CurrentUser | null;
   };
 }
 

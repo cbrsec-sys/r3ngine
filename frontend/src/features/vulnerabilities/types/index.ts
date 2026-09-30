@@ -1,6 +1,27 @@
 import type { components, operations } from '@/types/api';
 
-export type Vulnerability = components["schemas"]["Vulnerability"];
+/**
+ * `VulnerabilitySerializer.get_scan_history`: the scan's own columns (`model_to_dict`, so
+ * relations are ids) with a few display fields added, or `{}` when the finding has no scan.
+ */
+export interface VulnerabilityScanHistory {
+  id?: number;
+  start_scan_date?: string;
+  stop_scan_date?: string | null;
+  scan_status?: number;
+  scan_type?: number;
+  results_dir?: string;
+  error_message?: string | null;
+  domain?: { name: string };
+  initiated_by?: components["schemas"]["MinimalUser"] | null;
+  aborted_by?: components["schemas"]["MinimalUser"] | null;
+  completed_ago?: string | null;
+}
+
+/** drf-yasg types the `scan_history` `SerializerMethodField` as `string`; restated here. */
+export type Vulnerability = Omit<components["schemas"]["Vulnerability"], "scan_history"> & {
+  readonly scan_history?: VulnerabilityScanHistory;
+};
 
 export type VulnerabilityResponse = operations["api_listVulnerability_list"]["responses"]["200"]["content"]["application/json"];
 

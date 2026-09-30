@@ -474,8 +474,8 @@ def run_command(
                 try:
                     if popen.stdout:
                         popen.stdout.close()
-                except Exception:
-                    pass
+                except OSError:
+                    pass  # stream already broken; the process is reaped below
                 try:
                     if popen.poll() is None:
                         try:
@@ -1233,8 +1233,8 @@ def stream_command(
 			if proc.stdout:
 				try:
 					proc.stdout.close()
-				except Exception:
-					pass
+				except OSError:
+					pass  # stream already broken; the process was killed above
 
 	watchdog_thread = threading.Thread(
 		target=watchdog,
@@ -1329,8 +1329,8 @@ def stream_command(
 			if process.stdout:
 				try:
 					process.stdout.close()
-				except Exception:
-					pass
+				except OSError:
+					pass  # stream already broken; the process is reaped below
 			try:
 				if process.poll() is None:
 					try:
@@ -1357,8 +1357,8 @@ def activity_heartbeat_safe(message: str) -> None:
 	try:
 		from temporalio import activity
 		activity.heartbeat(message)
-	except Exception:
-		pass
+	except RuntimeError:
+		pass  # not running inside a Temporal activity
 
 
 def _link_endpoints_subscan(http_urls, scan, subscan_id):

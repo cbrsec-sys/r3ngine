@@ -9,6 +9,7 @@ import hashlib
 import re
 import shlex
 import requests
+import urllib3
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -240,8 +241,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 								target_host = urlparse(entry.get('target', '')).hostname or ''
 								if target_host in subdomain_lines:
 									subdomain_lines[target_host].append(line)
-							except (json.JSONDecodeError, Exception):
-								continue
+							except (ValueError, AttributeError, TypeError):
+								continue  # not a JSON object with a string target
 					for _name, lines in subdomain_lines.items():
 						if lines:
 							_kr_out = f"{results_dir}/kr_{_name}.json"
@@ -635,8 +636,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 							peek = res.raw.read(512, decode_content=True).decode('utf-8', errors='ignore').strip()
 							if peek.startswith('{') and ('"version"' in peek or '"sources"' in peek or '"mappings"' in peek):
 								valid_sourcemap_targets.add(map_candidate)
-					except Exception:
-						pass
+					except (requests.RequestException, urllib3.exceptions.HTTPError):
+						pass  # no reachable sourcemap next to this script
 
 		logger.warning('[WEB_API] Sourcemapper: identified %d valid sourcemap target(s)', len(valid_sourcemap_targets))
 		for sm_url in valid_sourcemap_targets:

@@ -408,8 +408,8 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
             if os.path.exists(output_file):
                 try:
                     os.remove(output_file)
-                except Exception:
-                    pass
+                except OSError:
+                    logger.warning("Could not remove stale WPScan output %s", output_file, exc_info=True)
 
             # Execute tool — stream_command is a generator; must be consumed to run the subprocess.
             for _ in stream_command(cmd, scan_id=self.scan_id, activity_id=self.activity_id):
@@ -457,8 +457,8 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
                     if os.path.exists(output_file):
                         try:
                             os.remove(output_file)
-                        except Exception:
-                            pass
+                        except OSError:
+                            logger.warning("Could not remove aborted WPScan output %s", output_file, exc_info=True)
                     break
             else:
                 # Execution succeeded or failed with different error

@@ -148,8 +148,9 @@ class BrowserManager:
                     except Exception as e:
                         logger.error("Error joining PlaywrightThread: %s", e)
                     self._thread = None
-        except Exception as e:
-            pass
+        except Exception:
+            # Runs from atexit: log and let interpreter shutdown continue.
+            logger.warning("PlaywrightThread shutdown failed", exc_info=True)
 
 browser_manager = BrowserManager()
 atexit.register(browser_manager.shutdown)

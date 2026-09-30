@@ -54,10 +54,11 @@ import type { LLMConfig, LLMModel, TestLlmConnectionResult } from '../api';
 
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import type { ApiErrorLike } from '../../../types/errors';
 
 export const LlmToolkitPage: React.FC = () => {
   const { tokens } = useThemeTokens();
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const { data: toolkit, isLoading: isToolkitLoading } = useLlmToolkit(projectSlug);
   const updateSettings = useUpdateLlmSettings(projectSlug);
   const toggleLlmEnabled = useToggleLlmEnabled(projectSlug);
@@ -172,11 +173,12 @@ export const LlmToolkitPage: React.FC = () => {
           severity: 'success',
         });
       },
-      onError: (error: any) => {
+      onError: (caught) => {
+        const error = caught as ApiErrorLike;
         setLlmEnabled(!enabled);
         setSnackbar({
           open: true,
-          message: `Failed to update LLM switch: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          message: `Failed to update LLM switch: ${error?.response?.data?.message || error?.message || 'Unknown error'}`,
           severity: 'error',
         });
       },
@@ -219,10 +221,11 @@ export const LlmToolkitPage: React.FC = () => {
           });
         }
       },
-      onError: (error: any) => {
+      onError: (caught) => {
+        const error = caught as ApiErrorLike;
         setSnackbar({
           open: true,
-          message: `Failed to update LLM settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          message: `Failed to update LLM settings: ${error?.response?.data?.message || error?.message || 'Unknown error'}`,
           severity: 'error',
         });
       },

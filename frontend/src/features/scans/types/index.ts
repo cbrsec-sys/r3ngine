@@ -1,23 +1,62 @@
 import type { components } from '@/types/api';
 
-export type ScanHistory = Omit<components["schemas"]["ScanHistory"], "scan_status"> & {
-  scan_status?: number;
-  is_spiderfoot_running?: boolean;
-  successful_task_count?: number;
-  failed_task_count?: number;
-  total_task_count?: number;
-  current_tier?: number;
-  total_tiers?: number;
-  current_tier_progress?: number;
+/**
+ * `ScanHistorySerializer` row. drf-yasg types every `SerializerMethodField` as `string`, so the
+ * method fields whose getters return other types are restated from the serializer.
+ */
+export type ScanHistory = Omit<
+  components["schemas"]["ScanHistory"],
+  | "id" | "scan_status" | "subdomain_count" | "endpoint_count" | "vulnerability_count" | "current_progress"
+  | "completed_time" | "completed_ago" | "organizations" | "max_severity" | "is_spiderfoot_running"
+  | "successful_task_count" | "failed_task_count" | "total_task_count" | "current_tier" | "total_tiers"
+  | "current_tier_progress"
+> & {
+  readonly id: number;
+  scan_status: number;
+  readonly subdomain_count?: number;
+  readonly endpoint_count?: number;
+  readonly vulnerability_count?: number;
+  /** Percentage of finished tasks, 0-100. */
+  readonly current_progress?: number;
+  /** Seconds between start and stop; `null` while running. */
+  readonly completed_time?: number | null;
+  /** `null` while running. */
+  readonly completed_ago?: string | null;
+  /** Names of the target's organizations. */
+  readonly organizations?: string[];
+  readonly max_severity?: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'unknown' | 'none';
+  readonly is_spiderfoot_running?: boolean;
+  readonly successful_task_count?: number;
+  readonly failed_task_count?: number;
+  readonly total_task_count?: number;
+  readonly current_tier?: number;
+  readonly total_tiers?: number;
+  readonly current_tier_progress?: number;
 };
-export type ScheduledScan = components["schemas"]["PeriodicTask"];
-export type SubScan = components["schemas"]["SubScan"];
-export type Command = components["schemas"]["Command"];
-export type Vulnerability = components["schemas"]["Vulnerability"];
-export type Subdomain = components["schemas"]["Subdomain"];
-export type Domain = components["schemas"]["Domain"];
+/** `/api/scheduledScans/` is backed by `TemporalScheduleSerializer`. */
+export type ScheduledScan = components["schemas"]["TemporalSchedule"];
+/** `SubScanSerializer` row; `engine` is the engine name. */
+export type SubScan = Omit<components["schemas"]["SubScan"], "id"> & { readonly id: number };
 
-export type DirectoryFile = components["schemas"]["DirectoryFile"];
+/** `GET /api/scan_status/?project=`: the project's active and recent scans and subscans. */
+export interface ScanStatusResponse {
+  scans: { pending: ScanHistory[]; scanning: ScanHistory[]; completed: ScanHistory[] };
+  tasks: { pending: SubScan[]; running: SubScan[]; completed: SubScan[] };
+}
+export type Command = components["schemas"]["Command"];
+export type { Vulnerability } from '../../vulnerabilities/types';
+export type Subdomain = components["schemas"]["Subdomain"];
+export type { Domain } from '../../targets/types';
+
+/** Row of `GET /api/listDirectories/` with `subdomain_id` (`EndPointDirectorySerializer`). */
+export type { DirectoryFile } from '../../subdomains/types';
+
+/** Row of `GET /api/listDirectories/` without `subdomain_id`: a subdomain that has endpoints. */
+export interface DirectorySubdomainSummary {
+  id: number;
+  name: string;
+  directory_count: number;
+}
 
 /** Row of `most_common_vulnerability`: `values('name', 'severity').annotate(count=...)`. */
 export interface MostCommonVulnerabilityCount {
@@ -190,6 +229,11 @@ export interface SummaryEmployee {
   designation: string | null;
   metadata: Record<string, unknown>;
 }
+
+/** `EmailBreachSerializer` row; `compromised_data` is the JSON list of HIBP data classes. */
+export type EmailBreach = Omit<components["schemas"]["EmailBreach"], "compromised_data"> & {
+  compromised_data?: string[];
+};
 
 export interface Dork {
   id: number;

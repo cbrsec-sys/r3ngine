@@ -41,6 +41,7 @@ import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { ExtractAuthModal } from './ExtractAuthModal';
 import { getSafeUrl } from '../../../utils/securityUtils';
+import type { ApiErrorLike } from '../../../types/errors';
 
 interface EndpointsTabProps {
   projectSlug: string;
@@ -115,8 +116,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
         setExtractAuthStatus('error');
         showNotification('Workflow dispatched but no workflow_id returned', 'error');
       }
-    } catch (error: any) {
-      showNotification(error.message || 'Failed to dispatch auth extraction', 'error');
+    } catch (caught) {
+      const error = caught as ApiErrorLike;
+      showNotification(error?.message || 'Failed to dispatch auth extraction', 'error');
       setExtractAuthStatus('error');
     } finally {
       setPendingActionId(null);
@@ -147,8 +149,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
       showNotification('Brute force test dispatched successfully', 'success');
       setBruteModalOpen(false);
       setBruteEndpoint(null);
-    } catch (error: any) {
-      showNotification(error.message || 'Failed to dispatch brute test', 'error');
+    } catch (caught) {
+      const error = caught as ApiErrorLike;
+      showNotification(error?.message || 'Failed to dispatch brute test', 'error');
     } finally {
       setPendingActionId(null);
     }
@@ -234,8 +237,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
           await deleteMutation.mutateAsync(selectedEndpoints);
           showNotification(`${selectedEndpoints.length} endpoint(s) deleted successfully`);
           setSelectedEndpoints([]);
-        } catch (error: any) {
-          showNotification(error.message || 'Failed to delete endpoints', 'error');
+        } catch (caught) {
+          const error = caught as ApiErrorLike;
+          showNotification(error?.message || 'Failed to delete endpoints', 'error');
         }
       }
     });
@@ -252,8 +256,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
           await deleteMutation.mutateAsync([id]);
           showNotification('Endpoint deleted successfully');
           setSelectedEndpoints(prev => prev.filter(i => i !== id));
-        } catch (error: any) {
-          showNotification(error.message || 'Failed to delete endpoint', 'error');
+        } catch (caught) {
+          const error = caught as ApiErrorLike;
+          showNotification(error?.message || 'Failed to delete endpoint', 'error');
         }
       }
     });
@@ -701,7 +706,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                     </tr>
 
                     {/* Collapsible Auth Candidates section */}
-                    {isExpanded && endpoint.auth_candidates && endpoint.auth_candidates.map((candidate: any, idx: number) => (
+                    {isExpanded && endpoint.auth_candidates && endpoint.auth_candidates.map((candidate, idx) => (
                       <tr key={`expanded-${endpoint.id}-${idx}`} style={{ backgroundColor: isLight ? 'rgba(0,0,0,0.01)' : 'rgba(255,255,255,0.01)' }}>
                         <td colSpan={7} style={{ padding: '8px 16px 16px 56px' }}>
                           <Box sx={{

@@ -111,3 +111,6 @@ web/evidence/log
 r3ngine-mcp/
 r3ngine-mobile/
 r3ngine-plugins/
+
+# Intermediate of `npm run generate-types` (swagger2openapi output); web/openapi.json is the source.
+web/openapi3.json

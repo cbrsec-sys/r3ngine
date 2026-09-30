@@ -99,8 +99,9 @@ class ProxyValidationTests(TestCase):
             def get_side_effect(url, **kwargs):
                 proxy_url = session.proxies.get('http', '')
                 if 'work.com' in proxy_url:
-                    import time
-                    time.sleep(0.05)
+                    # No delay needed for the dead entry to be cached first:
+                    # with two workers both checks are already running, and
+                    # the executor waits for them before get_random_proxy returns.
                     mock_response = MagicMock()
                     mock_response.status_code = 200
                     mock_response.text = '1.2.3.4'

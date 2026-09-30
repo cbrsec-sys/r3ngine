@@ -13,21 +13,10 @@ import {
 import { FileText, Monitor, User as UserIcon, Calendar } from 'lucide-react';
 import { TacticalPanel } from '../../../../components/TacticalPanel';
 import { getSafeUrl } from '../../../../utils/securityUtils';
-
-interface Document {
-  id: number;
-  doc_name?: string;
-  url?: string;
-  title?: string;
-  author?: string;
-  producer?: string;
-  creator?: string;
-  os?: string;
-  creation_date?: string;
-}
+import type { MetafinderDocument } from '../../types';
 
 interface DocumentSectionProps {
-  documents: Document[];
+  documents: MetafinderDocument[];
 }
 
 export const DocumentSection: React.FC<DocumentSectionProps> = ({ documents }) => {

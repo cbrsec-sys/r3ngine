@@ -27,20 +27,34 @@ import {
   Database,
   Search,
   Lock,
-  ChevronRight
+  ChevronRight,
+  type LucideIcon,
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import { useApiVault, useUpdateApiVault } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import type { ApiErrorLike } from '../../../types/errors';
+
+/** API keys and credentials edited on the vault page; every value is a string. */
+type ApiVaultForm = Record<'netlas_key' | 'chaos_key' | 'shodan_key' | 'censys_key' | 'leaklookup_key' | 'hackerone_username' | 'hackerone_key' | 'acunetix_url' | 'acunetix_key' | 'linkedin_username' | 'linkedin_password' | 'hunterio_key' | 'wpscan_key' | 'projectdiscovery_key', string>;
+
+interface KeyFieldProps {
+  label: string;
+  description: string;
+  field: keyof ApiVaultForm;
+  placeholder: string;
+  icon: LucideIcon;
+  url?: string;
+}
 
 export const ApiVaultPage: React.FC = () => {
   const { tokens } = useThemeTokens();
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const { data: settings, isLoading } = useApiVault(projectSlug);
   const updateSettings = useUpdateApiVault(projectSlug);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ApiVaultForm>({
     netlas_key: '',
     chaos_key: '',
     shodan_key: '',
@@ -106,10 +120,11 @@ export const ApiVaultPage: React.FC = () => {
           severity: 'success',
         });
       },
-      onError: (error: any) => {
+      onError: (caught) => {
+        const error = caught as ApiErrorLike;
         setSnackbar({
           open: true,
-          message: `Failed to update API Vault: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          message: `Failed to update API Vault: ${error?.response?.data?.message || error?.message || 'Unknown error'}`,
           severity: 'error',
         });
       },
@@ -118,7 +133,7 @@ export const ApiVaultPage: React.FC = () => {
 
   if (isLoading) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}1A`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
-  const KeyField = ({ label, description, field, placeholder, icon: Icon, url }: any) => (
+  const KeyField = ({ label, description, field, placeholder, icon: Icon, url }: KeyFieldProps) => (
     <Box sx={{ mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -146,7 +161,7 @@ export const ApiVaultPage: React.FC = () => {
         fullWidth
         variant="outlined"
         type={showKeys[field] ? 'text' : 'password'}
-        value={(form as any)[field]}
+        value={form[field]}
         onChange={(e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))}
         placeholder={placeholder}
         slotProps={{

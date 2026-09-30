@@ -55,6 +55,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import type { ResolvedThemeTokens } from '../../../theme/tokens';
 
 // ── Mermaid diagram renderer (lazy — keeps mermaid out of the critical path) ─
 
@@ -156,7 +157,7 @@ const TrustBadge: React.FC<{ trustLevel: Plugin['trust_level'] }> = ({ trustLeve
 };
 
 // ── Helper to resolve trust config dynamically ────────────────────────────────
-function getTrustLevelConfig(trustLevel: Plugin['trust_level'], tokens: any) {
+function getTrustLevelConfig(trustLevel: Plugin['trust_level'], tokens: ResolvedThemeTokens) {
   switch (trustLevel) {
     case 'official':
       return {

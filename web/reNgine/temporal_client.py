@@ -36,8 +36,8 @@ def run_and_close(loop: asyncio.AbstractEventLoop, coro):
     """
     try:
         loop.close()
-    except Exception:
-        pass
+    except RuntimeError:
+        pass  # a running loop cannot be closed; asyncio.run() below reports the real problem
     return asyncio.run(coro)
 
 

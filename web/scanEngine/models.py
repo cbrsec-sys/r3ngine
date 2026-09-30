@@ -45,8 +45,8 @@ class EngineType(models.Model):
             if isinstance(config, dict):
                 # Tasks are the top level keys in the YAML config
                 return list(config.keys())
-        except Exception:
-            pass
+        except yaml.YAMLError:
+            logger.warning("Engine %s has invalid YAML configuration", self.pk, exc_info=True)
         return []
 
     def has_task(self, task_name):

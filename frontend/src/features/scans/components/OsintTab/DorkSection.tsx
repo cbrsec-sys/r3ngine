@@ -13,12 +13,7 @@ import {
 import { Search, ExternalLink, Globe } from 'lucide-react';
 import { TacticalPanel } from '../../../../components/TacticalPanel';
 import { getSafeUrl } from '../../../../utils/securityUtils';
-
-interface Dork {
-  id: number;
-  type: string;
-  url: string;
-}
+import type { Dork } from '../../types';
 
 interface DorkSectionProps {
   dorks: Dork[];
@@ -56,7 +51,7 @@ export const DorkSection: React.FC<DorkSectionProps> = ({ dorks }) => {
               <ListItemText
                 primary={
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.light' }}>
-                    {dork.type.toUpperCase().replace(/_/g, ' ')}
+                    {(dork.type ?? '').toUpperCase().replace(/_/g, ' ')}
                   </Typography>
                 }
                 secondary={

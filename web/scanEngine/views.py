@@ -277,8 +277,8 @@ def tool_specific_settings(request, slug):
     gf_list = []
     try:
         gf_list = (subprocess.check_output(['gf', '-list'])).decode("utf-8").split('\n')
-    except:
-        pass
+    except (OSError, subprocess.CalledProcessError):
+        logger.warning("Could not list gf patterns", exc_info=True)
     _tpl_base = "/root/nuclei-templates"
     nuclei_custom_pattern = sorted(
         os.path.relpath(f, _tpl_base)

@@ -18,12 +18,6 @@ class OnlySubdomainNameSerializer(serializers.ModelSerializer):
 		fields = ['name', 'id']
 
 
-class OnlySubdomainNameSerializer(serializers.ModelSerializer):
-	class Meta:
-		model = Subdomain
-		fields = ['name', 'id']
-
-
 class SubdomainChangesSerializer(serializers.ModelSerializer):
 
 	change = serializers.SerializerMethodField('get_change')
@@ -377,10 +371,8 @@ class SubdomainSerializer(serializers.ModelSerializer):
 		return len(subdomain.get_todos.filter(is_done=False))
 
 	def get_vuln_count(self, obj):
-		try:
-			return obj.vuln_count
-		except:
-			return None
+		# Only present when the queryset was annotated with vuln_count.
+		return getattr(obj, 'vuln_count', None)
 
 	def _severity_count(self, subdomain: Subdomain, severity: int, fallback: str) -> int:
 		counts = getattr(subdomain, 'severity_counts_ann', None)

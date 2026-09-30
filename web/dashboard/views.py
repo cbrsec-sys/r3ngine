@@ -45,8 +45,8 @@ def index(request, slug, *args, **kwargs):
         user_preferences = UserPreferences.objects.get(user=request.user)
         if user_preferences.ui_version == 'v3':
             return render(request, 'dashboard/v3_index.html', {'project': project})
-    except Exception as e:
-        # Fallback to legacy dashboard
+    except UserPreferences.DoesNotExist:
+        # No stored preference: fall back to the legacy dashboard.
         pass
 
 

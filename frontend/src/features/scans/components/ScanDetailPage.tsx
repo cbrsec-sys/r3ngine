@@ -44,7 +44,8 @@ import {
   Alert,
   Snackbar
 } from '@mui/material';
-import type { SxProps, Theme } from '@mui/material';
+import type { Theme } from '@mui/material';
+import type { SystemStyleObject } from '@mui/system';
 import type { ApexOptions } from 'apexcharts';
 import {
   Activity,
@@ -1374,7 +1375,7 @@ interface SubdomainVulnCounts {
   total: number;
 }
 
-const MostVulnerableSubdomain = React.memo(function MostVulnerableSubdomain({ vulnerabilities = EMPTY_VULNERABILITIES, sx = FULL_HEIGHT_SX }: { vulnerabilities: SummaryVulnerability[], sx?: SxProps<Theme> }) {
+const MostVulnerableSubdomain = React.memo(function MostVulnerableSubdomain({ vulnerabilities = EMPTY_VULNERABILITIES, sx = FULL_HEIGHT_SX }: { vulnerabilities: SummaryVulnerability[], sx?: SystemStyleObject<Theme> }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
@@ -1478,7 +1479,7 @@ interface CommonVulnerabilityRow {
   vulnerability: SummaryVulnerability;
 }
 
-const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulnerabilities = EMPTY_VULNERABILITIES, onVulnClick, sx = FULL_HEIGHT_SX }: { vulnerabilities: SummaryVulnerability[], onVulnClick: (v: SummaryVulnerabilityBase) => void, sx?: SxProps<Theme> }) {
+const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulnerabilities = EMPTY_VULNERABILITIES, onVulnClick, sx = FULL_HEIGHT_SX }: { vulnerabilities: SummaryVulnerability[], onVulnClick: (v: SummaryVulnerabilityBase) => void, sx?: SystemStyleObject<Theme> }) {
   const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
@@ -1552,7 +1553,7 @@ const MostCommonVulnsWidget = React.memo(function MostCommonVulnsWidget({ vulner
   );
 });
 
-const ImportantSubdomainsWidget = React.memo(function ImportantSubdomainsWidget({ subdomains = EMPTY_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Subdomain[], sx?: SxProps<Theme> }) {
+const ImportantSubdomainsWidget = React.memo(function ImportantSubdomainsWidget({ subdomains = EMPTY_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Subdomain[], sx?: SystemStyleObject<Theme> }) {
   const { tokens } = useThemeTokens();
   return (
     <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
@@ -1573,7 +1574,7 @@ const ImportantSubdomainsWidget = React.memo(function ImportantSubdomainsWidget(
   );
 });
 
-const ReconNotesWidget: React.FC<{ notes: TodoNote[], sx?: SxProps<Theme> }> = ({ notes = [], sx = {} }) => {
+const ReconNotesWidget: React.FC<{ notes: TodoNote[], sx?: SystemStyleObject<Theme> }> = ({ notes = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
   return (
     <TacticalPanel
@@ -1606,7 +1607,7 @@ const ReconNotesWidget: React.FC<{ notes: TodoNote[], sx?: SxProps<Theme> }> = (
   );
 };
 
-const IpAddressesWidget = React.memo(function IpAddressesWidget({ subdomains = EMPTY_PARTIAL_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Partial<Subdomain>[], sx?: SxProps<Theme> }) {
+const IpAddressesWidget = React.memo(function IpAddressesWidget({ subdomains = EMPTY_PARTIAL_SUBDOMAINS, sx = FULL_HEIGHT_SX }: { subdomains: Partial<Subdomain>[], sx?: SystemStyleObject<Theme> }) {
   const { tokens, isLight } = useThemeTokens();
   const ips = useMemo(
     () => Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0'))),
@@ -1628,7 +1629,7 @@ const IpAddressesWidget = React.memo(function IpAddressesWidget({ subdomains = E
   );
 });
 
-const DiscoveredPortsWidget: React.FC<{ ports: DiscoveredPort[], sx?: SxProps<Theme> }> = ({ ports = [], sx = {} }) => {
+const DiscoveredPortsWidget: React.FC<{ ports: DiscoveredPort[], sx?: SystemStyleObject<Theme> }> = ({ ports = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
   return (
     <TacticalPanel title="DISCOVERED PORTS" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ports.length}</Box>} sx={{ height: '100%', ...sx }}>
@@ -1646,7 +1647,7 @@ const DiscoveredPortsWidget: React.FC<{ ports: DiscoveredPort[], sx?: SxProps<Th
   );
 };
 
-const DiscoveredTechWidget: React.FC<{ techs: DiscoveredTechnology[], sx?: SxProps<Theme> }> = ({ techs = [], sx = {} }) => {
+const DiscoveredTechWidget: React.FC<{ techs: DiscoveredTechnology[], sx?: SystemStyleObject<Theme> }> = ({ techs = [], sx = {} }) => {
   const { tokens, isLight } = useThemeTokens();
   return (
     <TacticalPanel title="DISCOVERED TECHNOLOGIES" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{techs.length}</Box>} sx={{ height: '100%', ...sx }}>

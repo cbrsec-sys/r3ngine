@@ -317,10 +317,7 @@ class TemporalTaskProxy:
 
 def _start_scan_task_proxy(ctx: dict, task_name: str, description: str):
     """Claim a pre-populated ScanActivity row. No-op outside a Temporal activity."""
-    try:
-        if not activity.in_activity():
-            return None
-    except Exception:
+    if not activity.in_activity():
         return None
     return TemporalTaskProxy(ctx, task_name, description)
 

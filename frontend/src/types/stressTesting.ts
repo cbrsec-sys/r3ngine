@@ -133,3 +133,17 @@ export interface AggregatedStressMetrics {
   rtt_avg?: number;
   rtt_max?: number;
 }
+
+/** Per-endpoint aggregate row plotted by the endpoint-level stress charts and table. */
+export interface EndpointStressMetrics {
+  endpoint: string;
+  timestamp: number;
+  concurrent_users: number;
+  total_requests: number;
+  avg_latency: number;
+  p95_latency: number;
+  p99_latency: number;
+  /** Fraction of failed requests, 0-1. */
+  error_rate: number;
+  throughput_rps: number;
+}

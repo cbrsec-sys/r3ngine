@@ -169,7 +169,8 @@ def has_openapi_spec(url, proxy=None):
 				if isinstance(data, dict) and ('paths' in data or 'openapi' in data or 'swagger' in data):
 					logger.info('[GATE] OpenAPI spec confirmed at %s', probe_url)
 					return True
-			except Exception:
+			except (ValueError, RecursionError):
+				# Not a JSON document (or a pathologically nested one).
 				continue
 		except requests.RequestException as e:
 			logger.info('[GATE] has_openapi_spec: %s → error (%s)', probe_url, e)

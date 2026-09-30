@@ -292,8 +292,8 @@ def _run_help(binary_path: str, *, tool_name: str = '') -> tuple[str, str]:
             text = (proc.stdout or '') + '\n' + (proc.stderr or '')
             if text.strip():
                 return text, ' '.join(args[1:])
-        except Exception:
-            continue
+        except (OSError, ValueError, subprocess.SubprocessError):
+            continue  # this help flag hung or the binary cannot run: try the next form
     return '', ''
 
 

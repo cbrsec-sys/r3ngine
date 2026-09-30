@@ -209,14 +209,44 @@ Done (2026-09-29), details and operator steps in
   against 1.31.3 but is due a bump. `make.bat fullupgrade` does not run the
   Temporal step.
 
+### Code quality pass (phase 8, 2026-09-30)
+
+Done:
+
+- No silent broad exception handlers are left in `web/` (60 → 0): each was
+  narrowed to what can actually be raised, or now logs. A static test
+  (`tests/test_swallowed_exceptions.py`) rejects new ones.
+- Bugs found on the way: WebSocket JWT auth accepted deactivated users;
+  OpSec "metadata stripping" was a stub and did nothing; the plugin install
+  status returned internal error text (pg_dump/migration stderr) to the
+  client; an evidence purge recorded "file deleted" before trying and even
+  when the storage delete failed.
+- Frontend: no `any`/`@ts-ignore` left (147 → 0); API types regenerated from
+  the drf-yasg schema (`frontend/README.md` has the steps); 11 display bugs
+  the types exposed were fixed.
+- Tests: no network access or kaleido rendering in the unit suite; the test
+  runner rejects files and directories whose path comes from a mock.
+- The WHOIS/BUCKETS tabs and the Nivo chart were fixed in phase 9.
+
 ## Other known follow-ups
 
+- Remote workers: scan workflows still send their activities to the fixed
+  `python-orchestrator-queue`, so a scan started on a worker runs its tools
+  on the master. The per-worker Go queue (phase 10) only takes effect for
+  activities that already run on the worker.
+- The assessment WebSocket (`AssessmentEventConsumer`) lets any logged-in
+  user subscribe to any assessment's events; check it against the REST
+  permissions before multi-team use.
+- drf-yasg types every `SerializerMethodField` as a string and JSON fields as
+  empty objects, so the generated `frontend/src/types/api.ts` needs manual
+  overrides for those fields. `swagger_serializer_method` annotations on the
+  serializers would fix it at the source.
+- `save_email`/`save_employee` start identity-enrichment threads that tests
+  cannot switch off centrally (they currently do nothing on hosts without
+  the tools); a seam in `reNgine/utils/task.py` would make that explicit.
 - MCP sessions still record the client IP from `X-Forwarded-For`.
 - Some task functions still put `str(e)` into their internal result dicts
   (not returned to HTTP clients, but stored and shown in places).
-- Frontend: three chart libraries (ApexCharts, ECharts, Nivo) could be
-  consolidated; the scan WHOIS and BUCKETS tabs read fields the summary API
-  never sends (`domain_info.whois_data`, `buckets_count`).
-- Tests: `tests.test_tool_execution` trufflehog case writes a directory named
-  after a `MagicMock` into the current directory; tests that hit
-  `tldextract` fetch the public suffix list over the network.
+- Frontend: ApexCharts and ECharts could still be consolidated into one.
+- Go SDK in `web/executor` is v1.25.1 (2023); it works with Temporal 1.31
+  but is worth bumping.

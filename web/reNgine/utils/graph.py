@@ -38,8 +38,8 @@ def _graph_heartbeat(message, *details):
             activity.heartbeat(message, *details)
         else:
             activity.heartbeat(message)
-    except Exception:
-        pass
+    except RuntimeError:
+        pass  # not running inside a Temporal activity
 
 
 def _last_graph_sync_scan_id():
@@ -49,8 +49,10 @@ def _last_graph_sync_scan_id():
         details = activity.info().heartbeat_details
         if details:
             return int(details[0])
-    except Exception:
-        pass
+    except RuntimeError:
+        pass  # not running inside a Temporal activity
+    except (TypeError, ValueError):
+        logger.warning("Ignoring unreadable graph sync checkpoint", exc_info=True)
     return 0
 
 

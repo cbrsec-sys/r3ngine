@@ -180,17 +180,17 @@ class RengineUpdateCheck(APIView):
 			v_str = v_str.strip().lstrip('v')
 			try:
 				return version.parse(v_str)
-			except Exception:
+			except version.InvalidVersion:
 				# PEP 440 sanitization fallback
 				sanitized = v_str.replace('-beta.rc', 'b').replace('-rc', 'rc').replace('-beta', 'b').replace('-', '.')
 				try:
 					return version.parse(sanitized)
-				except Exception:
+				except version.InvalidVersion:
 					digits = re.findall(r'\d+', v_str)
 					if digits:
 						try:
 							return version.parse('.'.join(digits))
-						except Exception:
+						except version.InvalidVersion:
 							pass
 					return version.parse('0.0.0')
 

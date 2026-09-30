@@ -72,7 +72,9 @@ class PluginViewSet(viewsets.ModelViewSet):
             try:
                 AtomicInstaller.install(path, install_id=iid)
             except Exception:
-                pass  # AtomicInstaller already writes 'failed' state to cache
+                # install() records its own failures; what escapes is a failed
+                # rollback or setup step, and the thread would otherwise die silently.
+                logger.exception("Plugin install %s failed outside the installer's handler", iid)
             finally:
                 if os.path.exists(path):
                     os.remove(path)

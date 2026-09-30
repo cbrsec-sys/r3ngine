@@ -212,6 +212,7 @@ class AssessmentEventConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _get_current_state(self):
+        from django.core.exceptions import ValidationError
         from engagements.models import AssessmentWorkflowState
         try:
             state = AssessmentWorkflowState.objects.get(assessment__uuid=self.assessment_id)
@@ -220,7 +221,8 @@ class AssessmentEventConsumer(AsyncWebsocketConsumer):
                 'stage': state.current_stage,
                 'progress': state.progress_percent
             }
-        except Exception:
+        except (AssessmentWorkflowState.DoesNotExist, ValidationError):
+            # No workflow started yet, or the route id is not a valid UUID.
             return None
 
     async def disconnect(self, close_code):

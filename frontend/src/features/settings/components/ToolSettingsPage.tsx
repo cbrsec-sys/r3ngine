@@ -87,6 +87,7 @@ const groupByDirectory = (templates: string[]): Record<string, string[]> =>
   }, {} as Record<string, string[]>);
 
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import type { ApiErrorLike } from '../../../types/errors';
 
 export const ToolSettingsPage: React.FC = () => {
   const { tokens } = useThemeTokens();
@@ -175,8 +176,9 @@ export const ToolSettingsPage: React.FC = () => {
         onSuccess: (data) => {
           setSnackbar({ open: true, message: data.message, severity: 'success' });
         },
-        onError: (error: any) => {
-          setSnackbar({ open: true, message: error.response?.data?.message || 'Upload failed', severity: 'error' });
+        onError: (caught) => {
+          const error = caught as ApiErrorLike;
+          setSnackbar({ open: true, message: error?.response?.data?.message || 'Upload failed', severity: 'error' });
         }
       });
     }

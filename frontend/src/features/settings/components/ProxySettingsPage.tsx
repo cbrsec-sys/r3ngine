@@ -30,6 +30,7 @@ import { useProxySettings, useUpdateProxySettings, useFetchProxies, useProxyTask
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ProxyValidationModal } from './ProxyValidationModal';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import type { ApiErrorLike } from '../../../types/errors';
 
 const KNOWN_SCHEMES = /^(https?|socks[45]):\/\//i;
 const HOST_PORT_RE = /^[\w.\-]+:\d{1,5}$/;
@@ -58,7 +59,7 @@ export function parseProxyLine(line: string): string | null {
 
 export const ProxySettingsPage: React.FC = () => {
   const { tokens } = useThemeTokens();
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const queryClient = useQueryClient();
   const { data: settings, isLoading: isSettingsLoading } = useProxySettings(projectSlug);
   const updateSettings = useUpdateProxySettings(projectSlug);
@@ -106,7 +107,7 @@ export const ProxySettingsPage: React.FC = () => {
 
   useEffect(() => {
     if (taskStatus?.status === 'SUCCESS' && taskStatus.result) {
-      const resultData = taskStatus.result as any;
+      const resultData = taskStatus.result;
       const proxyStr = typeof resultData === 'string' ? resultData : (resultData?.proxies || '');
       setProxyList(proxyStr);
       setUseProxy(true);
@@ -145,10 +146,11 @@ export const ProxySettingsPage: React.FC = () => {
       onSuccess: () => {
         setSnackbar({ open: true, message: 'Proxy settings saved successfully.', severity: 'success' });
       },
-      onError: (error: any) => {
+      onError: (caught) => {
+        const error = caught as ApiErrorLike;
         setSnackbar({
           open: true,
-          message: `Failed to save proxy settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          message: `Failed to save proxy settings: ${error?.response?.data?.message || error?.message || 'Unknown error'}`,
           severity: 'error',
         });
       },
@@ -197,10 +199,11 @@ export const ProxySettingsPage: React.FC = () => {
           severity: 'success'
         });
       },
-      onError: (error: any) => {
+      onError: (caught) => {
+        const error = caught as ApiErrorLike;
         setSnackbar({
           open: true,
-          message: `Failed to start proxy fetch: ${error?.response?.data?.error || error?.response?.data?.message || error.message || 'Unknown error'}`,
+          message: `Failed to start proxy fetch: ${error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Unknown error'}`,
           severity: 'error'
         });
       }
@@ -249,10 +252,11 @@ export const ProxySettingsPage: React.FC = () => {
         severity: addedCount > 0 ? 'success' : 'info'
       });
       setUseProxy(true);
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as ApiErrorLike;
       setSnackbar({
         open: true,
-        message: `Failed to fetch from ${label}: ${error.message}`,
+        message: `Failed to fetch from ${label}: ${error?.message}`,
         severity: 'error'
       });
     } finally {
@@ -647,7 +651,7 @@ export const ProxySettingsPage: React.FC = () => {
             {currentTaskId && (
               <Box sx={{ mb: 4, p: 2, bgcolor: 'action.hover', borderRadius: 1, border: 1, borderColor: 'divider' }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
-                  {(!taskStatus || taskStatus.status === 'PROGRESS' || taskStatus.status === 'PENDING') ? (
+                  {(!taskStatus || taskStatus.status === 'RUNNING' || taskStatus.status === 'PENDING') ? (
                     <CircularProgress size={20} sx={{ color: tokens.accent.primary }} />
                   ) : taskStatus.status === 'SUCCESS' ? (
                     <CheckCircle2 size={20} color="#00ff00" />
@@ -680,7 +684,7 @@ export const ProxySettingsPage: React.FC = () => {
                 )}
                 {taskStatus?.status === 'FAILURE' && (
                   <Alert severity="error" sx={{ bgcolor: 'rgba(255, 0, 0, 0.05)', color: '#ff0055', border: '1px solid rgba(255, 0, 0, 0.2)' }}>
-                    Task failed: {taskStatus.result || 'Unknown error during verification'}
+                    Task failed: {typeof taskStatus.result === 'string' && taskStatus.result ? taskStatus.result : 'Unknown error during verification'}
                   </Alert>
                 )}
               </Box>
@@ -691,7 +695,7 @@ export const ProxySettingsPage: React.FC = () => {
                 variant="outlined"
                 startIcon={<RefreshCw size={18} className={fetchProxies.isPending ? 'spin' : ''} />}
                 onClick={handleFetchClick}
-                disabled={fetchProxies.isPending || (taskStatus && taskStatus.status === 'PROGRESS')}
+                disabled={fetchProxies.isPending || (taskStatus && taskStatus.status === 'RUNNING')}
                 sx={{
                   borderColor: tokens.accent.primary,
                   color: tokens.accent.primary,

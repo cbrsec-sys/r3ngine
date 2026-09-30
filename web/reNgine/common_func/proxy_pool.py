@@ -96,8 +96,9 @@ def _detect_server_ip(timeout: int = 5) -> str:
 		)
 		if resp.status_code == 200:
 			return resp.json().get('ip', '')
-	except Exception:
-		pass
+	except (requests.RequestException, ValueError, AttributeError):
+		# Detection was explicitly enabled, so running without it must be visible.
+		logger.warning("Server IP lookup failed; transparent proxy detection is skipped", exc_info=True)
 	return ''
 
 

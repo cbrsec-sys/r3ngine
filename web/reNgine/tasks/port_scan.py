@@ -381,13 +381,11 @@ def nmap(
 						parsed_port = parsed_url.port
 					else:
 						parsed_port = 443 if parsed_url.scheme == 'https' else 80
-				except Exception:
-					try:
-						port_part = url_str.split(':')[-1]
-						if port_part.isdigit():
-							parsed_port = int(port_part)
-					except Exception:
-						pass
+				except ValueError:
+					# Out-of-range or malformed port: take the trailing digits as-is.
+					port_part = url_str.split(':')[-1]
+					if port_part.isdigit():
+						parsed_port = int(port_part)
 			save_auth_candidate(
 				scan_history=self.scan,
 				target=vuln_data['http_url'],

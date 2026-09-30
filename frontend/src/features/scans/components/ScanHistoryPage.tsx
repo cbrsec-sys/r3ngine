@@ -125,7 +125,7 @@ const HistoryProgressBar: React.FC<{
 
 export const ScanHistoryPage: React.FC = () => {
   const { tokens, isLight, theme } = useThemeTokens();
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const navigate = useNavigate();
   const { data: scans, isLoading } = useScansHistory(projectSlug);
   const stopScanMutation = useStopScan(projectSlug);
@@ -460,7 +460,7 @@ export const ScanHistoryPage: React.FC = () => {
                       sx={{ borderBottom: 1, borderColor: 'divider', cursor: 'pointer' }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate({ to: `/${projectSlug}/scan/detail/${scan.id}` as any });
+                        navigate({ to: '/$projectSlug/scan/detail/$scanId', params: { projectSlug, scanId: String(scan.id) } });
                       }}
                     >
                       <Typography

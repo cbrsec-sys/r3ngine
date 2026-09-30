@@ -2,6 +2,7 @@ import hashlib
 import os
 import logging
 from django.conf import settings
+from playwright.sync_api import Error as PlaywrightError
 from .browser_manager import browser_manager
 
 logger = logging.getLogger(__name__)
@@ -99,8 +100,8 @@ def capture_url(browser, url, scan_id, results_dir=None):
         try:
             page.screenshot(path=screenshot_full_path)
             result["screenshot_path"] = screenshot_rel_path
-        except:
-            pass
+        except PlaywrightError:
+            pass  # the capture failure above is already logged
     finally:
         page.close()
         context.close()

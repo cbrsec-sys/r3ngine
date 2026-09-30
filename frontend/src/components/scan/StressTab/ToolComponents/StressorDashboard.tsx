@@ -10,7 +10,7 @@ export interface StressorTelemetryPoint {
   pps?: number;
   bps?: number;
   rps?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface StressorDashboardProps {

@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 from django.test import TransactionTestCase
@@ -33,8 +34,17 @@ class ToolExecutionTest(TransactionTestCase):
             start_scan_date=timezone.now(),
             scan_type=self.engine
         )
-        self.results_dir = f"/tmp/rengine_results/{self.scan.id}"
-        os.makedirs(self.results_dir, exist_ok=True)
+        tmp = tempfile.TemporaryDirectory(prefix='rengine_tool_exec_')
+        self.addCleanup(tmp.cleanup)
+        self.results_dir = tmp.name
+        # save_email/save_employee start enrich_identities_task in a daemon
+        # thread that outlives the test (writing into results_dir after its
+        # cleanup, and running gosearch where installed). Tests that want it
+        # call it directly; the name is resolved at call time, so this covers
+        # the background threads only.
+        enrich_patcher = patch('reNgine.tasks.osint.enrich_identities_task')
+        enrich_patcher.start()
+        self.addCleanup(enrich_patcher.stop)
         self.scan.results_dir = self.results_dir
         self.scan.save()
         
@@ -58,6 +68,7 @@ class ToolExecutionTest(TransactionTestCase):
         self.task = MagicMock()
         self.task.scan = self.scan
         self.task.scan_id = self.scan.id
+        self.task.results_dir = self.results_dir
         self.task.domain = self.domain
         self.task.yaml_configuration = self.ctx['yaml_configuration']
         self.task.activity_id = 1

@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -5,6 +7,10 @@ from startScan.models import SubScan
 from .serializers import SubScanSerializer
 from .permissions import HasPermission
 from reNgine.definitions import PERM_INITATE_SCANS_SUBSCANS, ABORTED_TASK
+
+logger = logging.getLogger(__name__)
+
+
 class SubScanViewSet(viewsets.ModelViewSet):
     queryset = SubScan.objects.all().order_by('-start_scan_date')
     serializer_class = SubScanSerializer
@@ -30,7 +36,7 @@ class SubScanViewSet(viewsets.ModelViewSet):
             try:
                 abort_subscan(subscan)
             except Exception:
-                pass
+                logger.warning("Could not abort subscan %s before deleting it", subscan.id, exc_info=True)
             subscan.delete()
         return Response({'status': True, 'message': f'Successfully deleted {count} subscans'})
 

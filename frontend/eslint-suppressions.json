@@ -5,9 +5,6 @@
     }
   },
   "src/components/Shell/index.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 9
     },
@@ -16,32 +13,18 @@
     }
   },
   "src/components/TacticalPanel.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
   },
   "src/components/scan/StressTab/DrilldownPanel.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "react-hooks/rules-of-hooks": {
       "count": 1
     }
   },
-  "src/components/scan/StressTab/EndpointTable.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/components/scan/StressTab/LatencyChart.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "@typescript-eslint/no-unused-vars": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/scan/StressTab/SharedToolCharts/DistributionChart.tsx": {
@@ -50,9 +33,6 @@
     }
   },
   "src/components/scan/StressTab/SharedToolCharts/PercentileChart.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -68,22 +48,11 @@
     }
   },
   "src/components/scan/StressTab/StressHeatmap.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
     }
   },
-  "src/components/scan/StressTab/ThroughputChart.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/components/scan/StressTab/ToolComponents/Hping3Dashboard.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
@@ -92,9 +61,6 @@
     }
   },
   "src/components/scan/StressTab/ToolComponents/K6Dashboard.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
@@ -102,20 +68,7 @@
       "count": 3
     }
   },
-  "src/components/scan/StressTab/ToolComponents/LocustDashboard.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/components/scan/StressTab/ToolComponents/StressorDashboard.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/components/scan/StressTab/ToolComponents/WrkDashboard.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -144,22 +97,14 @@
       "count": 1
     }
   },
-  "src/features/assessments/hooks/useAssessmentStream.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/features/assessments/index.tsx": {
     "react-refresh/only-export-components": {
       "count": 5
     }
   },
   "src/features/auth/components/LoginPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/auth/components/LogoutPage.tsx": {
@@ -168,9 +113,6 @@
     }
   },
   "src/features/auth/components/OnboardingPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 8
     },
@@ -179,9 +121,6 @@
     }
   },
   "src/features/bounty/components/BountyHubPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 10
     }
@@ -197,27 +136,11 @@
     }
   },
   "src/features/dashboard/components/GeoMap.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 4
     }
   },
-  "src/features/dashboard/components/KPIs.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "src/features/dashboard/components/TrendCharts.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/features/dashboard/components/VulnerabilityFeed.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "no-useless-assignment": {
       "count": 1
     },
@@ -230,20 +153,7 @@
       "count": 7
     }
   },
-  "src/features/endpoints/types/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/features/engines/api/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/features/engines/components/EngineConfigModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "react-hooks/set-state-in-effect": {
       "count": 3
     }
@@ -283,11 +193,6 @@
       "count": 1
     }
   },
-  "src/features/engines/components/shared/TagInput.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
   "src/features/engines/hooks/useEngineConfig.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -303,11 +208,6 @@
       "count": 22
     }
   },
-  "src/features/evidence/components/EvidenceUploadDialog.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/features/evidence/pages/EvidencePage.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 3
@@ -321,19 +221,9 @@
       "count": 1
     }
   },
-  "src/features/monitoring/components/AddMonitoringTargetModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/features/monitoring/components/DiscoveryTable.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
-    }
-  },
-  "src/features/monitoring/components/MonitoringStats.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/features/monitoring/index.tsx": {
@@ -342,41 +232,22 @@
     }
   },
   "src/features/notifications/components/NotificationsDropdown.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 5
     }
   },
   "src/features/organizations/components/CreateOrganizationModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
   },
   "src/features/organizations/components/OrganizationPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
   },
   "src/features/organizations/components/OrganizationTable.tsx": {
     "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
-  "src/features/organizations/orgTypes.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/features/plugins/api/pluginsApi.ts": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
@@ -391,9 +262,6 @@
     }
   },
   "src/features/plugins/components/PluginCard.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
     },
@@ -402,16 +270,6 @@
     },
     "react-hooks/set-state-in-effect": {
       "count": 3
-    }
-  },
-  "src/features/plugins/components/PluginComponent.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "src/features/plugins/components/PluginComponentLoader.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/features/plugins/components/PluginInventory.tsx": {
@@ -424,30 +282,12 @@
       "count": 1
     }
   },
-  "src/features/plugins/pages/PluginManagementPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "src/features/profiles/components/ProfileSelector.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/features/projects/components/AddProjectModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/features/projects/index.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 3
     }
   },
   "src/features/scans/api/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -463,38 +303,21 @@
     }
   },
   "src/features/scans/components/AttackSurfacePage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
   },
   "src/features/scans/components/AttackSurfaceTab.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
     }
   },
-  "src/features/scans/components/BreachDetailsModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/features/scans/components/BruteConfigDialog.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 3
     }
   },
   "src/features/scans/components/DirectoriesTab.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 11
     },
@@ -503,9 +326,6 @@
     }
   },
   "src/features/scans/components/EndpointsTab.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
@@ -516,9 +336,6 @@
     }
   },
   "src/features/scans/components/GraphBlastRadiusPanel.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -529,9 +346,6 @@
     }
   },
   "src/features/scans/components/GraphControlPanel.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
     }
@@ -554,11 +368,6 @@
   "src/features/scans/components/OsintTab/EmailImportModal.tsx": {
     "no-useless-escape": {
       "count": 1
-    }
-  },
-  "src/features/scans/components/OsintTab/EmailSection.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/features/scans/components/OsintTab/EmployeeIntelModal.tsx": {
@@ -591,33 +400,21 @@
     }
   },
   "src/features/scans/components/ScanHistoryDrawer.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 8
     }
   },
   "src/features/scans/components/ScanHistoryPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 7
     }
   },
   "src/features/scans/components/ScanList.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 7
     }
   },
   "src/features/scans/components/ScanReportModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 6
     }
@@ -628,17 +425,11 @@
     }
   },
   "src/features/scans/components/SecretLeaksTab.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
     "@typescript-eslint/no-unused-expressions": {
       "count": 1
     }
   },
   "src/features/scans/components/StartScanModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 3
     },
@@ -647,9 +438,6 @@
     }
   },
   "src/features/scans/components/SubScansPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 3
     }
@@ -678,32 +466,11 @@
     }
   },
   "src/features/search/components/SearchPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 8
     }
   },
-  "src/features/search/types/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/features/settings/api/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "src/features/settings/components/AdminSettingsPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
   "src/features/settings/components/ApiVaultPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 5
     },
@@ -720,9 +487,6 @@
     }
   },
   "src/features/settings/components/LlmToolkitPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 6
     },
@@ -739,9 +503,6 @@
     }
   },
   "src/features/settings/components/OpSecSettingsPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
@@ -755,9 +516,6 @@
     }
   },
   "src/features/settings/components/ProxySettingsPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "no-useless-escape": {
       "count": 1
     },
@@ -777,25 +535,16 @@
     }
   },
   "src/features/settings/components/ReNgineSettingsPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 7
     }
   },
   "src/features/settings/components/RemoteWorkersPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
   },
   "src/features/settings/components/ReportSettingsPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 4
     },
@@ -807,9 +556,6 @@
     }
   },
   "src/features/settings/components/ToolArsenalPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 10
     },
@@ -823,9 +569,6 @@
     }
   },
   "src/features/settings/components/ToolSettingsPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 10
     }
@@ -836,9 +579,6 @@
     }
   },
   "src/features/subdomains/SearchsploitModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
@@ -851,34 +591,17 @@
       "count": 1
     }
   },
-  "src/features/targets/api/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 2
-    }
-  },
   "src/features/targets/components/AddTargetModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
     }
   },
   "src/features/targets/components/EditTargetModal.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
   },
   "src/features/targets/components/TargetList.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 13
     }
@@ -909,16 +632,8 @@
     }
   },
   "src/features/todos/components/TodoPage.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 3
-    }
-  },
-  "src/features/todos/components/TodoSidebar.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
     }
   },
   "src/features/tools/components/ToolboxModals.tsx": {
@@ -969,9 +684,6 @@
     }
   },
   "src/features/workflows/components/WorkflowLauncher.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -993,19 +705,11 @@
     }
   },
   "src/router.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "react-hooks/rules-of-hooks": {
       "count": 2
     },
     "react-refresh/only-export-components": {
       "count": 2
-    }
-  },
-  "src/store/stressStore.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
     }
   }
 }

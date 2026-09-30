@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { paths, operations, components } from '@/types/api';
-import type { Domain, Organization, Engine, TargetSummaryResponse } from '../types';
+import type { Domain, DomainListResponse, Organization, Engine, TargetSummaryResponse } from '../types';
 
 export const useDomains = (projectSlug: string) => {
   return useQuery<Domain[]>({
@@ -12,7 +11,7 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["api_listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      const data: DomainListResponse = await response.json();
       return data.results || [];
     },
     enabled: !!projectSlug,
@@ -137,11 +136,10 @@ export const useEngines = () => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as any;
+      const data: Engine[] | { engines?: Engine[] } = await response.json();
       // listEngines returns a list directly in some cases, or wrapped in an object
-      if (Array.isArray(data)) return data as Engine[];
-      if ('engines' in data && Array.isArray(data.engines)) return data.engines as Engine[];
-      return [] as Engine[];
+      if (Array.isArray(data)) return data;
+      return Array.isArray(data.engines) ? data.engines : [];
     },
   });
 };

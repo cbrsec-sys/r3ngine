@@ -110,7 +110,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const isMobileHeader = useMediaQuery(theme.breakpoints.down('lg'));
 
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const { data: torStatus } = useTorStatus();
   const torActive = torStatus?.running ?? false;
   const { data: torExitIP } = useTorExitIP(torActive);

@@ -61,7 +61,7 @@ export const LoginPage: React.FC = () => {
       } else {
         setError(response.message || 'Invalid username or password.');
       }
-    } catch (err: any) {
+    } catch {
       setError('An error occurred during login. Please try again.');
     }
   };

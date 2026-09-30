@@ -23,9 +23,19 @@ except (ImportError, SyntaxError):
     # and since PluginsConfig.ready() imports this module the whole Django app
     # registry failed to load rather than just the plugin signature check.
     TRUSTED_PUBLIC_KEYS: list[bytes] = []
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 from .models import Plugin
 
 logger = logging.getLogger(__name__)
+
+
+class PluginInstallError(ValueError):
+    """An install failure whose message is safe and useful to show the user.
+
+    Anything else raised during an install is reported to the client as a
+    generic error (security rule 8.2); its details stay in the server log.
+    """
+
 
 class MarketplaceManager:
     MARKETPLACE_REPO_RAW_BASE = "https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/master"
@@ -102,7 +112,7 @@ class MarketplaceManager:
                     os.remove(temp_zip_path)
                 raise e
         else:
-            raise Exception(f"Failed to download plugin {slug}: {response.status_code}")
+            raise PluginInstallError(f"Failed to download plugin {slug}: HTTP {response.status_code}")
 
     @classmethod
     def _marketplace_icon_url(cls, slug: str | None, icon_field: object = None) -> str | None:
@@ -150,7 +160,7 @@ class PluginManager:
             for member in zip_ref.infolist():
                 dest = os.path.realpath(os.path.join(temp_dir, member.filename))
                 if not dest.startswith(safe_root):
-                    raise ValueError(f"Unsafe path in plugin archive: {member.filename}")
+                    raise PluginInstallError(f"Unsafe path in plugin archive: {member.filename}")
             zip_ref.extractall(temp_dir)
             
         # If there's only one directory and no files in the root, move everything up
@@ -170,7 +180,7 @@ class PluginManager:
         """Validates the manifest.yaml file."""
         manifest_path = os.path.join(plugin_dir, 'manifest.yaml')
         if not os.path.exists(manifest_path):
-            raise Exception("Manifest.yaml not found in plugin archive.")
+            raise PluginInstallError("Manifest.yaml not found in plugin archive.")
             
         with open(manifest_path, 'r') as f:
             manifest = yaml.safe_load(f)
@@ -178,14 +188,14 @@ class PluginManager:
         required_fields = ['name', 'version', 'runtime']
         for field in required_fields:
             if field not in manifest:
-                raise Exception(f"Missing required field '{field}' in manifest.yaml")
+                raise PluginInstallError(f"Missing required field '{field}' in manifest.yaml")
                 
         # Validate runtime keys.
         # Valid anchor values: any real scan task name (e.g. "subdomain_discovery")
         # or "standalone" for plugins that operate independently of the main scan pipeline.
         runtime = manifest.get('runtime', {})
         if not any(k in runtime for k in ['run after', 'run before']):
-            raise Exception("Manifest must specify 'run after' or 'run before' in runtime section.")
+            raise PluginInstallError("Manifest must specify 'run after' or 'run before' in runtime section.")
             
         return manifest
 
@@ -216,15 +226,15 @@ class PluginManager:
         with zipfile.ZipFile(_io.BytesIO(r3n_bytes), 'r') as r3n_zip:
             names = r3n_zip.namelist()
             if 'r3n_manifest.json' not in names:
-                raise ValueError("Not a valid .r3n file: missing r3n_manifest.json")
+                raise PluginInstallError("Not a valid .r3n file: missing r3n_manifest.json")
             if 'plugin.zip' not in names:
-                raise ValueError("Not a valid .r3n file: missing plugin.zip")
+                raise PluginInstallError("Not a valid .r3n file: missing plugin.zip")
             meta = json.loads(r3n_zip.read('r3n_manifest.json'))
             plugin_zip_bytes = r3n_zip.read('plugin.zip')
 
         actual_hash = hashlib.sha256(plugin_zip_bytes).hexdigest()
         if actual_hash != meta.get('content_hash'):
-            raise ValueError("Content hash mismatch — archive may be tampered")
+            raise PluginInstallError("Content hash mismatch — archive may be tampered")
 
         raw_sig = meta.get('signature')
         raw_pub = meta.get('public_key')
@@ -238,9 +248,10 @@ class PluginManager:
             pub_key = Ed25519PublicKey.from_public_bytes(pub_key_bytes)
             pub_key.verify(sig_bytes, actual_hash.encode())
         except InvalidSignature:
-            raise ValueError("Invalid signature — archive may be tampered")
+            raise PluginInstallError("Invalid signature — archive may be tampered")
         except Exception as e:
-            raise ValueError(f"Signature verification error: {e}")
+            logger.warning("Plugin signature could not be verified", exc_info=True)
+            raise PluginInstallError("Signature could not be verified — malformed key or signature") from e
 
         if pub_key_bytes in TRUSTED_PUBLIC_KEYS:
             return plugin_zip_bytes, meta, 'official'
@@ -441,10 +452,11 @@ class AtomicInstaller:
                     init_f = os.path.join(d, '__init__.py')
                     if not os.path.exists(init_f):
                         try:
-                            with open(init_f, 'w') as f:
+                            with open(init_f, 'w'):
                                 pass
-                        except Exception:
-                            pass
+                        except OSError:
+                            # The plugin migration below fails without it; say why.
+                            logger.warning("Could not create %s", init_f, exc_info=True)
 
                 app_label = f"{plugin_slug}_backend"
                 logger.info("Running migrations for plugin app: %s", app_label)
@@ -583,16 +595,17 @@ class AtomicInstaller:
             return Plugin.objects.get(slug=plugin_slug)
                 
         except Exception as e:
-            logger.error("Installation failed for %s: %s", plugin_slug, str(e))
+            logger.exception("Installation failed for %s", plugin_slug)
+            client_message = str(e) if isinstance(e, PluginInstallError) else INTERNAL_ERROR_MESSAGE
             # Mark the current in-progress step as failed and update overall status
             if install_id:
                 data = cache.get(f'plugin:install:{install_id}') or {'steps': [], 'status': 'running'}
                 for s in data.get('steps', []):
                     if s['status'] == 'in_progress':
                         s['status'] = 'failed'
-                        s['message'] = str(e)
+                        s['message'] = client_message
                 data['status'] = 'failed'
-                data['error'] = str(e)
+                data['error'] = client_message
                 cache.set(f'plugin:install:{install_id}', data, timeout=300)
             # Rollback DB
             if backup_db_file:
