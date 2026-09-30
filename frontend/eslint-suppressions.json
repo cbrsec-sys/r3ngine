@@ -476,9 +476,6 @@
     },
     "react-hooks/set-state-in-effect": {
       "count": 1
-    },
-    "react-hooks/static-components": {
-      "count": 7
     }
   },
   "src/features/settings/components/CheckForUpdateModal.tsx": {

@@ -17,7 +17,7 @@ from dashboard.models import (
     OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
     ShodanAPIKey, CensysAPIKey, LLMConfig, SpiderfootAPIKey, LeakLookupAPIKey,
     AcunetixAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey,
-    SOCConfiguration
+    SecurityTrailsAPIKey, SOCConfiguration
 )
 
 from scanEngine.models import (
@@ -36,7 +36,7 @@ DASHBOARD_MODELS = [
     OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
     ShodanAPIKey, CensysAPIKey, LLMConfig, SpiderfootAPIKey, LeakLookupAPIKey,
     AcunetixAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey,
-    SOCConfiguration
+    SecurityTrailsAPIKey, SOCConfiguration
 ]
 
 SCANENGINE_MODELS = [
@@ -48,7 +48,8 @@ SCANENGINE_MODELS = [
 SINGLETON_MODELS = (
     OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
     ShodanAPIKey, CensysAPIKey, LeakLookupAPIKey, AcunetixAPIKey,
-    LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey, SOCConfiguration,
+    LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey, SecurityTrailsAPIKey,
+    SOCConfiguration,
     InterestingLookupModel, Notification, Proxy, OpSec, Hackerone,
     VulnerabilityReportSetting
 )

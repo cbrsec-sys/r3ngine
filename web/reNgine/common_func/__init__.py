@@ -95,6 +95,7 @@ from reNgine.common_func.api_keys import (  # noqa: E402,F401
 	get_netlas_key,
 	get_chaos_key,
 	get_hackerone_key_username,
+	get_securitytrails_key,
 )
 from reNgine.common_func.url_utils import (  # noqa: E402,F401
 	get_subdomain_from_url,

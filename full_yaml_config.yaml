@@ -15,7 +15,7 @@
 #   user_agent: ''            # Custom User-Agent string
 #
 # Tools installed in the Docker image (reference):
-#   Subdomain/DNS   : subfinder, dnsx, tlsx, ctfr, sublist3r, oneforall, netlas, baddns, chaos
+#   Subdomain/DNS   : subfinder, dnsx, tlsx, ctfr, sublist3r, oneforall, netlas, baddns, chaos, securitytrails
 #   ASN/WHOIS       : getasn, jswhois, whoisdomain
 #   OSINT           : bbot, maigret, h8mail, holehe, spiderfoot
 #   HTTP/Crawl      : httpx, katana, gospider, hakrawler, cariddi, gau, waybackurls,
@@ -55,6 +55,7 @@ subdomain_discovery:
     - oneforall
     - netlas
     - baddns
+    # - securitytrails        # SecurityTrails API; key in the API Vault, one query of the monthly quota per scan
     # - amass-passive         # Passive amass enumeration
     # - amass-active          # Active amass enumeration (with wordlist)
   enable_http_crawl: true

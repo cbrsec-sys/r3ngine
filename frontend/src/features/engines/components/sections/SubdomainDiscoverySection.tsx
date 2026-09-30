@@ -9,7 +9,7 @@ import { useThemeTokens } from '../../../../theme/useThemeTokens';
 
 const SUBDOMAIN_TOOLS = [
   'subfinder', 'chaos', 'ctfr', 'sublist3r', 'tlsx',
-  'oneforall', 'netlas', 'baddns', 'amass-passive', 'amass-active',
+  'oneforall', 'netlas', 'securitytrails', 'baddns', 'amass-passive', 'amass-active',
 ];
 
 interface Props {

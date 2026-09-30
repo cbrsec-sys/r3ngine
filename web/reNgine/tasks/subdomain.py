@@ -7,6 +7,7 @@ from pathlib import Path
 
 from reNgine.common_func import *
 from reNgine.definitions import *
+from reNgine.osint.securitytrails import SecurityTrailsError, fetch_securitytrails_subdomains
 from reNgine.utils.opsec import OpSecManager, ProxychainsWrapper, get_opsec_manager
 from reNgine.utils.task import run_command, run_command_with_retry, stream_command, save_subdomain, save_endpoint, save_subdomain_metadata
 from reNgine.tasks.persistence import create_scan_activity
@@ -104,6 +105,8 @@ def subdomain_discovery(
 	default_subdomain_tools.append('amass-active')
 	# Append baddns so it is always registered as a supported default subdomain discovery tool
 	default_subdomain_tools.append('baddns')
+	# SecurityTrails is an API, not an installed tool
+	default_subdomain_tools.append('securitytrails')
 
 	# Run tools
 	opsec = get_opsec_manager()
@@ -184,6 +187,10 @@ def subdomain_discovery(
 					continue
 				results_file = self.results_dir + '/subdomains_chaos.txt'
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
+
+			elif tool == 'securitytrails':
+				_collect_securitytrails_subdomains(host, f'{self.results_dir}/subdomains_securitytrails.txt')
+				continue
 
 			elif tool == 'baddns':
 				results_file = self.results_dir + '/baddns_report.json'
@@ -457,7 +464,22 @@ def save_imported_subdomains(subdomains, ctx={}):
 			output_file.write(f'{subdomain}\n')
 
 
+def _collect_securitytrails_subdomains(host: str, results_file: str) -> int:
+	"""Write SecurityTrails subdomains of ``host`` to ``results_file``.
 
-
-
-
+	The file is picked up with the other ``subdomains_*.txt`` outputs. Skips the
+	lookup without a vault key: each call spends one query of the monthly quota.
+	"""
+	api_key = get_securitytrails_key()
+	if not api_key:
+		logger.warning('SecurityTrails API key not configured in the API vault. Skipping.')
+		return 0
+	try:
+		subdomains = fetch_securitytrails_subdomains(host, api_key)
+	except SecurityTrailsError as exc:
+		logger.error('SecurityTrails lookup for %s failed: %s', host, exc)
+		return 0
+	with open(results_file, 'w') as f:
+		f.writelines(f'{name}\n' for name in subdomains)
+	logger.info('SecurityTrails returned %d subdomains for %s', len(subdomains), host)
+	return len(subdomains)

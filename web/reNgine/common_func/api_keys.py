@@ -11,6 +11,7 @@ from dashboard.models import (
 	LeakLookupAPIKey,
 	NetlasAPIKey,
 	OpenAiAPIKey,
+	SecurityTrailsAPIKey,
 	SpiderfootAPIKey,
 )
 
@@ -44,6 +45,12 @@ def get_chaos_api_key():
 		str: Chaos API key or ''.
 	"""
 	key_obj = ChaosAPIKey.objects.first()
+	return key_obj.key if key_obj else ''
+
+
+def get_securitytrails_key() -> str:
+	"""Return the SecurityTrails API key from the vault, or ''."""
+	key_obj = SecurityTrailsAPIKey.objects.first()
 	return key_obj.key if key_obj else ''
 
 

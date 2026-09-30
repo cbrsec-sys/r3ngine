@@ -27,7 +27,7 @@ from dashboard.models import LLMConfig, LLMSettings
 from scanEngine.forms import *
 from scanEngine.forms import ConfigurationForm
 from scanEngine.models import *
-from dashboard.models import SpiderfootAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey, ProjectDiscoveryAPIKey
+from dashboard.models import SpiderfootAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey, ProjectDiscoveryAPIKey, SecurityTrailsAPIKey
 from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 
@@ -1074,6 +1074,7 @@ def api_vault(request, slug):
         linkedin_username = _pick('linkedin_username', 'linkedin_username')
         key_wpscan = _pick('key_wpscan', 'wpscan_key')
         key_projectdiscovery = _pick('key_projectdiscovery', 'projectdiscovery_key')
+        key_securitytrails = _pick('key_securitytrails', 'securitytrails_key')
 
         # Treat empty strings as "clear value" (fixes: unsetting defaults to last value).
         if key_openai is not None:
@@ -1177,6 +1178,12 @@ def api_vault(request, slug):
                 defaults={'key': key_projectdiscovery or ""}
             )
 
+        if key_securitytrails is not None:
+            SecurityTrailsAPIKey.objects.update_or_create(
+                id=1,
+                defaults={'key': key_securitytrails or ""}
+            )
+
         if linkedin_username is not None:
             LinkedInCredentials.objects.update_or_create(
                 id=1,
@@ -1228,6 +1235,7 @@ def api_vault(request, slug):
             'linkedin_username': LinkedInCredentials.objects.first().username if LinkedInCredentials.objects.exists() else "",
             'wpscan_key': WpScanAPIKey.objects.first().key if WpScanAPIKey.objects.exists() else "",
             'projectdiscovery_key': ProjectDiscoveryAPIKey.objects.first().key if ProjectDiscoveryAPIKey.objects.exists() else "",
+            'securitytrails_key': get_securitytrails_key(),
         })
 
     return render(request, 'dashboard/v3_index.html', context)

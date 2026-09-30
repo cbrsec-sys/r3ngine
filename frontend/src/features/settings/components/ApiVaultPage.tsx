@@ -37,7 +37,7 @@ import { useThemeTokens } from '../../../theme/useThemeTokens';
 import type { ApiErrorLike } from '../../../types/errors';
 
 /** API keys and credentials edited on the vault page; every value is a string. */
-type ApiVaultForm = Record<'netlas_key' | 'chaos_key' | 'shodan_key' | 'censys_key' | 'leaklookup_key' | 'hackerone_username' | 'hackerone_key' | 'acunetix_url' | 'acunetix_key' | 'linkedin_username' | 'linkedin_password' | 'hunterio_key' | 'wpscan_key' | 'projectdiscovery_key', string>;
+type ApiVaultForm = Record<'netlas_key' | 'chaos_key' | 'shodan_key' | 'censys_key' | 'leaklookup_key' | 'hackerone_username' | 'hackerone_key' | 'acunetix_url' | 'acunetix_key' | 'linkedin_username' | 'linkedin_password' | 'hunterio_key' | 'wpscan_key' | 'projectdiscovery_key' | 'securitytrails_key', string>;
 
 interface KeyFieldProps {
   label: string;
@@ -47,6 +47,71 @@ interface KeyFieldProps {
   icon: LucideIcon;
   url?: string;
 }
+
+/** Form state shared by every KeyField, passed down from the page. */
+interface KeyFieldState {
+  form: ApiVaultForm;
+  showKeys: Record<string, boolean>;
+  accent: string;
+  onFieldChange: (field: keyof ApiVaultForm, value: string) => void;
+  onToggle: (field: string) => void;
+}
+
+const KeyField = ({ label, description, field, placeholder, icon: Icon, url, form, showKeys, accent, onFieldChange, onToggle }: KeyFieldProps & KeyFieldState) => (
+  <Box sx={{ mb: 4 }}>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Icon size={18} color={accent} />
+        <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.85rem', fontWeight: 700 }}>
+          {label}
+        </Typography>
+      </Box>
+      {url && (
+        <Button
+          href={url}
+          target="_blank"
+          size="small"
+          endIcon={<ExternalLink size={12} />}
+          sx={{ color: 'text.secondary', fontSize: '10px', '&:hover': { color: accent } }}
+        >
+          GET KEY
+        </Button>
+      )}
+    </Box>
+    <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
+      {description}
+    </Typography>
+    <TextField
+      fullWidth
+      variant="outlined"
+      type={showKeys[field] ? 'text' : 'password'}
+      value={form[field]}
+      onChange={(e) => onFieldChange(field, e.target.value)}
+      placeholder={placeholder}
+      slotProps={{
+        input: {
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton onClick={() => onToggle(field)} edge="end" sx={{ color: 'text.disabled' }}>
+                {showKeys[field] ? <EyeOff size={18} /> : <Eye size={18} />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }
+      }}
+      sx={{
+        '& .MuiOutlinedInput-root': {
+          color: 'text.primary',
+          bgcolor: 'action.hover',
+          fontFamily: 'monospace',
+          '& fieldset': { borderColor: 'divider' },
+          '&:hover fieldset': { borderColor: `${accent}4D` },
+          '&.Mui-focused fieldset': { borderColor: accent },
+        }
+      }}
+    />
+  </Box>
+);
 
 export const ApiVaultPage: React.FC = () => {
   const { tokens } = useThemeTokens();
@@ -68,7 +133,8 @@ export const ApiVaultPage: React.FC = () => {
     linkedin_password: '',
     hunterio_key: '',
     wpscan_key: '',
-    projectdiscovery_key: ''
+    projectdiscovery_key: '',
+    securitytrails_key: ''
   });
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -98,7 +164,8 @@ export const ApiVaultPage: React.FC = () => {
         linkedin_password: settings.linkedin_password || '',
         hunterio_key: settings.hunterio_key || '',
         wpscan_key: settings.wpscan_key || '',
-        projectdiscovery_key: settings.projectdiscovery_key || ''
+        projectdiscovery_key: settings.projectdiscovery_key || '',
+        securitytrails_key: settings.securitytrails_key || ''
       });
     }
   }, [settings]);
@@ -131,63 +198,15 @@ export const ApiVaultPage: React.FC = () => {
     });
   };
 
-  if (isLoading) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}1A`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
+  const fieldState: KeyFieldState = {
+    form,
+    showKeys,
+    accent: tokens.accent.primary,
+    onFieldChange: (field, value) => setForm((prev) => ({ ...prev, [field]: value })),
+    onToggle: toggleVisibility,
+  };
 
-  const KeyField = ({ label, description, field, placeholder, icon: Icon, url }: KeyFieldProps) => (
-    <Box sx={{ mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Icon size={18} color={tokens.accent.primary} />
-          <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.85rem', fontWeight: 700 }}>
-            {label}
-          </Typography>
-        </Box>
-        {url && (
-          <Button
-            href={url}
-            target="_blank"
-            size="small"
-            endIcon={<ExternalLink size={12} />}
-            sx={{ color: 'text.secondary', fontSize: '10px', '&:hover': { color: tokens.accent.primary } }}
-          >
-            GET KEY
-          </Button>
-        )}
-      </Box>
-      <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
-        {description}
-      </Typography>
-      <TextField
-        fullWidth
-        variant="outlined"
-        type={showKeys[field] ? 'text' : 'password'}
-        value={form[field]}
-        onChange={(e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))}
-        placeholder={placeholder}
-        slotProps={{
-          input: {
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton onClick={() => toggleVisibility(field)} edge="end" sx={{ color: 'text.disabled' }}>
-                  {showKeys[field] ? <EyeOff size={18} /> : <Eye size={18} />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          }
-        }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            color: 'text.primary',
-            bgcolor: 'action.hover',
-            fontFamily: 'monospace',
-            '& fieldset': { borderColor: 'divider' },
-            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
-            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
-          }
-        }}
-      />
-    </Box>
-  );
+  if (isLoading) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}1A`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -232,6 +251,7 @@ export const ApiVaultPage: React.FC = () => {
             <TacticalPanel title="OSINT & DISCOVERY" icon={<Globe size={20} />}>
               <Box sx={{ p: 1 }}>
                 <KeyField
+                  {...fieldState}
                   label="NETLAS"
                   description="Used for WHOIS information and historical OSINT data."
                   field="netlas_key"
@@ -240,6 +260,7 @@ export const ApiVaultPage: React.FC = () => {
                   url="https://netlas.io"
                 />
                 <KeyField
+                  {...fieldState}
                   label="CHAOS"
                   description="Used for subdomain enumeration and recon data from Project Discovery."
                   field="chaos_key"
@@ -248,6 +269,16 @@ export const ApiVaultPage: React.FC = () => {
                   url="https://cloud.projectdiscovery.io"
                 />
                 <KeyField
+                  {...fieldState}
+                  label="SECURITYTRAILS"
+                  description="Used for subdomain enumeration (securitytrails tool). Each scan spends one query of the monthly quota."
+                  field="securitytrails_key"
+                  placeholder="Enter SecurityTrails Key"
+                  icon={Search}
+                  url="https://securitytrails.com"
+                />
+                <KeyField
+                  {...fieldState}
                   label="PROJECTDISCOVERY (PDCP)"
                   description="Used by vulnx to search and retrieve enriched vulnerability details from PDCP."
                   field="projectdiscovery_key"
@@ -256,6 +287,7 @@ export const ApiVaultPage: React.FC = () => {
                   url="https://cloud.projectdiscovery.io"
                 />
                 <KeyField
+                  {...fieldState}
                   label="SHODAN"
                   description="Used for origin discovery and historical IP lookups."
                   field="shodan_key"
@@ -264,6 +296,7 @@ export const ApiVaultPage: React.FC = () => {
                   url="https://shodan.io"
                 />
                 <KeyField
+                  {...fieldState}
                   label="LEAKLOOKUP"
                   description="Used to search for leaked credentials and data breaches."
                   field="leaklookup_key"
@@ -272,6 +305,7 @@ export const ApiVaultPage: React.FC = () => {
                   url="https://leak-lookup.com"
                 />
                 <KeyField
+                  {...fieldState}
                   label="HUNTER.IO"
                   description="Used for professional email discovery and corporate dossiers."
                   field="hunterio_key"
@@ -538,6 +572,7 @@ export const ApiVaultPage: React.FC = () => {
               <TacticalPanel title="WPSCAN CONFIGURATION" icon={<Shield size={20} />}>
                 <Box sx={{ p: 1 }}>
                   <KeyField
+                    {...fieldState}
                     label="WPSCAN API KEY"
                     description="WPScan API key is used to retrieve vulnerability data for WordPress installations."
                     field="wpscan_key"

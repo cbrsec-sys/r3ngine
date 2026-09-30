@@ -117,6 +117,7 @@ export interface ApiVaultSettings {
   hunterio_key?: string;
   wpscan_key?: string;
   projectdiscovery_key?: string;
+  securitytrails_key?: string;
 }
 
 export interface ReportSettings {
@@ -561,6 +562,7 @@ export const useUpdateApiVault = (slug: string) => {
       formData.append('hunterio_key', data.hunterio_key || '');
       formData.append('wpscan_key', data.wpscan_key || '');
       formData.append('key_projectdiscovery', data.projectdiscovery_key || '');
+      formData.append('key_securitytrails', data.securitytrails_key || '');
 
       const response = await axios.post(`/scanEngine/${slug}/api_vault`, formData, {
         headers: {
