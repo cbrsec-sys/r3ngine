@@ -6,31 +6,167 @@ import type {
 } from '../types/engineConfig';
 import { DEFAULT_ENGINE_CONFIG } from '../types/engineConfig';
 
-// ─── Serialiser ──────────────────────────────────────────────────────────────
-
-const GLOBAL_KEYS = ['custom_headers', 'enable_http_crawl', 'threads', 'timeout', 'rate_limit', 'retries', 'intensity'];
-
 /**
- * Every top-level key the form reads or writes. Anything else in an engine's YAML
- * (a section added by hand or by a newer backend) is carried through a save unchanged.
- * The form must own every key it can omit: a disabled section or a default global
- * is written by leaving the key out, so it must never come back from the old YAML.
+ * Engine YAML is user-edited, so every value is `unknown` until read: mappings go through
+ * `asMapping`, and leaf values are taken at the type the engine schema declares for them.
  */
-const FORM_KEYS = new Set<string>([
-  ...GLOBAL_KEYS,
-  ...Object.keys(DEFAULT_ENGINE_CONFIG).filter((k) => k !== 'global'),
-  // leaks_and_secrets is written as secret_scanning; both spellings are read.
-  'secret_scanning',
-]);
+type YamlMapping = Record<string, unknown>;
 
-function unknownTopLevelKeys(yamlStr: string): Record<string, unknown> {
-  const doc: unknown = yamlLoad(yamlStr);
-  if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) return {};
-  return Object.fromEntries(Object.entries(doc).filter(([key]) => !FORM_KEYS.has(key)));
+function isMapping(node: unknown): node is YamlMapping {
+  return typeof node === 'object' && node !== null && !Array.isArray(node);
 }
 
-function serialiseConfigToYaml(config: EngineConfig, passthrough: Record<string, unknown> = {}): string {
-  const out: Record<string, unknown> = { ...passthrough };
+/** A YAML mapping node, or `{}` for a missing/null node or a list. */
+function asMapping(node: unknown): YamlMapping {
+  return isMapping(node) ? node : {};
+}
+
+/** Secret scanning settings from all three spellings, oldest first so the newest wins. */
+function secretScanningSettings(raw: YamlMapping): YamlMapping {
+  return {
+    ...asMapping(asMapping(raw.osint).leaks_and_secrets),
+    ...asMapping(raw.leaks_and_secrets),
+    ...asMapping(raw.secret_scanning),
+  };
+}
+
+// ─── Keys the form owns ──────────────────────────────────────────────────────
+
+/**
+ * The keys of a YAML mapping the form owns. `null`: the form owns the whole value.
+ * A nested `OwnedKeys`: the form owns that mapping's listed keys and carries the rest.
+ */
+export interface OwnedKeys {
+  readonly [key: string]: OwnedKeys | null;
+}
+
+const owned = (...keys: string[]): OwnedKeys => Object.fromEntries(keys.map((key) => [key, null]));
+
+const VIGOLIUM_STAGE = ['strategy', 'concurrency', 'rate_limit', 'timeout'];
+
+/**
+ * Everything the parser reads or the serialiser may write, per mapping. A key missing
+ * from the loaded YAML's mapping here is carried through a save unchanged, so every key
+ * the form can leave out (a disabled section, a default global, an option written only
+ * when switched on) must be listed or a stale value comes back from the old YAML.
+ */
+export const FORM_OWNED_KEYS: Readonly<Record<SectionKey | keyof GlobalConfig | 'secret_scanning', OwnedKeys | null>> = {
+  custom_headers: null,
+  enable_http_crawl: null,
+  threads: null,
+  timeout: null,
+  rate_limit: null,
+  retries: null,
+  intensity: null,
+
+  subdomain_discovery: owned(
+    'uses_tools', 'threads', 'timeout', 'enable_http_crawl', 'bbot',
+    'use_subfinder_config', 'use_amass_config', 'amass_wordlist',
+  ),
+  dns_security: owned(),
+  // whatbreach is a boolean or a mapping depending on a checkbox, so it is owned whole.
+  osint: owned(
+    'discover', 'dorks', 'custom_dorks', 'intensity', 'documents_limit',
+    'whatbreach', 'credspy', 'leaks_and_secrets',
+  ),
+  spiderfoot_scan: owned('modules', 'intensity', 'threads'),
+  vigolium_harvest: owned('run_vigolium_harvest', ...VIGOLIUM_STAGE),
+  vigolium_discovery: owned('run_vigolium_discovery', ...VIGOLIUM_STAGE),
+  firewall_vpn_scan: owned('run_ike_scan', 'run_sslscan', 'ports'),
+  http_crawl: owned('threads', 'follow_redirect'),
+  port_scan: owned(
+    'ports', 'rate_limit', 'threads', 'timeout', 'passive', 'enable_http_crawl',
+    'enable_nmap', 'nmap_cmd', 'nmap_script', 'nmap_script_args', 'exclude_ports', 'exclude_subdomains',
+  ),
+  email_security: {
+    enabled: null,
+    mailbox_verification: owned('enabled', 'timeout', 'max_candidates', 'delay_ms', 'http_url'),
+  },
+  screenshot: owned('intensity', 'timeout', 'threads', 'enable_http_crawl'),
+  fetch_url: owned(
+    'uses_tools', 'remove_duplicate_endpoints', 'duplicate_fields', 'enable_http_crawl',
+    'gf_patterns', 'ignore_file_extensions', 'threads',
+  ),
+  web_api_discovery: owned(
+    'uses_tools', 'scan_only_active', 'threads', 'timeout', 'kr_wordlist',
+    'run_favirecon', 'run_sourcemapper', 'run_grpcurl', 'run_julius', 'run_gqlspection',
+  ),
+  param_discovery: owned('enabled', 'min_confidence'),
+  dir_file_fuzz: owned(
+    'run_dirsearch', 'run_feroxbuster', 'auto_calibration', 'enable_http_crawl', 'extensions',
+    'wordlist_name', 'rate_limit', 'threads', 'timeout', 'max_time', 'recursive_level',
+    'match_http_status', 'follow_redirect', 'stop_on_error', 'max_repeat_by_signature',
+  ),
+  waf_detection: owned('enable_http_crawl', 'use_shodan', 'use_censys'),
+  waf_bypass: owned('enabled', 'use_benchmarking', 'use_nuclei', 'timeout', 'threads'),
+  // Read under three spellings, written only as secret_scanning; see secretScanningSettings.
+  leaks_and_secrets: null,
+  secret_scanning: owned('gitleaks', 'trufflehog', 'leaklookup'),
+  vigolium_analysis: owned('run_vigolium_analysis', ...VIGOLIUM_STAGE),
+  vulnerability_scan: {
+    ...owned(
+      'run_nuclei', 'run_dalfox', 'run_crlfuzz', 'run_s3scanner', 'run_acunetix', 'run_wpscan',
+      'run_wptaint_scan', 'run_smugglex', 'run_second_order', 'run_nuclei_dast', 'run_vigolium',
+      'concurrency', 'rate_limit', 'retries', 'timeout', 'intensity', 'fetch_gpt_report',
+      'enable_http_crawl', 'wpscan_enumeration', 'wpscan_detection_mode',
+    ),
+    acunetix: owned('submit_live_subdomains', 'resubmit_after_days', 'start_scan_on_submit'),
+    nuclei: owned('use_nuclei_config', 'severities', 'tags', 'templates', 'custom_templates'),
+    cpanel_scanner: owned('run_cpanel2shell', 'cpanel_user_wordlist', 'proxy_type'),
+    vigolium: owned(
+      ...VIGOLIUM_STAGE, 'run_phase_a', 'run_phase_b', 'scope_origin', 'skip_spidering',
+    ),
+  },
+  attack_path_modeling: owned('enabled', 'top_n'),
+  tier_7: owned('high_noise_modules'),
+  vigolium_audit: owned('run_vigolium_audit', 'intensity', 'use_ai', 'timeout'),
+};
+
+/** The parts of a loaded YAML mapping the form does not own. */
+interface Leftovers {
+  /** Keys the form does not own, with their loaded values. */
+  values: YamlMapping;
+  /** Leftovers inside the mappings the form owns, by key. */
+  nested: Readonly<Record<string, Leftovers>>;
+}
+
+const NO_LEFTOVERS: Leftovers = { values: {}, nested: {} };
+
+function collectLeftovers(node: YamlMapping, ownedKeys: OwnedKeys): Leftovers {
+  const entries = Object.entries(node);
+  return {
+    values: Object.fromEntries(entries.filter(([key]) => !Object.hasOwn(ownedKeys, key))),
+    nested: Object.fromEntries(entries.flatMap(([key, value]) => {
+      const inner = Object.hasOwn(ownedKeys, key) ? ownedKeys[key] : null;
+      return inner ? [[key, collectLeftovers(asMapping(value), inner)]] : [];
+    })),
+  };
+}
+
+function engineLeftovers(yamlStr: string): Leftovers {
+  const raw = asMapping(yamlLoad(yamlStr));
+  return collectLeftovers({ ...raw, secret_scanning: secretScanningSettings(raw) }, FORM_OWNED_KEYS);
+}
+
+/**
+ * Lays the leftovers under what the form wrote. Only mappings the form actually wrote
+ * take nested leftovers: an owned key the form left out stays out, with its leftovers.
+ */
+function withLeftovers(written: YamlMapping, leftovers: Leftovers): YamlMapping {
+  const carried = Object.entries(leftovers.values).filter(([key]) => !Object.hasOwn(written, key));
+  const nested = Object.entries(leftovers.nested).flatMap(([key, inner]) => {
+    const value = Object.hasOwn(written, key) ? written[key] : undefined;
+    return isMapping(value) ? [[key, withLeftovers(value, inner)]] : [];
+  });
+  // Object spread defines own properties, so a `__proto__` key from the YAML stays a plain key.
+  return { ...written, ...Object.fromEntries(carried), ...Object.fromEntries(nested) };
+}
+
+// ─── Serialiser ──────────────────────────────────────────────────────────────
+
+/** Writes the form's config, then carries over the loaded YAML's keys the form does not own. */
+export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers = NO_LEFTOVERS): string {
+  const out: YamlMapping = {};
 
   // Global fields — top level, no wrapper key
   const g = config.global;
@@ -240,21 +376,10 @@ function serialiseConfigToYaml(config: EngineConfig, passthrough: Record<string,
     writeSection('vigolium_audit', { run_vigolium_audit: true, intensity: c.intensity, use_ai: c.use_ai, timeout: c.timeout });
   }
 
-  return yamlDump(out, { lineWidth: 120, quotingType: "'", forceQuotes: false } as DumpOptions);
+  return yamlDump(withLeftovers(out, leftovers), { lineWidth: 120, quotingType: "'", forceQuotes: false } as DumpOptions);
 }
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
-
-/**
- * Engine YAML is user-edited, so every value is `unknown` until read: mappings go through
- * `asMapping`, and leaf values are taken at the type the engine schema declares for them.
- */
-type YamlMapping = Record<string, unknown>;
-
-/** A YAML mapping node, or `{}` for a missing/null node or a list. */
-function asMapping(node: unknown): YamlMapping {
-  return typeof node === 'object' && node !== null && !Array.isArray(node) ? (node as YamlMapping) : {};
-}
 
 function parseYamlToConfig(yamlStr: string): EngineConfig {
   const doc: unknown = yamlLoad(yamlStr);
@@ -264,12 +389,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
   const raw = asMapping(doc);
   const def = DEFAULT_ENGINE_CONFIG;
 
-  // Secret scanning settings, oldest spelling first: osint.leaks_and_secrets,
-  // top-level leaks_and_secrets (older editor saves), then secret_scanning.
-  const osintLeaks = asMapping(asMapping(raw.osint).leaks_and_secrets);
-  const topLeaks = asMapping(raw.leaks_and_secrets);
-  const secretScanning = asMapping(raw.secret_scanning);
-  const mergedLeaks = { ...osintLeaks, ...topLeaks, ...secretScanning };
+  const mergedLeaks = secretScanningSettings(raw);
 
   const g = def.global;
   type GlobalConfig = EngineConfig['global'];
@@ -577,17 +697,17 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
   });
   const [yaml, setYamlStr] = useState<string>(() => initialYaml ?? serialiseConfigToYaml(DEFAULT_ENGINE_CONFIG));
   const [yamlError, setYamlError] = useState<string | null>(null);
-  // Top-level keys of the loaded YAML that the form does not own, re-emitted on every serialise.
-  const passthrough = useRef<Record<string, unknown>>({});
+  // Keys of the loaded YAML the form does not own, re-emitted on every serialise.
+  const leftovers = useRef<Leftovers>(NO_LEFTOVERS);
 
-  const serialise = useCallback((next: EngineConfig) => serialiseConfigToYaml(next, passthrough.current), []);
+  const serialise = useCallback((next: EngineConfig) => serialiseConfigToYaml(next, leftovers.current), []);
 
   // Re-parse when initialYaml changes (edit mode load)
   useEffect(() => {
     if (!initialYaml) return;
     try {
       const parsed = parseYamlToConfig(initialYaml);
-      passthrough.current = unknownTopLevelKeys(initialYaml);
+      leftovers.current = engineLeftovers(initialYaml);
       setConfig(parsed);
       setYamlStr(serialise(parsed));
       setYamlError(null);
@@ -644,7 +764,7 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
     setYamlStr(raw);
     try {
       const parsed = parseYamlToConfig(raw);
-      passthrough.current = unknownTopLevelKeys(raw);
+      leftovers.current = engineLeftovers(raw);
       setConfig(parsed);
       setYamlError(null);
     } catch (e) {
@@ -655,7 +775,7 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
   const loadTemplate = useCallback((yamlStr: string) => {
     try {
       const parsed = parseYamlToConfig(yamlStr);
-      passthrough.current = unknownTopLevelKeys(yamlStr);
+      leftovers.current = engineLeftovers(yamlStr);
       updateConfigAndYaml(parsed);
     } catch (e) {
       setYamlError(e instanceof Error ? e.message : String(e));

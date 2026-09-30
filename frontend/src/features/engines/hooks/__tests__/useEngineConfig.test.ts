@@ -1,6 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useEngineConfig } from '../useEngineConfig';
+import { load as yamlLoad } from 'js-yaml';
+import { FORM_OWNED_KEYS, serialiseConfigToYaml, useEngineConfig } from '../useEngineConfig';
+import type { OwnedKeys } from '../useEngineConfig';
+import { DEFAULT_ENGINE_CONFIG } from '../../types/engineConfig';
+import type { EngineConfig } from '../../types/engineConfig';
+
+type Mapping = Record<string, unknown>;
+
+function isMapping(node: unknown): node is Mapping {
+  return typeof node === 'object' && node !== null && !Array.isArray(node);
+}
+
+function loadMapping(yaml: string): Mapping {
+  const doc: unknown = yamlLoad(yaml);
+  if (!isMapping(doc)) throw new Error('expected a YAML mapping');
+  return doc;
+}
+
+function mappingAt(root: Mapping, ...path: string[]): Mapping {
+  return path.reduce<Mapping>((node, key) => {
+    const next = node[key];
+    if (!isMapping(next)) throw new Error(`expected a mapping at ${path.join('.')}`);
+    return next;
+  }, root);
+}
 
 const ENGINE_YAML = `
 threads: 12
@@ -195,5 +219,176 @@ port_scan:
     act(() => result.current.updateSection('tier_7', { high_noise_modules: ['b'] }));
 
     expect(result.current.yaml).toMatch(/^tier_7:\n {2}high_noise_modules:\n {4}- b$/m);
+  });
+});
+
+describe('useEngineConfig keys the form does not own inside a section', () => {
+  it('keeps an unknown section key through an edit of that section', () => {
+    const { result } = renderHook(() => useEngineConfig('port_scan:\n  ports: [top-100]\n  some_backend_key: 1\n'));
+    act(() => result.current.updateSection('port_scan', { rate_limit: 10 }));
+
+    const portScan = mappingAt(loadMapping(result.current.yaml), 'port_scan');
+    expect(portScan.rate_limit).toBe(10);
+    expect(portScan.some_backend_key).toBe(1);
+  });
+
+  it('keeps unknown keys inside the nested mappings the form writes', () => {
+    const yaml = `
+vulnerability_scan:
+  nuclei:
+    tags: [cve]
+    max_templates_per_batch: 200
+  cpanel_scanner:
+    proxy_type: static
+    extra: 3
+email_security:
+  mailbox_verification:
+    max_candidates: 50
+    probe_from: probe@example.test
+`;
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    act(() => result.current.updateSection('vulnerability_scan', { rate_limit: 5 }));
+    const doc = loadMapping(result.current.yaml);
+
+    expect(mappingAt(doc, 'vulnerability_scan', 'nuclei')).toMatchObject({ tags: ['cve'], max_templates_per_batch: 200 });
+    expect(mappingAt(doc, 'vulnerability_scan', 'cpanel_scanner')).toMatchObject({ proxy_type: 'static', extra: 3 });
+    expect(mappingAt(doc, 'email_security', 'mailbox_verification')).toMatchObject({
+      max_candidates: 50, probe_from: 'probe@example.test',
+    });
+  });
+
+  it('does not bring back an owned key the form now leaves out', () => {
+    const yaml = `
+port_scan:
+  enable_nmap: true
+  nmap_cmd: nmap -sV
+  exclude_subdomains: true
+  some_backend_key: 1
+osint:
+  custom_dorks: [site-dork]
+  whatbreach:
+    download_found_databases: true
+    extra: 1
+`;
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    act(() => result.current.updateSection('port_scan', { enable_nmap: false, exclude_subdomains: false }));
+    act(() => result.current.updateSection('osint', { custom_dorks: [], whatbreach: false }));
+    const doc = loadMapping(result.current.yaml);
+
+    const portScan = mappingAt(doc, 'port_scan');
+    expect(portScan).not.toHaveProperty('enable_nmap');
+    expect(portScan).not.toHaveProperty('nmap_cmd');
+    expect(portScan).not.toHaveProperty('exclude_subdomains');
+    expect(portScan.some_backend_key).toBe(1);
+    const osint = mappingAt(doc, 'osint');
+    expect(osint).not.toHaveProperty('custom_dorks');
+    expect(osint.whatbreach).toBe(false);
+  });
+
+  it('drops an owned nested mapping the form leaves out, with its unknown keys', () => {
+    const yaml = `
+vulnerability_scan:
+  run_vigolium: true
+  vigolium:
+    strategy: fast
+    extra: 1
+  nuclei:
+    tags: [cve]
+    extra: 2
+`;
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    act(() => result.current.updateSection('vulnerability_scan', { run_vigolium: false, run_nuclei: false }));
+    const vuln = mappingAt(loadMapping(result.current.yaml), 'vulnerability_scan');
+
+    expect(vuln).not.toHaveProperty('vigolium');
+    expect(vuln).not.toHaveProperty('nuclei');
+  });
+
+  it('still drops a disabled section with its unknown keys', () => {
+    const { result } = renderHook(() => useEngineConfig('port_scan:\n  some_backend_key: 1\n'));
+    act(() => result.current.toggleSection('port_scan', false));
+
+    expect(result.current.yaml).not.toMatch(/^port_scan:/m);
+    expect(result.current.yaml).not.toContain('some_backend_key');
+  });
+
+  it('carries unknown secret scanning keys from every spelling into secret_scanning only', () => {
+    const yaml = `
+osint:
+  discover: [emails]
+  leaks_and_secrets:
+    gitleaks: false
+    from_osint: 1
+leaks_and_secrets:
+  from_old_save: 2
+`;
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    act(() => result.current.updateSection('osint', { documents_limit: 10 }));
+    const doc = loadMapping(result.current.yaml);
+
+    expect(mappingAt(doc, 'osint')).not.toHaveProperty('leaks_and_secrets');
+    expect(doc).not.toHaveProperty('leaks_and_secrets');
+    expect(mappingAt(doc, 'secret_scanning')).toMatchObject({ gitleaks: false, from_osint: 1, from_old_save: 2 });
+
+    act(() => result.current.toggleSection('leaks_and_secrets', false));
+    expect(result.current.yaml).not.toContain('secret_scanning');
+    expect(result.current.yaml).not.toContain('from_osint');
+  });
+
+  it('takes section keys from YAML typed into the YAML tab or loaded from a template', () => {
+    const { result } = renderHook(() => useEngineConfig('port_scan:\n  first: 1\n'));
+    act(() => result.current.setYaml('port_scan:\n  second: 2\n'));
+    act(() => result.current.updateSection('port_scan', { threads: 5 }));
+
+    expect(mappingAt(loadMapping(result.current.yaml), 'port_scan')).toMatchObject({ second: 2 });
+    expect(result.current.yaml).not.toContain('first');
+
+    act(() => result.current.loadTemplate('port_scan:\n  third: 3\n'));
+    expect(mappingAt(loadMapping(result.current.yaml), 'port_scan')).toMatchObject({ third: 3 });
+    expect(result.current.yaml).not.toContain('second');
+  });
+});
+
+/** Every checkbox on, every text field and list filled: the config that writes the most keys. */
+function everythingOn(node: unknown): unknown {
+  if (typeof node === 'boolean') return true;
+  if (typeof node === 'string') return node || 'set';
+  if (Array.isArray(node)) return node.length > 0 ? node : ['set'];
+  if (isMapping(node)) return Object.fromEntries(Object.entries(node).map(([key, value]) => [key, everythingOn(value)]));
+  return node;
+}
+
+function unownedKeys(written: Mapping, ownedKeys: OwnedKeys, path = ''): string[] {
+  return Object.entries(written).flatMap(([key, value]) => {
+    if (!Object.hasOwn(ownedKeys, key)) return [`${path}${key}`];
+    const inner = ownedKeys[key];
+    return inner && isMapping(value) ? unownedKeys(value, inner, `${path}${key}.`) : [];
+  });
+}
+
+function ownedMappingPaths(ownedKeys: OwnedKeys, path: string[] = []): string[][] {
+  return Object.entries(ownedKeys).flatMap(([key, inner]) =>
+    inner ? [[...path, key], ...ownedMappingPaths(inner, [...path, key])] : []);
+}
+
+describe('FORM_OWNED_KEYS', () => {
+  const maximal = everythingOn(DEFAULT_ENGINE_CONFIG) as EngineConfig;
+  const config: EngineConfig = {
+    ...maximal,
+    global: { ...maximal.global, intensity: 'aggressive', enable_http_crawl: false },
+  };
+  const written = loadMapping(serialiseConfigToYaml(config));
+
+  it('lists every key the serialiser can write, at every level', () => {
+    expect(unownedKeys(written, FORM_OWNED_KEYS)).toEqual([]);
+  });
+
+  it('is checked against every owned mapping, so the guard above is not vacuous', () => {
+    for (const path of ownedMappingPaths(FORM_OWNED_KEYS)) {
+      expect(() => mappingAt(written, ...path), path.join('.')).not.toThrow();
+    }
+    expect(mappingAt(written, 'port_scan')).toHaveProperty('nmap_script_args');
+    expect(mappingAt(written, 'vulnerability_scan', 'nuclei')).toHaveProperty('custom_templates');
+    expect(mappingAt(written, 'email_security', 'mailbox_verification')).toHaveProperty('http_url');
   });
 });
