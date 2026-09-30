@@ -676,7 +676,11 @@ def save_endpoint(
         **endpoint_data):
     """Get or create EndPoint object."""
     endpoint_data = replace_nulls(endpoint_data)
-    scheme = urlparse(http_url).scheme
+    try:
+        scheme = urlparse(http_url).scheme
+    except ValueError:
+        logger.warning("%s is not a valid URL. Skipping.", http_url)
+        return None, False
     endpoint = None
     created = False
     
@@ -687,8 +691,8 @@ def save_endpoint(
             domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
             ctx['_domain_obj'] = domain
         if domain:
-            host = urlparse(http_url).hostname or ''
-            domain_name = domain.name.lower()
+            host = _url_host(http_url)
+            domain_name = domain.name.lower().rstrip('.')
             if host != domain_name and not host.endswith('.' + domain_name):
                 logger.error("%s is not a URL of domain %s. Skipping.", http_url, domain.name)
                 return None, False
@@ -1793,3 +1797,10 @@ def save_subdomain_metadata(subdomain, endpoint, extra_datas=None):
 		logger.debug("No HTTP URL found for %s yet. Skipping metadata extraction.", subdomain.name)
 
 
+def _url_host(http_url: str) -> str:
+    """Lower-case host of a URL, or of a bare 'host[:port][/path]' as callers pass for a subdomain."""
+    target = http_url if '://' in http_url else f'//{http_url}'
+    try:
+        return (urlparse(target).hostname or '').rstrip('.')
+    except ValueError:
+        return ''

@@ -1,4 +1,6 @@
 """save_endpoint only accepts URLs whose host is the scanned domain or one of its subdomains."""
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.utils import timezone
 
@@ -36,3 +38,23 @@ class SaveEndpointScopeTests(TestCase):
             with self.subTest(url=url):
                 endpoint, _ = save_endpoint(url, ctx=dict(self.ctx))
                 self.assertIsNotNone(endpoint)
+
+    @patch('reNgine.temporal_activities.TemporalTaskProxy')
+    @patch('reNgine.tasks.http_crawl', return_value=[])
+    def test_a_bare_subdomain_is_crawled_like_before(self, mock_crawl, _proxy) -> None:
+        # The subscan starter passes 'host[/path]' with no scheme and lets http_crawl probe it.
+        save_endpoint('api.example.test/app', ctx=dict(self.ctx), crawl=True)
+        self.assertEqual(mock_crawl.call_args.kwargs['urls'], ['api.example.test/app'])
+
+    @patch('reNgine.temporal_activities.TemporalTaskProxy')
+    @patch('reNgine.tasks.http_crawl', return_value=[])
+    def test_a_bare_foreign_host_is_not_crawled(self, mock_crawl, _proxy) -> None:
+        for url in ('attacker.test', 'example.test.attacker.test:8080/x', 'http://[bad/'):
+            with self.subTest(url=url):
+                self.assertEqual(save_endpoint(url, ctx=dict(self.ctx), crawl=True), (None, False))
+        mock_crawl.assert_not_called()
+
+    def test_a_domain_stored_with_a_trailing_dot_still_matches(self) -> None:
+        Domain.objects.filter(pk=self.domain.pk).update(name='Example.test.')
+        endpoint, _ = save_endpoint('https://www.example.test/', ctx=dict(self.ctx))
+        self.assertIsNotNone(endpoint)
