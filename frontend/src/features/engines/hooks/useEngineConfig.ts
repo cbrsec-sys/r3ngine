@@ -350,18 +350,24 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       threads: (r.threads as number) ?? 30,
     }), def.fetch_url.config) as EngineConfig['fetch_url'],
 
-    web_api_discovery: section('web_api_discovery', (r) => ({
-      uses_tools: (r.uses_tools as string[]) ?? def.web_api_discovery.config.uses_tools,
-      scan_only_active: (r.scan_only_active as boolean) ?? true,
-      threads: (r.threads as number) ?? 30,
-      timeout: (r.timeout as number) ?? 5,
-      kr_wordlist: (r.kr_wordlist as string) ?? 'routes-small.kite',
-      run_favirecon: (r.run_favirecon as boolean) ?? true,
-      run_sourcemapper: (r.run_sourcemapper as boolean) ?? true,
-      run_grpcurl: (r.run_grpcurl as boolean) ?? true,
-      run_julius: (r.run_julius as boolean) ?? true,
-      run_gqlspection: (r.run_gqlspection as boolean) ?? true,
-    }), def.web_api_discovery.config) as EngineConfig['web_api_discovery'],
+    web_api_discovery: section('web_api_discovery', (r) => {
+      const tools = (r.uses_tools as string[]) ?? def.web_api_discovery.config.uses_tools;
+      // The backend runs a tool when it is listed OR its run_<tool> flag is true,
+      // so an absent flag mirrors the list instead of switching the tool on.
+      const flag = (key: string, tool: string) => (r[key] as boolean | undefined) ?? tools.includes(tool);
+      return {
+        uses_tools: tools,
+        scan_only_active: (r.scan_only_active as boolean) ?? true,
+        threads: (r.threads as number) ?? 30,
+        timeout: (r.timeout as number) ?? 5,
+        kr_wordlist: (r.kr_wordlist as string) ?? 'routes-small.kite',
+        run_favirecon: flag('run_favirecon', 'favirecon'),
+        run_sourcemapper: flag('run_sourcemapper', 'sourcemapper'),
+        run_grpcurl: flag('run_grpcurl', 'grpcurl'),
+        run_julius: flag('run_julius', 'julius'),
+        run_gqlspection: flag('run_gqlspection', 'gqlspection'),
+      };
+    }, def.web_api_discovery.config) as EngineConfig['web_api_discovery'],
 
     param_discovery: section('param_discovery', (r) => ({
       min_confidence: (r.min_confidence as number) ?? 50,

@@ -19,6 +19,26 @@ from targetApp.models import Domain
 logger = logging.getLogger(__name__)
 
 
+# web_api_discovery tools the engine editor exposes as run_<tool> checkboxes
+# (and the built-in engines set) next to the uses_tools list.
+API_DISCOVERY_FLAG_TOOLS = ('favirecon', 'sourcemapper', 'grpcurl', 'julius', 'gqlspection')
+
+
+def resolve_api_discovery_tools(section: dict, default: list[str] | None = None) -> list[str]:
+	"""Return the web_api_discovery tools to run.
+
+	Starts from ``uses_tools`` (or ``default`` when the key is absent) and adds
+	every tool whose ``run_<tool>`` flag is true. A false flag does not remove a
+	tool listed in ``uses_tools``: the checkbox and the list are alternatives.
+	"""
+	section = section or {}
+	tools = list(section.get('uses_tools', default or []))
+	for tool in API_DISCOVERY_FLAG_TOOLS:
+		if section.get(f'run_{tool}') is True and tool not in tools:
+			tools.append(tool)
+	return tools
+
+
 #------------------#
 # EngineType utils #
 #------------------#

@@ -213,7 +213,7 @@ def initiate_scan_temporal(
 		enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 		gf_patterns = config.get(GF_PATTERNS, [])
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
-		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+		api_discovery_tools = resolve_api_discovery_tools(api_discovery_config)
 		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Get domain ----
@@ -483,7 +483,7 @@ def initiate_subscan_temporal(
 		
 		# ---- Get web_api_discovery config ----
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
-		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+		api_discovery_tools = resolve_api_discovery_tools(api_discovery_config)
 		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Skip subscan types that are already active for this subdomain ----

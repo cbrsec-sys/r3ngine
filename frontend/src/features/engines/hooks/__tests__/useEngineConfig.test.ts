@@ -58,3 +58,19 @@ describe('useEngineConfig YAML parsing', () => {
     expect(result.current.yaml).toContain('rate_limit: 10');
   });
 });
+
+describe('useEngineConfig web_api_discovery checkboxes', () => {
+  it('mirrors uses_tools when a run_<tool> flag is absent', () => {
+    const yaml = `
+web_api_discovery:
+  uses_tools: [linkfinder, favirecon]
+  run_julius: true
+`;
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    const { config } = result.current.config.web_api_discovery;
+
+    expect(config.run_favirecon).toBe(true);
+    expect(config.run_sourcemapper).toBe(false);
+    expect(config.run_julius).toBe(true);
+  });
+});

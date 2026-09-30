@@ -115,7 +115,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	"""Advanced Web App & API Discovery using Kiterunner, Arjun, LinkFinder, etc."""
 	scan_id = ctx.get('scan_history_id')
 	config = self.yaml_configuration.get(WEB_API_DISCOVERY) or {}
-	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'semgrep'])
+	uses_tools = ctx.get('api_discovery_tools') or resolve_api_discovery_tools(
+		config, default=['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'semgrep'])
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)

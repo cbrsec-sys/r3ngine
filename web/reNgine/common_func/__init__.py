@@ -60,6 +60,7 @@ from reNgine.common_func.scan_config import (  # noqa: E402,F401
 	get_output_file_name,
 	get_traceback_path,
 	fmt_traceback,
+	resolve_api_discovery_tools,
 )
 from reNgine.common_func.db_queries import (  # noqa: E402,F401
 	get_lookup_keywords,

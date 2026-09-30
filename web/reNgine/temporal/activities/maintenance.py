@@ -7,7 +7,7 @@ from temporalio import activity
 from reNgine.temporal.heartbeat import keep_alive
 
 from reNgine.utils.logger import get_module_logger, format_exception_for_log
-from reNgine.common_func import merge_imported_subdomains
+from reNgine.common_func import merge_imported_subdomains, resolve_api_discovery_tools
 
 logger = get_module_logger(__name__)
 
@@ -203,7 +203,7 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
 
     gf_patterns = config.get(GF_PATTERNS, [])
     api_discovery_config = config.get(WEB_API_DISCOVERY, {})
-    api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+    api_discovery_tools = resolve_api_discovery_tools(api_discovery_config)
     kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
     if gf_patterns and 'fetch_url' in tasks:
