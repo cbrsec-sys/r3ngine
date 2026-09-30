@@ -74,3 +74,28 @@ web_api_discovery:
     expect(config.run_julius).toBe(true);
   });
 });
+
+describe('useEngineConfig secret scanning section', () => {
+  it('reads secret_scanning so saving a built-in engine keeps it', () => {
+    const yaml = `
+secret_scanning:
+  trufflehog: true
+  gitleaks: false
+  leaklookup: true
+`;
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    expect(result.current.config.leaks_and_secrets).toEqual({
+      enabled: true,
+      config: { gitleaks: false, trufflehog: true, leaklookup: true },
+    });
+  });
+
+  it('writes the section as secret_scanning, including for older saves', () => {
+    const { result } = renderHook(() => useEngineConfig('leaks_and_secrets:\n  leaklookup: false\n'));
+    act(() => result.current.updateSection('leaks_and_secrets', { gitleaks: false }));
+
+    expect(result.current.yaml).toMatch(/^secret_scanning:/m);
+    expect(result.current.yaml).not.toMatch(/^leaks_and_secrets:/m);
+    expect(result.current.yaml).toContain('leaklookup: false');
+  });
+});

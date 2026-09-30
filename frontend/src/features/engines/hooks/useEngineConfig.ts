@@ -152,7 +152,8 @@ function serialiseConfigToYaml(config: EngineConfig): string {
 
   if (config.leaks_and_secrets.enabled) {
     const c = config.leaks_and_secrets.config;
-    writeSection('leaks_and_secrets', { gitleaks: c.gitleaks, trufflehog: c.trufflehog, leaklookup: c.leaklookup });
+    // secret_scanning is the key the scan workflows gate on; the UI section keeps its old name.
+    writeSection('secret_scanning', { gitleaks: c.gitleaks, trufflehog: c.trufflehog, leaklookup: c.leaklookup });
   }
 
   if (config.vigolium_analysis.enabled) {
@@ -226,10 +227,12 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
   const raw = asMapping(doc);
   const def = DEFAULT_ENGINE_CONFIG;
 
-  // Merge osint.leaks_and_secrets into top-level leaks_and_secrets
+  // Secret scanning settings, oldest spelling first: osint.leaks_and_secrets,
+  // top-level leaks_and_secrets (older editor saves), then secret_scanning.
   const osintLeaks = asMapping(asMapping(raw.osint).leaks_and_secrets);
   const topLeaks = asMapping(raw.leaks_and_secrets);
-  const mergedLeaks = { ...osintLeaks, ...topLeaks };
+  const secretScanning = asMapping(raw.secret_scanning);
+  const mergedLeaks = { ...osintLeaks, ...topLeaks, ...secretScanning };
 
   const g = def.global;
   type GlobalConfig = EngineConfig['global'];
@@ -405,7 +408,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     }), def.waf_bypass.config) as EngineConfig['waf_bypass'],
 
     leaks_and_secrets: {
-      enabled: Object.keys(mergedLeaks).length > 0 || 'leaks_and_secrets' in raw,
+      enabled: Object.keys(mergedLeaks).length > 0 || 'leaks_and_secrets' in raw || 'secret_scanning' in raw,
       config: {
         gitleaks: (mergedLeaks.gitleaks as boolean) ?? true,
         trufflehog: (mergedLeaks.trufflehog as boolean) ?? true,

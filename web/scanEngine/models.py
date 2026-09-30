@@ -44,7 +44,12 @@ class EngineType(models.Model):
             config = yaml.safe_load(self.yaml_configuration)
             if isinstance(config, dict):
                 # Tasks are the top level keys in the YAML config
-                return list(config.keys())
+                tasks = list(config.keys())
+                # The engine editor used to save the secret scanning section as
+                # a top-level leaks_and_secrets, which no workflow gates on.
+                if 'leaks_and_secrets' in tasks and 'secret_scanning' not in tasks:
+                    tasks.append('secret_scanning')
+                return tasks
         except yaml.YAMLError:
             logger.warning("Engine %s has invalid YAML configuration", self.pk, exc_info=True)
         return []
