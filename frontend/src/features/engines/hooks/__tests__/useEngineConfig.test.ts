@@ -146,3 +146,54 @@ email_security:
     expect(reopened.current.yaml).not.toContain('http_url');
   });
 });
+
+describe('useEngineConfig keys the form does not own', () => {
+  const HAND_EDITED = `
+threads: 12
+delay: 2
+custom_section:
+  answer: 42
+port_scan:
+  ports: [top-100]
+`;
+
+  it('keeps an unknown top-level key through an edit', () => {
+    const { result } = renderHook(() => useEngineConfig(HAND_EDITED));
+    act(() => result.current.updateGlobal({ threads: 20 }));
+
+    expect(result.current.yaml).toMatch(/^threads: 20$/m);
+    expect(result.current.yaml).toMatch(/^delay: 2$/m);
+    expect(result.current.yaml).toMatch(/^custom_section:\n {2}answer: 42$/m);
+  });
+
+  it('does not bring back a section the user switched off', () => {
+    const { result } = renderHook(() => useEngineConfig(HAND_EDITED));
+    act(() => result.current.toggleSection('port_scan', false));
+
+    expect(result.current.yaml).not.toMatch(/^port_scan:/m);
+    expect(result.current.yaml).toMatch(/^custom_section:/m);
+  });
+
+  it('does not bring back a global reset to its default', () => {
+    const { result } = renderHook(() => useEngineConfig('intensity: aggressive\n'));
+    act(() => result.current.updateGlobal({ intensity: 'normal' }));
+
+    expect(result.current.yaml).not.toMatch(/^intensity:/m);
+  });
+
+  it('takes unknown keys from YAML typed into the YAML tab', () => {
+    const { result } = renderHook(() => useEngineConfig(HAND_EDITED));
+    act(() => result.current.setYaml('other_section:\n  x: 1\n'));
+    act(() => result.current.updateGlobal({ threads: 5 }));
+
+    expect(result.current.yaml).toMatch(/^other_section:/m);
+    expect(result.current.yaml).not.toMatch(/^custom_section:/m);
+  });
+
+  it('writes the Tier 7 correlation settings', () => {
+    const { result } = renderHook(() => useEngineConfig('tier_7:\n  high_noise_modules: [a]\n'));
+    act(() => result.current.updateSection('tier_7', { high_noise_modules: ['b'] }));
+
+    expect(result.current.yaml).toMatch(/^tier_7:\n {2}high_noise_modules:\n {4}- b$/m);
+  });
+});

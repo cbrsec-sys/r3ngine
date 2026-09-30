@@ -687,8 +687,9 @@ def save_endpoint(
             domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
             ctx['_domain_obj'] = domain
         if domain:
-            _parsed_host = urlparse(http_url).hostname or ''
-            if _parsed_host != domain.name and not _parsed_host.endswith('.' + domain.name):
+            host = urlparse(http_url).hostname or ''
+            domain_name = domain.name.lower()
+            if host != domain_name and not host.endswith('.' + domain_name):
                 logger.error("%s is not a URL of domain %s. Skipping.", http_url, domain.name)
                 return None, False
 

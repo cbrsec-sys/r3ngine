@@ -58,6 +58,26 @@ def resolve_target_host(ctx: dict, subdomain=None, domain=None) -> str:
     return host[:500]
 
 
+_HARDWARE_PROFILE_KEYS = ('threads', 'rate_limit', 'delay', 'retries')
+
+
+def apply_hardware_profile_defaults(yaml_configuration: dict, hw_profile: dict) -> None:
+    """Fill the resource limits an engine leaves unset, in place.
+
+    Precedence per section: the section's own value, then the engine's global
+    value, then the hardware profile. Timeouts stay with the engine.
+    """
+    for key in _HARDWARE_PROFILE_KEYS:
+        if yaml_configuration.get(key) is None and hw_profile.get(key) is not None:
+            yaml_configuration[key] = hw_profile[key]
+    for section in yaml_configuration.values():
+        if not isinstance(section, dict):
+            continue
+        for key in _HARDWARE_PROFILE_KEYS:
+            if section.get(key) is None and yaml_configuration.get(key) is not None:
+                section[key] = yaml_configuration[key]
+
+
 # ---------------------------------------------------------------------------
 # TemporalTaskProxy
 # ---------------------------------------------------------------------------
@@ -106,17 +126,7 @@ class TemporalTaskProxy:
         
         hw_profile = ctx.get('hardware_profile')
         if hw_profile:
-            # Hardware profiles supply defaults only — engine YAML values take precedence.
-            # An explicit value of 0/False in the YAML wins over the profile.
-            for key in ('threads', 'rate_limit', 'delay', 'retries'):
-                if hw_profile.get(key) is not None and self.yaml_configuration.get(key) is None:
-                    self.yaml_configuration[key] = hw_profile[key]
-
-            for section_config in self.yaml_configuration.values():
-                if isinstance(section_config, dict):
-                    for key in ('threads', 'rate_limit', 'delay', 'retries'):
-                        if hw_profile.get(key) is not None and section_config.get(key) is None:
-                            section_config[key] = hw_profile[key]
+            apply_hardware_profile_defaults(self.yaml_configuration, hw_profile)
 
         # Apply ScanProfile settings if provided in ctx.
         # Throttle values are stored as direct attributes (not merged into yaml_configuration)
