@@ -963,6 +963,8 @@ def _test_llm_provider(provider: str, api_key: str, model: str, base_url: str = 
                 max_tokens=20,
                 base_url=base_url,
                 timeout=30,
+                # Someone is waiting on the result; report a rate limit instead of sitting it out.
+                retries=0,
             )
             return {'status': 'success', 'message': f'{label} connection successful.', 'response': response_text.strip()}
         except req_lib.exceptions.HTTPError as exc:

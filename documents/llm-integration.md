@@ -25,6 +25,11 @@ cloud providers are called over plain HTTP (`requests`) from
 `web/reNgine/llm_client.py`, which the report generators and the AI Hub
 connection test share; Ollama goes through `langchain_community`.
 
+Requests that hit a rate limit (429), an overloaded provider (Anthropic's 529),
+a 5xx or a failed connection are retried twice, honouring `Retry-After` up to
+20 s per wait; the AI Hub connection test does not retry. Anthropic calls ask for
+up to 4096 output tokens unless the caller sets `max_tokens`.
+
 **OpenAI-compatible** covers any server that implements `POST <base>/chat/completions`
 (and, for the model picker, `GET <base>/models`): gateways such as OpenRouter,
 and local servers such as vLLM, LM Studio or llama.cpp. The Base URL is the API

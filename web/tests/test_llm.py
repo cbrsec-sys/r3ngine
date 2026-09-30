@@ -271,3 +271,85 @@ class TestLLMSettingsSwitch(TestCase):
         self.assertEqual(unknown.status_code, 400)
         self.assertFalse(LLMConfig.objects.exists())
 
+
+
+def _http_response(status, body=None, headers=None):
+    import requests
+    response = requests.Response()
+    response.status_code = status
+    response._content = __import__('json').dumps(body or {}).encode()
+    response.headers.update(headers or {})
+    response.url = 'https://llm.example.test'
+    return response
+
+
+class TestLLMClientRetries(TestCase):
+    OK = {"choices": [{"message": {"content": "done"}}]}
+
+    def _complete(self, **kwargs):
+        from reNgine.llm_client import complete
+        return complete('openai', api_key='k', model='m', system='s', user='u', **kwargs)
+
+    @patch('reNgine.llm_client.time.sleep')
+    def test_rate_limit_is_retried_after_the_advertised_delay(self, mock_sleep):
+        responses = [_http_response(429, headers={'Retry-After': '3'}), _http_response(200, self.OK)]
+        with patch('requests.post', side_effect=responses) as mock_post:
+            self.assertEqual(self._complete(), 'done')
+        self.assertEqual(mock_post.call_count, 2)
+        mock_sleep.assert_called_once_with(3.0)
+
+    @patch('reNgine.llm_client.time.sleep')
+    def test_long_retry_after_is_capped(self, mock_sleep):
+        responses = [_http_response(529, headers={'Retry-After': '600'}), _http_response(200, self.OK)]
+        with patch('requests.post', side_effect=responses):
+            self._complete()
+        mock_sleep.assert_called_once_with(20)
+
+    @patch('reNgine.llm_client.time.sleep')
+    def test_gives_up_after_the_retry_budget(self, mock_sleep):
+        import requests
+        with patch('requests.post', return_value=_http_response(503)) as mock_post:
+            with self.assertRaises(requests.exceptions.HTTPError):
+                self._complete()
+        self.assertEqual(mock_post.call_count, 3)
+        self.assertEqual([c.args[0] for c in mock_sleep.call_args_list], [2.0, 4.0])
+
+    @patch('reNgine.llm_client.time.sleep')
+    def test_connection_failure_is_retried(self, _sleep):
+        import requests
+        responses = [requests.exceptions.ConnectionError('reset'), _http_response(200, self.OK)]
+        with patch('requests.post', side_effect=responses) as mock_post:
+            self.assertEqual(self._complete(), 'done')
+        self.assertEqual(mock_post.call_count, 2)
+
+    @patch('reNgine.llm_client.time.sleep')
+    def test_client_errors_and_read_timeouts_are_not_retried(self, mock_sleep):
+        import requests
+        with patch('requests.post', return_value=_http_response(401)) as mock_post:
+            with self.assertRaises(requests.exceptions.HTTPError):
+                self._complete()
+        self.assertEqual(mock_post.call_count, 1)
+        with patch('requests.post', side_effect=requests.exceptions.ReadTimeout()) as mock_post:
+            with self.assertRaises(requests.exceptions.ReadTimeout):
+                self._complete()
+        self.assertEqual(mock_post.call_count, 1)
+        mock_sleep.assert_not_called()
+
+    @patch('reNgine.llm_client.time.sleep')
+    def test_connection_test_reports_a_rate_limit_at_once(self, mock_sleep):
+        from scanEngine.views import _test_llm_provider
+        with patch('requests.post', return_value=_http_response(429)) as mock_post:
+            result = _test_llm_provider('openai', 'k', 'm')
+        self.assertEqual(result['status'], 'error')
+        self.assertIn('Rate limit', result['message'])
+        self.assertEqual(mock_post.call_count, 1)
+        mock_sleep.assert_not_called()
+
+    def test_anthropic_asks_for_4096_tokens_unless_told_otherwise(self):
+        from reNgine.llm_client import complete
+        body = {"content": [{"type": "text", "text": "ok"}]}
+        with patch('requests.post', return_value=_http_response(200, body)) as mock_post:
+            complete('anthropic', api_key='k', model='m', system='s', user='u')
+            complete('anthropic', api_key='k', model='m', system='s', user='u', max_tokens=20)
+        self.assertEqual(mock_post.call_args_list[0].kwargs['json']['max_tokens'], 4096)
+        self.assertEqual(mock_post.call_args_list[1].kwargs['json']['max_tokens'], 20)
