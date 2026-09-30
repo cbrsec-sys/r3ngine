@@ -257,7 +257,3 @@ Done:
   `~/nuclei-templates exists but is not a git repository`. nuclei itself reads
   the directory fine; only vigolium's known-issue step is affected. Fix by
   giving vigolium its own templates directory instead of the shared volume.
-- The engine editor rebuilds the YAML from the sections it knows and drops
-  every other top-level key on save. `secret_scanning` is now one of them;
-  `amass_intel_discovery`, `baddns` and `post_crawl_osint` still are not, so
-  an engine that uses them loses them when saved from the editor.

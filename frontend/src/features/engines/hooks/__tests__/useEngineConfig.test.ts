@@ -635,3 +635,14 @@ describe('useEngineConfig post-crawl OSINT section', () => {
     expect(loadMapping(result.current.yaml)).not.toHaveProperty('post_crawl_osint');
   });
 });
+
+describe('useEngineConfig Vigolium defaults', () => {
+  it('loads missing Vigolium settings with the values the backend falls back to', () => {
+    const { result } = renderHook(() => useEngineConfig('vulnerability_scan:\n  run_vigolium: true\n  vigolium: {}\n'));
+    const c = result.current.config;
+    expect(c.vigolium_harvest.config).toEqual({ strategy: 'balanced', concurrency: 30, rate_limit: 100, timeout: '60s' });
+    expect(c.vigolium_discovery.config).toEqual({ strategy: 'balanced', concurrency: 40, rate_limit: 100, timeout: '30s' });
+    expect(c.vigolium_analysis.config).toEqual({ strategy: 'balanced', concurrency: 20, rate_limit: 50, timeout: '10s' });
+    expect(c.vulnerability_scan.config.vigolium.timeout).toBe('300s');
+  });
+});

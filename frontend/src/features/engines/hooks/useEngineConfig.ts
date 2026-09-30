@@ -639,18 +639,20 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       threads: (r.threads as number) ?? 10,
     }), def.spiderfoot_scan.config) as EngineConfig['spiderfoot_scan'],
 
+    // Fallbacks are the ones run_vigolium_harvest uses for a missing key.
     vigolium_harvest: runFlagSection('vigolium_harvest', 'run_vigolium_harvest', (r) => ({
       strategy: (r.strategy as 'fast' | 'balanced' | 'thorough') ?? 'balanced',
-      concurrency: (r.concurrency as number) ?? 20,
-      rate_limit: (r.rate_limit as number) ?? 50,
-      timeout: (r.timeout as string) ?? '10s',
+      concurrency: (r.concurrency as number) ?? 30,
+      rate_limit: (r.rate_limit as number) ?? 100,
+      timeout: (r.timeout as string) ?? '60s',
     })) as EngineConfig['vigolium_harvest'],
 
+    // Fallbacks are the ones run_vigolium_discovery uses for a missing key.
     vigolium_discovery: runFlagSection('vigolium_discovery', 'run_vigolium_discovery', (r) => ({
       strategy: (r.strategy as 'fast' | 'balanced' | 'thorough') ?? 'balanced',
-      concurrency: (r.concurrency as number) ?? 20,
-      rate_limit: (r.rate_limit as number) ?? 50,
-      timeout: (r.timeout as string) ?? '10s',
+      concurrency: (r.concurrency as number) ?? 40,
+      rate_limit: (r.rate_limit as number) ?? 100,
+      timeout: (r.timeout as string) ?? '30s',
     })) as EngineConfig['vigolium_discovery'],
 
     firewall_vpn_scan: section('firewall_vpn_scan', (r) => ({
@@ -867,7 +869,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
           strategy: vig.strategy ?? 'balanced',
           concurrency: vig.concurrency ?? 50,
           rate_limit: vig.rate_limit ?? 100,
-          timeout: vig.timeout ?? '15s',
+          timeout: vig.timeout ?? '300s',
           run_phase_a: vig.run_phase_a ?? true,
           run_phase_b: vig.run_phase_b ?? true,
           scope_origin: (vig.scope_origin as 'all' | 'relaxed' | 'balanced' | 'strict') ?? 'balanced',
