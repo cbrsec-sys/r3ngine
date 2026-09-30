@@ -8,8 +8,10 @@ import { DEFAULT_ENGINE_CONFIG } from '../types/engineConfig';
 
 // ─── Serialiser ──────────────────────────────────────────────────────────────
 
-function serialiseConfigToYaml(config: EngineConfig): string {
-  const out: Record<string, unknown> = {};
+function serialiseConfigToYaml(config: EngineConfig, passthrough?: Record<string, unknown>): string {
+  // Start from passthrough so unknown keys (not known to the UI) survive a round-trip.
+  // Known keys are unconditionally overwritten below.
+  const out: Record<string, unknown> = passthrough ? { ...passthrough } : {};
 
   // Global fields — top level, no wrapper key
   const g = config.global;
@@ -552,14 +554,23 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
   });
   const [yaml, setYamlStr] = useState<string>(() => initialYaml ?? serialiseConfigToYaml(DEFAULT_ENGINE_CONFIG));
   const [yamlError, setYamlError] = useState<string | null>(null);
+  // Raw YAML object preserved for passthrough of keys the UI doesn't know about.
+  const [rawPassthrough, setRawPassthrough] = useState<Record<string, unknown>>(() => {
+    if (initialYaml) {
+      try { return (yamlLoad(initialYaml) as Record<string, unknown>) ?? {}; } catch { /* fall through */ }
+    }
+    return {};
+  });
 
   // Re-parse when initialYaml changes (edit mode load)
   useEffect(() => {
     if (!initialYaml) return;
     try {
       const parsed = parseYamlToConfig(initialYaml);
+      const raw = (yamlLoad(initialYaml) as Record<string, unknown>) ?? {};
       setConfig(parsed);
-      setYamlStr(serialiseConfigToYaml(parsed));
+      setRawPassthrough(raw);
+      setYamlStr(serialiseConfigToYaml(parsed, raw));
       setYamlError(null);
     } catch (e) {
       setYamlError(e instanceof Error ? e.message : String(e));
@@ -569,6 +580,7 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
   // Keep yaml in sync when config changes
   const updateConfigAndYaml = useCallback((next: EngineConfig) => {
     setConfig(next);
+    setRawPassthrough({});
     setYamlStr(serialiseConfigToYaml(next));
     setYamlError(null);
   }, []);
@@ -586,7 +598,7 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
           config: { ...prevSection.config, ...patch },
         },
       };
-      setYamlStr(serialiseConfigToYaml(next));
+      setRawPassthrough((pt) => { setYamlStr(serialiseConfigToYaml(next, pt)); return pt; });
       setYamlError(null);
       return next;
     });
@@ -595,7 +607,7 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
   const toggleSection = useCallback((section: SectionKey, enabled: boolean) => {
     setConfig((prev) => {
       const next: EngineConfig = { ...prev, [section]: { ...prev[section], enabled } };
-      setYamlStr(serialiseConfigToYaml(next));
+      setRawPassthrough((pt) => { setYamlStr(serialiseConfigToYaml(next, pt)); return pt; });
       setYamlError(null);
       return next;
     });
@@ -604,7 +616,7 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
   const updateGlobal = useCallback((patch: Partial<GlobalConfig>) => {
     setConfig((prev) => {
       const next: EngineConfig = { ...prev, global: { ...prev.global, ...patch } };
-      setYamlStr(serialiseConfigToYaml(next));
+      setRawPassthrough((pt) => { setYamlStr(serialiseConfigToYaml(next, pt)); return pt; });
       setYamlError(null);
       return next;
     });
@@ -614,7 +626,9 @@ export function useEngineConfig(initialYaml?: string): UseEngineConfigReturn {
     setYamlStr(raw);
     try {
       const parsed = parseYamlToConfig(raw);
+      const rawObj = (yamlLoad(raw) as Record<string, unknown>) ?? {};
       setConfig(parsed);
+      setRawPassthrough(rawObj);
       setYamlError(null);
     } catch (e) {
       setYamlError(e instanceof Error ? e.message : String(e));

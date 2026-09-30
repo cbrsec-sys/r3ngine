@@ -676,6 +676,13 @@ def _submit_acunetix_host(
 				target_id=target_id,
 			)
 			scan_started = bool(scan_info)
+			if not scan_started:
+				_record_submission(
+					task, command,
+					"FAILED — target_id=%s url=%s target added but scan did not start" % (target_id, target_url),
+					return_code=1,
+				)
+				return False
 
 		_persist_acunetix_submission(host, target_url, target_id, scan_history_id)
 	except Exception as exc:

@@ -106,21 +106,17 @@ class TemporalTaskProxy:
         
         hw_profile = ctx.get('hardware_profile')
         if hw_profile:
-            # Hardware profiles control resource limits (threads, rate, delay, retries).
-            # Timeouts are intentionally left to the engine YAML configuration so that
-            # each tool's per-section timeout is respected as-designed.
-            self.yaml_configuration['threads'] = hw_profile.get('threads')
-            self.yaml_configuration['rate_limit'] = hw_profile.get('rate_limit')
-            self.yaml_configuration['delay'] = hw_profile.get('delay')
-            self.yaml_configuration['retries'] = hw_profile.get('retries')
+            # Hardware profiles supply defaults only — engine YAML values take precedence.
+            # An explicit value of 0/False in the YAML wins over the profile.
+            for key in ('threads', 'rate_limit', 'delay', 'retries'):
+                if hw_profile.get(key) is not None and self.yaml_configuration.get(key) is None:
+                    self.yaml_configuration[key] = hw_profile[key]
 
-            # Apply the same limits to every subsection in the YAML.
             for section_config in self.yaml_configuration.values():
                 if isinstance(section_config, dict):
-                    section_config['threads'] = hw_profile.get('threads')
-                    section_config['rate_limit'] = hw_profile.get('rate_limit')
-                    section_config['delay'] = hw_profile.get('delay')
-                    section_config['retries'] = hw_profile.get('retries')
+                    for key in ('threads', 'rate_limit', 'delay', 'retries'):
+                        if hw_profile.get(key) is not None and section_config.get(key) is None:
+                            section_config[key] = hw_profile[key]
 
         # Apply ScanProfile settings if provided in ctx.
         # Throttle values are stored as direct attributes (not merged into yaml_configuration)

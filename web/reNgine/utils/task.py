@@ -686,9 +686,11 @@ def save_endpoint(
         if domain is None or isinstance(domain, int):
             domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
             ctx['_domain_obj'] = domain
-        if domain and domain.name not in http_url:
-            logger.error("%s is not a URL of domain %s. Skipping.", http_url, domain.name)
-            return None, False
+        if domain:
+            _parsed_host = urlparse(http_url).hostname or ''
+            if _parsed_host != domain.name and not _parsed_host.endswith('.' + domain.name):
+                logger.error("%s is not a URL of domain %s. Skipping.", http_url, domain.name)
+                return None, False
 
     if crawl:
         # Avoid circular import by importing here

@@ -207,17 +207,17 @@ if [ ! -f '/usr/local/bin/kr' ]; then
   cd /usr/src/app
 fi
 
-if [ ! -d '/usr/src/wordlist/kr' ]; then
+if [ ! -f '/usr/src/wordlist/kr/routes-small.kite' ]; then
   mkdir -p /usr/src/wordlist/kr
   cd /usr/src/wordlist/kr
-  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-large.kite.tar.gz -O routes-large.kite.tar.gz
-  tar -xvf routes-large.kite.tar.gz
-  rm -rf routes-large.kite.tar.gz
-  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-small.kite.tar.gz -O routes-small.kite.tar.gz
-  tar -xvf routes-small.kite.tar.gz
-  rm -rf routes-small.kite.tar.gz
-  cp routes-large.kite routes-large.kr
-  cp routes-small.kite routes-small.kr
+  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-large.kite.tar.gz -O routes-large.kite.tar.gz && \
+    tar -xvf routes-large.kite.tar.gz && \
+    rm -f routes-large.kite.tar.gz && \
+    cp routes-large.kite routes-large.kr
+  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-small.kite.tar.gz -O routes-small.kite.tar.gz && \
+    tar -xvf routes-small.kite.tar.gz && \
+    rm -f routes-small.kite.tar.gz && \
+    cp routes-small.kite routes-small.kr
   cd /usr/src/app
 fi
 

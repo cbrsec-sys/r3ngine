@@ -191,6 +191,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		_kr_wordlist_path = (_kr_base_dir / kr_wordlist).resolve()
 		if not str(_kr_wordlist_path).startswith(str(_kr_base_dir)):
 			logger.error('[WEB_API] Kiterunner: wordlist path %s escapes base dir — skipping', kr_wordlist)
+		elif not _kr_wordlist_path.exists():
+			logger.error('[WEB_API] Kiterunner: wordlist file %s not found — skipping (download may have failed at container start)', kr_wordlist)
 		else:
 			logger.warning('[WEB_API] Kiterunner: scanning %d subdomains | wordlist=%s | batch_size=%d', len(subdomain_targets), kr_wordlist, threads)
 
@@ -405,34 +407,97 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				logger.warning('[WEB_API] ParamSpider: no results file for %s (tool may have found nothing)', subdomain_name)
 
 		# LinkFinder - once per subdomain (JS endpoint and parameter extraction).
-		# processed_linkfinder_subdomains is the primary dedup guard so the tool
-		# runs at most once per subdomain regardless of whether its output file is
-		# empty (empty output = no JS found, not an error requiring a retry).
-		# os.path.exists is the Temporal retry guard: a file written by a prior
-		# activity attempt is loaded directly without re-running the tool.
+		# Two passes:
+		#  1. Crawl the root URL with -d so linkfinder discovers inline <script> tags.
+		#  2. Run linkfinder against each JS file already recorded in the DB for this
+		#     subdomain (downloaded by the HTTP crawler), bypassing 403s on the HTML page.
+		# processed_linkfinder_subdomains is the primary dedup guard.
+		# os.path.exists(lf_output) is the Temporal retry guard.
 		if 'linkfinder' in uses_tools and subdomain_name not in processed_linkfinder_subdomains:
 			processed_linkfinder_subdomains.add(subdomain_name)
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
 			if os.path.exists(lf_output):
 				logger.warning('[WEB_API] LinkFinder: cache hit for %s — loading existing results', subdomain_name)
 			else:
-				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {shlex.quote(url)} -o cli | tee {shlex.quote(lf_output)}"
+				# Pass 1: root URL with -d
+				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {shlex.quote(url)} -o cli 2>/dev/null | tee {shlex.quote(lf_output)}"
 				logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
 				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
+				# Pass 2: run on JS endpoints already in the DB for this subdomain
+				try:
+					js_endpoints = EndPoint.objects.filter(
+						scan_history__id=self.scan_id,
+						subdomain=subdomain,
+					).filter(
+						Q(http_url__iendswith='.js') |
+						Q(http_url__icontains='.js?') |
+						Q(content_type__icontains='javascript')
+					).values_list('http_url', flat=True)[:50]
+					for js_url in js_endpoints:
+						if not js_url:
+							continue
+						js_hash = hashlib.md5(js_url.encode()).hexdigest()[:8]  # noqa: S324 (non-crypto)
+						js_local = f"{results_dir}/js_{subdomain_name}_{js_hash}.js"
+						if not os.path.exists(js_local):
+							try:
+								resp = requests.get(js_url, timeout=10, verify=False, allow_redirects=True)  # noqa: S501
+								if resp.status_code == 200:
+									with open(js_local, 'wb') as jf:
+										jf.write(resp.content[:512 * 1024])  # cap at 512 KiB
+							except Exception:
+								continue
+						if os.path.exists(js_local) and os.path.getsize(js_local) > 0:
+							lf_js_cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {shlex.quote(js_local)} -o cli 2>/dev/null >> {shlex.quote(lf_output)}"
+							run_command(lf_js_cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
+				except Exception as exc:
+					logger.error('[WEB_API] LinkFinder: JS-file pass failed for %s: %s', subdomain_name, exc)
 				logger.warning('[WEB_API] LinkFinder: finished on %s', subdomain_name)
+			# Parse output with improved host classification
 			if os.path.exists(lf_output):
 				try:
 					lf_endpoints = 0
 					lf_params = 0
+					lf_new_subs = 0
+					base_parsed = urlparse(url)
+					base_host = base_parsed.hostname or ''
+					scan_domain = base_host.split('.', 1)[-1] if '.' in base_host else base_host
 					with open(lf_output, 'r') as f:
 						for line in f:
 							line = line.strip()
-							if line.startswith('/') or line.startswith('http'):
-								if line.startswith('/'):
-									parsed = urlparse(url)
-									full_url = f"{parsed.scheme}://{parsed.netloc}{line}"
-								else:
-									full_url = line
+							if not line or line.startswith('#') or line.startswith('Error'):
+								continue
+							# Normalise protocol-relative URLs
+							if line.startswith('//'):
+								line = base_parsed.scheme + ':' + line
+							# Resolve absolute paths against the base URL
+							if line.startswith('/'):
+								full_url = f"{base_parsed.scheme}://{base_parsed.netloc}{line}"
+							elif line.startswith('http'):
+								full_url = line
+							else:
+								# Relative path or noise (MIME type strings, etc.) — skip
+								continue
+							parsed_out = urlparse(full_url)
+							out_host = parsed_out.hostname or ''
+							# In-scope: same subdomain or any subdomain of the scan domain
+							if out_host == base_host or (scan_domain and out_host.endswith('.' + scan_domain)):
+								if out_host != base_host:
+									# Discovered a new subdomain via JS analysis
+									new_sub_qs = Subdomain.objects.filter(
+										scan_history__id=self.scan_id,
+										name=out_host,
+									)
+									if not new_sub_qs.exists():
+										try:
+											Subdomain.objects.get_or_create(
+												name=out_host,
+												scan_history_id=self.scan_id,
+												defaults={'target_domain': subdomain.target_domain},
+											)
+											lf_new_subs += 1
+											logger.warning('[WEB_API] LinkFinder: discovered new subdomain %s via JS analysis', out_host)
+										except Exception:
+											pass
 								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain)
 								lf_endpoints += 1
 								if endpoint is not None and '?' in full_url:
@@ -440,7 +505,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 									for p in params:
 										save_parameter(endpoint, p['name'], param_type='LinkFinder', value=p['value'])
 										lf_params += 1
-					logger.warning('[WEB_API] LinkFinder: %s → %d endpoints, %d params saved', subdomain_name, lf_endpoints, lf_params)
+							# External hosts are silently dropped
+					logger.warning('[WEB_API] LinkFinder: %s → %d endpoints, %d params, %d new subdomains', subdomain_name, lf_endpoints, lf_params, lf_new_subs)
 				except Exception as e:
 					logger.error('[WEB_API] LinkFinder: error parsing output for %s: %s', subdomain_name, e)
 			else:
