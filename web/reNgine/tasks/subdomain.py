@@ -23,9 +23,8 @@ def amass_intel_discovery(self, host, ctx={}, description=None):
 	Args:
 		host (str): Target domain to run intel on.
 	"""
-	config = self.yaml_configuration.get(SUBDOMAIN_DISCOVERY) or {}
-	use_amass_config = config.get(USE_AMASS_CONFIG, False)
-	
+	use_amass_config = _amass_intel_uses_config(self.yaml_configuration)
+
 	output_path = f'{self.results_dir}/amass_intel.txt'
 	
 	cmd = f'amass intel -d {shlex.quote(host)} -whois -o {shlex.quote(output_path)}'
@@ -483,3 +482,17 @@ def _collect_securitytrails_subdomains(host: str, results_file: str) -> int:
 		f.writelines(f'{name}\n' for name in subdomains)
 	logger.info('SecurityTrails returned %d subdomains for %s', len(subdomains), host)
 	return len(subdomains)
+
+
+def _amass_intel_uses_config(yaml_configuration: dict) -> bool:
+	"""Whether amass intel runs with /root/.config/amass.ini.
+
+	Read from the amass_intel_discovery section; engines that only set
+	subdomain_discovery.use_amass_config keep that value.
+	"""
+	subdomain_config = yaml_configuration.get(SUBDOMAIN_DISCOVERY)
+	intel_config = yaml_configuration.get(AMASS_INTEL_DISCOVERY)
+	fallback = subdomain_config.get(USE_AMASS_CONFIG, False) if isinstance(subdomain_config, dict) else False
+	if isinstance(intel_config, dict):
+		return bool(intel_config.get(USE_AMASS_CONFIG, fallback))
+	return bool(fallback)

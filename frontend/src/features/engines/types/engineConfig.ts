@@ -40,16 +40,53 @@ export interface DnsSecurityConfig {
 export interface OsintConfig {
   discover: string[];
   dorks: string[];
+  /** Plain-text dorks (`_target_` is replaced by the host). */
   custom_dorks: string[];
-  intensity: 'normal' | 'aggressive' | 'light';
+  /**
+   * Structured custom dorks (`lookup_site` with `lookup_extensions` or `lookup_keywords`)
+   * from the YAML. The form has no editor for them and writes them back unchanged.
+   */
+  custom_dork_rules: Record<string, unknown>[];
+  /** Extra dork runners on top of GoFuzz: dorks_hunter, xnldorker. */
+  dork_engines: string[];
+  /** Maximum documents the metainfo lookup inspects. */
   documents_limit: number;
+  /** EmailFinder, part of the `emails` lookup. */
+  emailfinder: boolean;
   whatbreach: boolean;
   whatbreach_download_databases: boolean;
   credspy: boolean;
   /** Breach lookups, written to osint.leaks_and_secrets. */
   leaklookup: boolean;
   leaksearch: boolean;
+  microsoft_recon: boolean;
+  /** misconfig-mapper against third-party services. */
+  misconfig: boolean;
+  /** osint.domain_security.spoofcheck */
+  spoofcheck: boolean;
+  /** osint.api_leaks.* */
+  porch_pirate: boolean;
+  postleaks: boolean;
+  /** SwaggerSpy internet search (the post-crawl path probe is post_crawl_osint.swaggerspy). */
+  swaggerspy: boolean;
+  /** osint.github_analysis: written only when on, as the backend runs it for any non-empty mapping. */
+  github_analysis: boolean;
+  /** osint.github_analysis.uses_tools */
+  github_tools: string[];
+  /** osint.github_analysis.gato */
+  github_gato: boolean;
+  /** osint.github_analysis.github_orgs; empty derives the organisation from the domain. */
+  github_orgs: string[];
 }
+
+/** `amass_intel_discovery` in engine YAML: its presence schedules Amass Intel in Tier 1. */
+export interface AmassIntelConfig {
+  /** Falls back to subdomain_discovery.use_amass_config when the section does not set it. */
+  use_amass_config: boolean;
+}
+
+/** `baddns` in engine YAML: its presence schedules the standalone BadDNS step; it has no settings. */
+export type BaddnsConfig = Record<string, never>;
 
 export interface SpiderfootConfig {
   modules: string;
@@ -169,6 +206,14 @@ export interface DirFileFuzzConfig {
   follow_redirect: boolean;
   stop_on_error: boolean;
   max_repeat_by_signature: number;
+}
+
+/** `post_crawl_osint` in engine YAML, run after directory fuzzing (Tier 4a). */
+export interface PostCrawlOsintConfig {
+  /** exifray document-metadata search; the YAML key keeps its old metagoofil name. */
+  metagoofil: boolean;
+  /** SwaggerSpy path probe against live subdomains. */
+  swaggerspy: boolean;
 }
 
 // ─── Tier 5: Analysis ────────────────────────────────────────────────────────
@@ -330,6 +375,8 @@ export interface EngineConfig {
   vigolium_harvest: SectionState<VigoliumHarvestConfig>;
   vigolium_discovery: SectionState<VigoliumDiscoveryConfig>;
   firewall_vpn_scan: SectionState<FirewallVpnConfig>;
+  amass_intel_discovery: SectionState<AmassIntelConfig>;
+  baddns: SectionState<BaddnsConfig>;
   // Tier 2
   http_crawl: SectionState<HttpCrawlConfig>;
   port_scan: SectionState<PortScanConfig>;
@@ -340,6 +387,7 @@ export interface EngineConfig {
   web_api_discovery: SectionState<WebApiDiscoveryConfig>;
   param_discovery: SectionState<ParamDiscoveryConfig>;
   dir_file_fuzz: SectionState<DirFileFuzzConfig>;
+  post_crawl_osint: SectionState<PostCrawlOsintConfig>;
   // Tier 5
   waf_detection: SectionState<WafDetectionConfig>;
   waf_bypass: SectionState<WafBypassConfig>;
@@ -401,19 +449,33 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
               'social_media', 'project_management', 'code_sharing', 'config_files',
               'jenkins', 'wordpress_files', 'php_error', 'exposed_documents', 'db_files', 'git_exposed'],
       custom_dorks: [],
-      intensity: 'normal',
+      custom_dork_rules: [],
+      dork_engines: [],
       documents_limit: 50,
+      emailfinder: true,
       whatbreach: true,
       whatbreach_download_databases: false,
       credspy: false,
       leaklookup: false,
       leaksearch: false,
+      microsoft_recon: false,
+      misconfig: false,
+      spoofcheck: false,
+      porch_pirate: false,
+      postleaks: false,
+      swaggerspy: false,
+      github_analysis: false,
+      github_tools: ['enumerepo', 'trufflehog', 'gitleaks'],
+      github_gato: false,
+      github_orgs: [],
     },
   },
   spiderfoot_scan: { enabled: false, config: { modules: 'all', intensity: 'normal', threads: 10 } },
   vigolium_harvest: { enabled: true, config: { strategy: 'balanced', concurrency: 20, rate_limit: 50, timeout: '10s' } },
   vigolium_discovery: { enabled: true, config: { strategy: 'balanced', concurrency: 20, rate_limit: 50, timeout: '10s' } },
   firewall_vpn_scan: { enabled: false, config: { run_ike_scan: true, run_sslscan: true, enable_testssl: false, enable_crt_sh: false, ports: [443, 4444, 8443, 10443, 5443] } },
+  amass_intel_discovery: { enabled: false, config: { use_amass_config: false } },
+  baddns: { enabled: false, config: {} },
   http_crawl: { enabled: true, config: { threads: 30, follow_redirect: true } },
   port_scan: {
     enabled: true,
@@ -471,6 +533,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       follow_redirect: false, stop_on_error: false, max_repeat_by_signature: 10,
     },
   },
+  post_crawl_osint: { enabled: false, config: { metagoofil: true, swaggerspy: true } },
   waf_detection: { enabled: false, config: { enable_http_crawl: true, use_shodan: true, use_censys: true } },
   waf_bypass: { enabled: false, config: { use_benchmarking: true, use_nuclei: true } },
   leaks_and_secrets: { enabled: false, config: { gitleaks: true, trufflehog: true, betterleaks: false } },

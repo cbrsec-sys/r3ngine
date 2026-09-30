@@ -12,6 +12,9 @@ import { SpiderfootSection } from './sections/SpiderfootSection';
 import { VigoliumHarvestSection } from './sections/VigoliumHarvestSection';
 import { VigoliumDiscoverySection } from './sections/VigoliumDiscoverySection';
 import { FirewallVpnSection } from './sections/FirewallVpnSection';
+import { AmassIntelSection } from './sections/AmassIntelSection';
+import { BaddnsSection } from './sections/BaddnsSection';
+import { PostCrawlOsintSection } from './sections/PostCrawlOsintSection';
 import { HttpCrawlSection } from './sections/HttpCrawlSection';
 import { PortScanSection } from './sections/PortScanSection';
 import { EmailSecuritySection } from './sections/EmailSecuritySection';
@@ -47,10 +50,12 @@ export const EngineConfigWizard: React.FC<EngineConfigWizardProps> = ({ state, a
     },
     {
       label: 'Tier 1 — Discovery',
-      description: 'Subdomain enumeration, OSINT, DNS security, SpiderFoot, and Vigolium harvest run in parallel.',
+      description: 'Subdomain enumeration, Amass Intel, BadDNS, OSINT, DNS security, SpiderFoot, and Vigolium harvest run in parallel.',
       content: (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <SubdomainDiscoverySection config={config.subdomain_discovery.config} enabled={config.subdomain_discovery.enabled} onToggle={(v) => toggleSection('subdomain_discovery', v)} onChange={(p) => updateSection('subdomain_discovery', p)} />
+          <AmassIntelSection config={config.amass_intel_discovery.config} enabled={config.amass_intel_discovery.enabled} onToggle={(v) => toggleSection('amass_intel_discovery', v)} onChange={(p) => updateSection('amass_intel_discovery', p)} />
+          <BaddnsSection enabled={config.baddns.enabled} onToggle={(v) => toggleSection('baddns', v)} subdomainDiscovery={config.subdomain_discovery} onSubdomainToolsChange={(uses_tools) => updateSection('subdomain_discovery', { uses_tools })} />
           <DnsSecuritySection config={config.dns_security.config} enabled={config.dns_security.enabled} onToggle={(v) => toggleSection('dns_security', v)} onChange={(p) => updateSection('dns_security', p)} />
           <OsintSection config={config.osint.config} enabled={config.osint.enabled} onToggle={(v) => toggleSection('osint', v)} onChange={(p) => updateSection('osint', p)} />
           <SpiderfootSection config={config.spiderfoot_scan.config} enabled={config.spiderfoot_scan.enabled} onToggle={(v) => toggleSection('spiderfoot_scan', v)} onChange={(p) => updateSection('spiderfoot_scan', p)} />
@@ -85,8 +90,13 @@ export const EngineConfigWizard: React.FC<EngineConfigWizardProps> = ({ state, a
     },
     {
       label: 'Tier 4 — Fuzzing',
-      description: 'Directory and file enumeration: ffuf on every target by default, dirsearch / feroxbuster as optional extra passes.',
-      content: <DirFileFuzzSection config={config.dir_file_fuzz.config} enabled={config.dir_file_fuzz.enabled} onToggle={(v) => toggleSection('dir_file_fuzz', v)} onChange={(p) => updateSection('dir_file_fuzz', p)} />,
+      description: 'Directory and file enumeration: ffuf on every target by default, dirsearch / feroxbuster as optional extra passes. Post-crawl OSINT follows.',
+      content: (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <DirFileFuzzSection config={config.dir_file_fuzz.config} enabled={config.dir_file_fuzz.enabled} onToggle={(v) => toggleSection('dir_file_fuzz', v)} onChange={(p) => updateSection('dir_file_fuzz', p)} />
+          <PostCrawlOsintSection config={config.post_crawl_osint.config} enabled={config.post_crawl_osint.enabled} onToggle={(v) => toggleSection('post_crawl_osint', v)} onChange={(p) => updateSection('post_crawl_osint', p)} />
+        </Box>
+      ),
     },
     {
       label: 'Tier 5 — Analysis',

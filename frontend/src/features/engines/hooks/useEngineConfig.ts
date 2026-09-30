@@ -4,6 +4,7 @@ import type { DumpOptions } from 'js-yaml';
 import type {
   EngineConfig, SectionKey, GlobalConfig, SpiderfootConfig,
 } from '../types/engineConfig';
+import type { OsintConfig } from '../types/engineConfig';
 import { DEFAULT_ENGINE_CONFIG } from '../types/engineConfig';
 import type { CpanelScannerConfig, DalfoxConfig, NucleiConfig, S3ScannerConfig } from '../types/engineConfig';
 import { CPANEL_DEFAULT_USER_WORDLIST, DEFAULT_DALFOX_CONFIG, S3SCANNER_DEFAULT_PROVIDERS } from '../types/engineConfig';
@@ -71,10 +72,19 @@ export const FORM_OWNED_KEYS: Readonly<Record<SectionKey | keyof GlobalConfig | 
   dns_security: owned('enable_axfr', 'enable_dnssec_check', 'enable_dns_brute', 'amplification_threshold'),
   // whatbreach is a boolean or a mapping depending on a checkbox, so it is owned whole.
   osint: {
+    // intensity is owned but never written: only `normal` ran metainfo, so any other value
+    // silently switched off a lookup the Discover chips show as on.
     ...owned('discover', 'dorks', 'custom_dorks', 'intensity', 'documents_limit', 'whatbreach', 'credspy'),
+    ...owned('emailfinder', 'microsoft_recon', 'misconfig', 'dork_engines'),
     // gitleaks/trufflehog here are an older spelling of secret_scanning and are carried through.
     leaks_and_secrets: owned('leaklookup', 'leaksearch'),
+    api_leaks: owned('porch_pirate', 'postleaks', 'swaggerspy'),
+    domain_security: owned('spoofcheck'),
+    github_analysis: owned('uses_tools', 'gato', 'github_orgs'),
   },
+  amass_intel_discovery: owned('use_amass_config'),
+  baddns: owned(),
+  post_crawl_osint: owned('metagoofil', 'swaggerspy'),
   spiderfoot_scan: owned('modules', 'intensity', 'threads'),
   vigolium_harvest: owned('run_vigolium_harvest', ...VIGOLIUM_STAGE),
   vigolium_discovery: owned('run_vigolium_discovery', ...VIGOLIUM_STAGE),
@@ -249,18 +259,31 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
 
   if (config.osint.enabled) {
     const c = config.osint.config;
+    const customDorks = [...c.custom_dorks, ...c.custom_dork_rules];
     writeSection('osint', {
       discover: c.discover,
       dorks: c.dorks,
-      ...(c.custom_dorks.length > 0 ? { custom_dorks: c.custom_dorks } : {}),
-      intensity: c.intensity,
+      ...(customDorks.length > 0 ? { custom_dorks: customDorks } : {}),
+      ...(c.dork_engines.length > 0 ? { dork_engines: c.dork_engines } : {}),
       documents_limit: c.documents_limit,
+      emailfinder: c.emailfinder,
       // whatbreach: nested dict when download enabled, plain boolean otherwise
       whatbreach: c.whatbreach
         ? (c.whatbreach_download_databases ? { download_found_databases: true } : true)
         : false,
       credspy: c.credspy,
       leaks_and_secrets: { leaklookup: c.leaklookup, leaksearch: c.leaksearch },
+      microsoft_recon: c.microsoft_recon,
+      misconfig: c.misconfig,
+      domain_security: { spoofcheck: c.spoofcheck },
+      api_leaks: { porch_pirate: c.porch_pirate, postleaks: c.postleaks, swaggerspy: c.swaggerspy },
+      ...(c.github_analysis ? {
+        github_analysis: {
+          uses_tools: c.github_tools,
+          gato: c.github_gato,
+          ...(c.github_orgs.length > 0 ? { github_orgs: c.github_orgs } : {}),
+        },
+      } : {}),
     });
   }
 
@@ -290,6 +313,13 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
       enable_testssl: c.enable_testssl, enable_crt_sh: c.enable_crt_sh, ports: c.ports,
     });
   }
+
+  // Presence of these top-level keys is what schedules the step (EngineType.tasks).
+  if (config.amass_intel_discovery.enabled) {
+    writeSection('amass_intel_discovery', { use_amass_config: config.amass_intel_discovery.config.use_amass_config });
+  }
+
+  if (config.baddns.enabled) writeSection('baddns', {});
 
   // ── Tier 2 ──────────────────────────────────────────────────────────────
   if (config.http_crawl.enabled) {
@@ -364,6 +394,11 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
       match_http_status: c.match_http_status, follow_redirect: c.follow_redirect,
       stop_on_error: c.stop_on_error, max_repeat_by_signature: c.max_repeat_by_signature,
     });
+  }
+
+  if (config.post_crawl_osint.enabled) {
+    const c = config.post_crawl_osint.config;
+    writeSection('post_crawl_osint', { metagoofil: c.metagoofil, swaggerspy: c.swaggerspy });
   }
 
   // ── Tier 5 ──────────────────────────────────────────────────────────────
@@ -475,6 +510,43 @@ function parseDalfox(r: YamlMapping): DalfoxConfig {
   };
 }
 
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+/** A YAML list, or `[]` for anything else. */
+const asList = (node: unknown): unknown[] => (Array.isArray(node) ? node : []);
+
+type OsintToolSettings = Omit<OsintConfig,
+  'discover' | 'dorks' | 'documents_limit' | 'whatbreach' | 'whatbreach_download_databases'
+  | 'credspy' | 'leaklookup' | 'leaksearch'>;
+
+/** The osint keys read by osint_discovery and dorking, with the backend's defaults. */
+function osintToolSettings(r: YamlMapping): OsintToolSettings {
+  const def = DEFAULT_ENGINE_CONFIG.osint.config;
+  const apiLeaks = asMapping(r.api_leaks);
+  const github = asMapping(r.github_analysis);
+  // The backend runs GitHub analysis for any non-empty github_analysis mapping.
+  const githubOn = Object.keys(github).length > 0;
+  return {
+    // The dorking task runs plain strings and lookup_site mappings; it ignores anything else.
+    custom_dorks: asList(r.custom_dorks).filter(isString),
+    custom_dork_rules: asList(r.custom_dorks).filter(isMapping),
+    dork_engines: asList(r.dork_engines).filter(isString),
+    emailfinder: (r.emailfinder as boolean) ?? true,
+    microsoft_recon: Boolean(r.microsoft_recon),
+    misconfig: Boolean(r.misconfig),
+    spoofcheck: Boolean(asMapping(r.domain_security).spoofcheck),
+    porch_pirate: Boolean(apiLeaks.porch_pirate),
+    postleaks: Boolean(apiLeaks.postleaks),
+    swaggerspy: Boolean(apiLeaks.swaggerspy),
+    github_analysis: githubOn,
+    github_tools: githubOn
+      ? (Array.isArray(github.uses_tools) ? github.uses_tools.filter(isString) : ['enumerepo'])
+      : def.github_tools,
+    github_gato: Boolean(github.gato),
+    github_orgs: asList(github.github_orgs).filter(isString),
+  };
+}
+
 function parseYamlToConfig(yamlStr: string): EngineConfig {
   const doc: unknown = yamlLoad(yamlStr);
   if (doc !== null && doc !== undefined && typeof doc !== 'object') {
@@ -542,8 +614,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     osint: section('osint', (r) => ({
       discover: (r.discover as string[]) ?? def.osint.config.discover,
       dorks: (r.dorks as string[]) ?? def.osint.config.dorks,
-      custom_dorks: (r.custom_dorks as string[]) ?? [],
-      intensity: (r.intensity as 'normal' | 'aggressive' | 'light') ?? 'normal',
+      ...osintToolSettings(r),
       documents_limit: (r.documents_limit as number) ?? 50,
       // whatbreach can be boolean true or { download_found_databases: true }
       ...(() => {
@@ -589,6 +660,18 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       enable_crt_sh: (r.enable_crt_sh as boolean) ?? false,
       ports: (r.ports as number[]) ?? [443, 4444, 8443, 10443, 5443],
     }), def.firewall_vpn_scan.config) as EngineConfig['firewall_vpn_scan'],
+
+    // Any value under these keys schedules the step, even null, as the task list is the key list.
+    amass_intel_discovery: (() => {
+      const own = asMapping(raw.amass_intel_discovery);
+      const fallback = asMapping(raw.subdomain_discovery).use_amass_config;
+      return {
+        enabled: 'amass_intel_discovery' in raw,
+        config: { use_amass_config: Boolean('use_amass_config' in own ? own.use_amass_config : fallback) },
+      };
+    })(),
+
+    baddns: { enabled: 'baddns' in raw, config: {} },
 
     http_crawl: section('http_crawl', (r) => ({
       threads: (r.threads as number) ?? 30,
@@ -683,6 +766,17 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       stop_on_error: (r.stop_on_error as boolean) ?? false,
       max_repeat_by_signature: (r.max_repeat_by_signature as number) ?? 10,
     }), def.dir_file_fuzz.config) as EngineConfig['dir_file_fuzz'],
+
+    // post_crawl_osint runs a tool only when its key is truthy.
+    post_crawl_osint: 'post_crawl_osint' in raw
+      ? {
+        enabled: true,
+        config: {
+          metagoofil: Boolean(asMapping(raw.post_crawl_osint).metagoofil),
+          swaggerspy: Boolean(asMapping(raw.post_crawl_osint).swaggerspy),
+        },
+      }
+      : { enabled: false, config: def.post_crawl_osint.config },
 
     waf_detection: section('waf_detection', (r) => ({
       enable_http_crawl: (r.enable_http_crawl as boolean) ?? true,

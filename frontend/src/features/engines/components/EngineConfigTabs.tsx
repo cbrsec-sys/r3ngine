@@ -9,6 +9,9 @@ import { SpiderfootSection } from './sections/SpiderfootSection';
 import { VigoliumHarvestSection } from './sections/VigoliumHarvestSection';
 import { VigoliumDiscoverySection } from './sections/VigoliumDiscoverySection';
 import { FirewallVpnSection } from './sections/FirewallVpnSection';
+import { AmassIntelSection } from './sections/AmassIntelSection';
+import { BaddnsSection } from './sections/BaddnsSection';
+import { PostCrawlOsintSection } from './sections/PostCrawlOsintSection';
 import { HttpCrawlSection } from './sections/HttpCrawlSection';
 import { PortScanSection } from './sections/PortScanSection';
 import { EmailSecuritySection } from './sections/EmailSecuritySection';
@@ -103,6 +106,18 @@ export const EngineConfigTabs: React.FC<EngineConfigTabsProps> = ({ state, avail
               enabled={config.subdomain_discovery.enabled}
               onToggle={(v) => toggleSection('subdomain_discovery', v)}
               onChange={(p) => updateSection('subdomain_discovery', p)}
+            />
+            <AmassIntelSection
+              config={config.amass_intel_discovery.config}
+              enabled={config.amass_intel_discovery.enabled}
+              onToggle={(v) => toggleSection('amass_intel_discovery', v)}
+              onChange={(p) => updateSection('amass_intel_discovery', p)}
+            />
+            <BaddnsSection
+              enabled={config.baddns.enabled}
+              onToggle={(v) => toggleSection('baddns', v)}
+              subdomainDiscovery={config.subdomain_discovery}
+              onSubdomainToolsChange={(uses_tools) => updateSection('subdomain_discovery', { uses_tools })}
             />
             <DnsSecuritySection
               config={config.dns_security.config}
@@ -204,12 +219,20 @@ export const EngineConfigTabs: React.FC<EngineConfigTabsProps> = ({ state, avail
       {/* Tab 4 — Tier 4: Fuzzing */}
       <Box {...panelProps(4)}>
         {tab === 4 && (
-          <DirFileFuzzSection
-            config={config.dir_file_fuzz.config}
-            enabled={config.dir_file_fuzz.enabled}
-            onToggle={(v) => toggleSection('dir_file_fuzz', v)}
-            onChange={(p) => updateSection('dir_file_fuzz', p)}
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <DirFileFuzzSection
+              config={config.dir_file_fuzz.config}
+              enabled={config.dir_file_fuzz.enabled}
+              onToggle={(v) => toggleSection('dir_file_fuzz', v)}
+              onChange={(p) => updateSection('dir_file_fuzz', p)}
+            />
+            <PostCrawlOsintSection
+              config={config.post_crawl_osint.config}
+              enabled={config.post_crawl_osint.enabled}
+              onToggle={(v) => toggleSection('post_crawl_osint', v)}
+              onChange={(p) => updateSection('post_crawl_osint', p)}
+            />
+          </Box>
         )}
       </Box>
 

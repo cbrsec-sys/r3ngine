@@ -504,3 +504,134 @@ describe('useEngineConfig settings moved to where the backend reads them', () =>
     });
   });
 });
+
+describe('useEngineConfig OSINT tools', () => {
+  const OSINT_ENGINE = `
+osint:
+  discover: [emails, metainfo]
+  dorks: [login_pages]
+  custom_dorks:
+    - site:_target_ ext:php
+    - lookup_site: _target_
+      lookup_extensions: php
+  intensity: light
+  emailfinder: false
+  microsoft_recon: true
+  misconfig: true
+  domain_security:
+    spoofcheck: true
+  api_leaks:
+    porch_pirate: true
+    swaggerspy: true
+  dork_engines: [gofuzz, dorks_hunter]
+  github_analysis:
+    uses_tools: [enumerepo, titus]
+    github_orgs: [acme-test]
+`;
+
+  it('reads every tool switch osint_discovery and dorking read', () => {
+    const { result } = renderHook(() => useEngineConfig(OSINT_ENGINE));
+    expect(result.current.config.osint.config).toMatchObject({
+      custom_dorks: ['site:_target_ ext:php'],
+      custom_dork_rules: [{ lookup_site: '_target_', lookup_extensions: 'php' }],
+      emailfinder: false,
+      microsoft_recon: true,
+      misconfig: true,
+      spoofcheck: true,
+      porch_pirate: true,
+      postleaks: false,
+      swaggerspy: true,
+      dork_engines: ['gofuzz', 'dorks_hunter'],
+      github_analysis: true,
+      github_tools: ['enumerepo', 'titus'],
+      github_gato: false,
+      github_orgs: ['acme-test'],
+    });
+  });
+
+  it('writes them back where the backend reads them, keeping structured custom dorks', () => {
+    const { result } = renderHook(() => useEngineConfig(OSINT_ENGINE));
+    act(() => result.current.updateSection('osint', { postleaks: true, github_gato: true }));
+    const osint = mappingAt(loadMapping(result.current.yaml), 'osint');
+
+    expect(osint.custom_dorks).toEqual(['site:_target_ ext:php', { lookup_site: '_target_', lookup_extensions: 'php' }]);
+    expect(osint).toMatchObject({ emailfinder: false, microsoft_recon: true, misconfig: true, dork_engines: ['gofuzz', 'dorks_hunter'] });
+    expect(mappingAt(osint, 'domain_security')).toEqual({ spoofcheck: true });
+    expect(mappingAt(osint, 'api_leaks')).toEqual({ porch_pirate: true, postleaks: true, swaggerspy: true });
+    expect(mappingAt(osint, 'github_analysis')).toEqual({ uses_tools: ['enumerepo', 'titus'], gato: true, github_orgs: ['acme-test'] });
+  });
+
+  it('drops the intensity that silently skipped the metainfo lookup', () => {
+    const { result } = renderHook(() => useEngineConfig(OSINT_ENGINE));
+    act(() => result.current.updateSection('osint', { documents_limit: 10 }));
+    expect(mappingAt(loadMapping(result.current.yaml), 'osint')).not.toHaveProperty('intensity');
+  });
+
+  it('leaves github_analysis out when it is off, as any mapping there runs it', () => {
+    const { result } = renderHook(() => useEngineConfig(OSINT_ENGINE));
+    act(() => result.current.updateSection('osint', { github_analysis: false }));
+    expect(mappingAt(loadMapping(result.current.yaml), 'osint')).not.toHaveProperty('github_analysis');
+  });
+
+  it('defaults like the backend when the keys are missing', () => {
+    const { result } = renderHook(() => useEngineConfig('osint:\n  discover: [emails]\n  github_analysis: {gato: true}\n'));
+    expect(result.current.config.osint.config).toMatchObject({
+      emailfinder: true, microsoft_recon: false, spoofcheck: false, dork_engines: [], custom_dork_rules: [],
+      github_analysis: true, github_tools: ['enumerepo'], github_gato: true,
+    });
+    const empty = renderHook(() => useEngineConfig('osint:\n  github_analysis: {}\n'));
+    expect(empty.result.current.config.osint.config.github_analysis).toBe(false);
+  });
+});
+
+describe('useEngineConfig discovery steps scheduled by their top-level key', () => {
+  it('reads amass_intel_discovery and baddns as on when the key is there, even without a value', () => {
+    const { result } = renderHook(() => useEngineConfig('amass_intel_discovery:\nbaddns:\n'));
+    expect(result.current.config.amass_intel_discovery.enabled).toBe(true);
+    expect(result.current.config.baddns.enabled).toBe(true);
+
+    const none = renderHook(() => useEngineConfig('threads: 5\n'));
+    expect(none.result.current.config.amass_intel_discovery.enabled).toBe(false);
+    expect(none.result.current.config.baddns.enabled).toBe(false);
+  });
+
+  it('takes the amass config switch from subdomain_discovery when the section does not set it', () => {
+    const inherited = renderHook(() => useEngineConfig('amass_intel_discovery: {}\nsubdomain_discovery:\n  use_amass_config: true\n'));
+    expect(inherited.result.current.config.amass_intel_discovery.config.use_amass_config).toBe(true);
+
+    const own = renderHook(() => useEngineConfig(
+      'amass_intel_discovery:\n  use_amass_config: false\nsubdomain_discovery:\n  use_amass_config: true\n',
+    ));
+    expect(own.result.current.config.amass_intel_discovery.config.use_amass_config).toBe(false);
+  });
+
+  it('writes the keys only while their cards are on', () => {
+    const { result } = renderHook(() => useEngineConfig('threads: 5\n'));
+    act(() => result.current.toggleSection('amass_intel_discovery', true));
+    act(() => result.current.toggleSection('baddns', true));
+    act(() => result.current.updateSection('amass_intel_discovery', { use_amass_config: true }));
+    let doc = loadMapping(result.current.yaml);
+    expect(mappingAt(doc, 'amass_intel_discovery')).toEqual({ use_amass_config: true });
+    expect(mappingAt(doc, 'baddns')).toEqual({});
+
+    act(() => result.current.toggleSection('baddns', false));
+    doc = loadMapping(result.current.yaml);
+    expect(doc).not.toHaveProperty('baddns');
+  });
+});
+
+describe('useEngineConfig post-crawl OSINT section', () => {
+  it('reads a tool whose key is missing as off, like the task', () => {
+    const { result } = renderHook(() => useEngineConfig('post_crawl_osint:\n  swaggerspy: true\n'));
+    expect(result.current.config.post_crawl_osint).toEqual({ enabled: true, config: { metagoofil: false, swaggerspy: true } });
+  });
+
+  it('round-trips both switches and drops the section when the card is off', () => {
+    const { result } = renderHook(() => useEngineConfig('post_crawl_osint:\n  metagoofil: true\n  swaggerspy: true\n'));
+    act(() => result.current.updateSection('post_crawl_osint', { swaggerspy: false }));
+    expect(mappingAt(loadMapping(result.current.yaml), 'post_crawl_osint')).toEqual({ metagoofil: true, swaggerspy: false });
+
+    act(() => result.current.toggleSection('post_crawl_osint', false));
+    expect(loadMapping(result.current.yaml)).not.toHaveProperty('post_crawl_osint');
+  });
+});

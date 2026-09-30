@@ -54,4 +54,27 @@ describe('EngineConfigTabs', () => {
     fireEvent.click(within(card as HTMLElement).getByRole('switch'));
     expect(state.toggleSection).toHaveBeenLastCalledWith('tier_7', false);
   });
+
+  it('puts Amass Intel and BadDNS right after subdomain discovery on the Tier 1 tab', () => {
+    renderTabs();
+    fireEvent.click(screen.getByRole('tab', { name: 'Tier 1 — Discovery' }));
+
+    const titles = within(screen.getByRole('tabpanel'))
+      .getAllByText(/^(Subdomain Discovery|Amass Intel|BadDNS|DNS Security)$/)
+      .map((el) => el.textContent);
+    expect(titles).toEqual(['Subdomain Discovery', 'Amass Intel', 'BadDNS', 'DNS Security']);
+  });
+
+  it('wires the BadDNS and post-crawl OSINT toggles to their sections', () => {
+    const state = renderTabs();
+    fireEvent.click(screen.getByRole('tab', { name: 'Tier 1 — Discovery' }));
+    const baddns = screen.getByText('BadDNS').closest('.MuiCard-root');
+    fireEvent.click(within(baddns as HTMLElement).getByRole('switch'));
+    expect(state.toggleSection).toHaveBeenLastCalledWith('baddns', true);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tier 4 — Fuzzing' }));
+    const postCrawl = screen.getByText('Post-Crawl OSINT').closest('.MuiCard-root');
+    fireEvent.click(within(postCrawl as HTMLElement).getByRole('switch'));
+    expect(state.toggleSection).toHaveBeenLastCalledWith('post_crawl_osint', true);
+  });
 });
