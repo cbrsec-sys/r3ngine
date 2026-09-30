@@ -707,6 +707,14 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	logger.info('Vulnerability scan completed...')
 	return None
 
+def _dalfox_setting(dalfox_config: dict, key: str, default):
+	"""A dalfox option under its lowercase key, the spelling the engine editor and the
+	reference YAML use, falling back to the uppercase key older engines were read with."""
+	if key in dalfox_config:
+		return dalfox_config[key]
+	return dalfox_config.get(key.upper(), default)
+
+
 def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	"""XSS Scan using dalfox
 
@@ -728,10 +736,10 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	if custom_header:
 		custom_headers.append(custom_header)
 	is_waf_evasion = dalfox_config.get(WAF_EVASION, False)
-	use_deep_scan = dalfox_config.get('DEEP_SCAN', False)
-	use_remote_payloads = dalfox_config.get('REMOTE_PAYLOADS', False)
-	use_remote_wordlists = dalfox_config.get('REMOTE_WORDLISTS', False)
-	scan_timeout = dalfox_config.get('SCAN_TIMEOUT', 300)
+	use_deep_scan = _dalfox_setting(dalfox_config, 'deep_scan', False)
+	use_remote_payloads = _dalfox_setting(dalfox_config, 'remote_payloads', False)
+	use_remote_wordlists = _dalfox_setting(dalfox_config, 'remote_wordlists', False)
+	scan_timeout = _dalfox_setting(dalfox_config, 'scan_timeout', 300)
 	blind_xss_server = dalfox_config.get(BLIND_XSS_SERVER)
 	user_agent = dalfox_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
 	timeout = dalfox_config.get(TIMEOUT)
@@ -769,14 +777,16 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' --deep-scan' if use_deep_scan else ''
 	cmd += f' --remote-payloads portswigger,payloadbox' if use_remote_payloads else ''
 	cmd += f' --remote-wordlists burp,assetnote' if use_remote_wordlists else ''
-	cmd += f' -b {blind_xss_server}' if blind_xss_server else ''
+	cmd += f' -b {shlex.quote(str(blind_xss_server))}' if blind_xss_server else ''
 	cmd += f' --delay {delay}' if delay else ''
 	cmd += f' --timeout {timeout}' if timeout else ''
 	cmd += f' --scan-timeout {scan_timeout}' if scan_timeout else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += f' {formatted_headers}'
-	cmd += f' --user-agent {user_agent}' if user_agent else ''
+	# The command runs through bash on the Go executor; a browser user agent is full of
+	# spaces, parentheses and semicolons.
+	cmd += f' --user-agent {shlex.quote(str(user_agent))}' if user_agent else ''
 	cmd += f' --workers {threads}' if threads else ''
 	cmd += f' --format json'
 	if ctx.get('singular_tool_run') and ctx.get('extra_cli_args'):
@@ -1010,7 +1020,7 @@ def s3scanner(self, ctx={}, description=None):
 	providers = s3_config.get(PROVIDERS, S3SCANNER_DEFAULT_PROVIDERS)
 	scan_history = ScanHistory.objects.filter(pk=self.scan_id).first()
 	for provider in providers:
-		cmd = f's3scanner -bucket-file {input_path} -enumerate -provider {provider} -threads {threads} -json'
+		cmd = f's3scanner -bucket-file {input_path} -enumerate -provider {shlex.quote(str(provider))} -threads {threads} -json'
 		for line in stream_command(
 				cmd,
 				history_file=self.history_file,

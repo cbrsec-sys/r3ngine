@@ -196,7 +196,8 @@ TRUFFLEHOG = 'trufflehog'
 RUN_CPANEL2SHELL = 'run_cpanel2shell'
 CPANEL_USER_WORDLIST = 'cpanel_user_wordlist'
 CPANEL_SCANNER_PROXY_TYPE = 'proxy_type'
-CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/app/wordlist/auth/cpanel_users.txt'
+# Downloaded by the orchestrator and executor entrypoints into the shared wordlist volume.
+CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/wordlist/cpanel_users.txt'
 
 RUN_REACT2SHELL = 'run_react2shell'
 USE_WORDFENCE_CANDIDATE = 'use_wordfence_candidate'

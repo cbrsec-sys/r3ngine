@@ -5,6 +5,8 @@ import type {
   EngineConfig, SectionKey, GlobalConfig, SpiderfootConfig,
 } from '../types/engineConfig';
 import { DEFAULT_ENGINE_CONFIG } from '../types/engineConfig';
+import type { CpanelScannerConfig, DalfoxConfig, NucleiConfig, S3ScannerConfig } from '../types/engineConfig';
+import { CPANEL_DEFAULT_USER_WORDLIST, DEFAULT_DALFOX_CONFIG, S3SCANNER_DEFAULT_PROVIDERS } from '../types/engineConfig';
 
 /**
  * Engine YAML is user-edited, so every value is `unknown` until read: mappings go through
@@ -43,6 +45,9 @@ export interface OwnedKeys {
 const owned = (...keys: string[]): OwnedKeys => Object.fromEntries(keys.map((key) => [key, null]));
 
 const VIGOLIUM_STAGE = ['strategy', 'concurrency', 'rate_limit', 'timeout'];
+
+/** dalfox_xss_scan also reads these under the uppercase keys older engines used. */
+const DALFOX_LEGACY_KEYS = ['deep_scan', 'remote_payloads', 'remote_wordlists', 'scan_timeout'] as const;
 
 /**
  * Everything the parser reads or the serialiser may write, per mapping. A key missing
@@ -110,11 +115,21 @@ export const FORM_OWNED_KEYS: Readonly<Record<SectionKey | keyof GlobalConfig | 
     ...owned(
       'run_nuclei', 'run_dalfox', 'run_crlfuzz', 'run_s3scanner', 'run_acunetix', 'run_wpscan',
       'run_wptaint_scan', 'run_smugglex', 'run_second_order', 'run_nuclei_dast', 'run_vigolium',
-      'run_semgrep', 'run_post_scan_processing', 'concurrency', 'rate_limit', 'retries', 'timeout', 'intensity', 'fetch_gpt_report',
+      'run_semgrep', 'run_post_scan_processing', 'concurrency', 'rate_limit', 'retries', 'intensity', 'fetch_gpt_report',
       'enable_http_crawl', 'wpscan_enumeration', 'wpscan_detection_mode',
     ),
     acunetix: owned('submit_live_subdomains', 'resubmit_after_days', 'start_scan_on_submit'),
-    nuclei: owned('use_nuclei_config', 'severities', 'tags', 'templates', 'custom_templates'),
+    nuclei: owned(
+      'use_nuclei_config', 'auto_update_templates', 'severities', 'tags', 'templates', 'custom_templates',
+      'max_templates_per_batch',
+    ),
+    // The parser moves the uppercase spellings to the lowercase keys.
+    dalfox: owned(
+      'waf_evasion', 'deep_scan', 'remote_payloads', 'remote_wordlists', 'scan_timeout',
+      'blind_xss_server', 'user_agent', 'timeout', 'delay', 'threads',
+      ...DALFOX_LEGACY_KEYS.map((key) => key.toUpperCase()),
+    ),
+    s3scanner: owned('threads', 'providers'),
     cpanel_scanner: owned('run_cpanel2shell', 'cpanel_user_wordlist', 'proxy_type'),
     react_scanner: owned('run_react2shell'),
     vigolium: owned(
@@ -167,6 +182,33 @@ function withLeftovers(written: YamlMapping, leftovers: Leftovers): YamlMapping 
 }
 
 // ─── Serialiser ──────────────────────────────────────────────────────────────
+
+function nucleiYaml(n: NucleiConfig): YamlMapping {
+  return {
+    use_nuclei_config: n.use_nuclei_config,
+    auto_update_templates: n.auto_update_templates,
+    severities: n.severities,
+    ...(n.tags.length ? { tags: n.tags } : {}),
+    ...(n.templates.length ? { templates: n.templates } : {}),
+    ...(n.custom_templates.length ? { custom_templates: n.custom_templates } : {}),
+    max_templates_per_batch: n.max_templates_per_batch,
+  };
+}
+
+/** Options at 0 or empty are left out, so dalfox_xss_scan uses its own fallback for them. */
+function dalfoxYaml(d: DalfoxConfig): YamlMapping {
+  const optional = { blind_xss_server: d.blind_xss_server, user_agent: d.user_agent, timeout: d.timeout, delay: d.delay, threads: d.threads };
+  return {
+    waf_evasion: d.waf_evasion, deep_scan: d.deep_scan,
+    remote_payloads: d.remote_payloads, remote_wordlists: d.remote_wordlists,
+    scan_timeout: d.scan_timeout,
+    ...Object.fromEntries(Object.entries(optional).filter(([, value]) => value)),
+  };
+}
+
+function s3scannerYaml(c: S3ScannerConfig): YamlMapping {
+  return { ...(c.threads > 0 ? { threads: c.threads } : {}), providers: c.providers };
+}
 
 /** Writes the form's config, then carries over the loaded YAML's keys the form does not own. */
 export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers = NO_LEFTOVERS): string {
@@ -359,14 +401,16 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
       run_vigolium: c.run_vigolium, run_semgrep: c.run_semgrep,
       run_post_scan_processing: c.run_post_scan_processing,
       concurrency: c.concurrency, rate_limit: c.rate_limit, retries: c.retries,
-      timeout: c.timeout, intensity: c.intensity, fetch_gpt_report: c.fetch_gpt_report,
+      intensity: c.intensity, fetch_gpt_report: c.fetch_gpt_report,
       enable_http_crawl: c.enable_http_crawl,
     };
     if (c.run_wpscan) {
       s.wpscan_enumeration = c.wpscan_enumeration;
       s.wpscan_detection_mode = c.wpscan_detection_mode;
     }
-    if (c.run_nuclei) s.nuclei = { use_nuclei_config: c.nuclei.use_nuclei_config, severities: c.nuclei.severities, ...(c.nuclei.tags.length ? { tags: c.nuclei.tags } : {}), ...(c.nuclei.templates.length ? { templates: c.nuclei.templates } : {}), ...(c.nuclei.custom_templates.length ? { custom_templates: c.nuclei.custom_templates } : {}) };
+    if (c.run_nuclei) s.nuclei = nucleiYaml(c.nuclei);
+    if (c.run_dalfox) s.dalfox = dalfoxYaml(c.dalfox);
+    if (c.run_s3scanner) s.s3scanner = s3scannerYaml(c.s3scanner);
     s.react_scanner = { run_react2shell: c.run_react2shell };
     s.cpanel_scanner = { run_cpanel2shell: c.cpanel_scanner.run_cpanel2shell, cpanel_user_wordlist: c.cpanel_scanner.cpanel_user_wordlist, proxy_type: c.cpanel_scanner.proxy_type };
     if (c.run_vigolium) s.vigolium = { strategy: c.vigolium.strategy, concurrency: c.vigolium.concurrency, rate_limit: c.vigolium.rate_limit, timeout: c.vigolium.timeout, run_phase_a: c.vigolium.run_phase_a, run_phase_b: c.vigolium.run_phase_b, scope_origin: c.vigolium.scope_origin, skip_spidering: c.vigolium.skip_spidering };
@@ -412,6 +456,23 @@ function spiderfootIntensity(value: unknown): SpiderfootConfig['intensity'] {
   if (value === 'fast' || value === 'light') return 'fast';
   if (value === 'deep' || value === 'aggressive') return 'deep';
   return 'normal';
+}
+
+function parseDalfox(r: YamlMapping): DalfoxConfig {
+  const d = DEFAULT_DALFOX_CONFIG;
+  const legacy = (key: typeof DALFOX_LEGACY_KEYS[number]): unknown => r[key] ?? r[key.toUpperCase()];
+  return {
+    waf_evasion: (r.waf_evasion as boolean) ?? d.waf_evasion,
+    deep_scan: (legacy('deep_scan') as boolean) ?? d.deep_scan,
+    remote_payloads: (legacy('remote_payloads') as boolean) ?? d.remote_payloads,
+    remote_wordlists: (legacy('remote_wordlists') as boolean) ?? d.remote_wordlists,
+    scan_timeout: (legacy('scan_timeout') as number) ?? d.scan_timeout,
+    blind_xss_server: (r.blind_xss_server as string) ?? d.blind_xss_server,
+    user_agent: (r.user_agent as string) ?? d.user_agent,
+    timeout: (r.timeout as number) ?? d.timeout,
+    delay: (r.delay as number) ?? d.delay,
+    threads: (r.threads as number) ?? d.threads,
+  };
 }
 
 function parseYamlToConfig(yamlStr: string): EngineConfig {
@@ -656,7 +717,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     vulnerability_scan: section('vulnerability_scan', (r) => {
       type VulnScan = EngineConfig['vulnerability_scan']['config'];
       const n = asMapping(r.nuclei) as Partial<VulnScan['nuclei']>;
-      const cp = asMapping(r.cpanel_scanner) as Partial<VulnScan['cpanel_scanner']>;
+      const cp = asMapping(r.cpanel_scanner) as Partial<Record<keyof CpanelScannerConfig, unknown>>;
       const vig = asMapping(r.vigolium) as Partial<VulnScan['vigolium']>;
       const ac = asMapping(r.acunetix) as Partial<NonNullable<VulnScan['acunetix']>>;
       return {
@@ -674,11 +735,11 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
         run_semgrep: (r.run_semgrep as boolean) ?? (asMapping(raw.leaks_and_secrets).run_semgrep as boolean) ?? true,
         run_react2shell: (asMapping(r.react_scanner).run_react2shell as boolean) ?? true,
         run_post_scan_processing: (r.run_post_scan_processing as boolean) ?? true,
-        concurrency: (r.concurrency as number) ?? 50,
-        rate_limit: (r.rate_limit as number) ?? 150,
-        retries: (r.retries as number) ?? 1,
-        timeout: (r.timeout as number) ?? 5,
-        intensity: (r.intensity as 'normal' | 'aggressive' | 'light') ?? 'normal',
+        // The scan tasks fall back to the engine-wide values for these.
+        concurrency: (r.concurrency as number) ?? global.threads,
+        rate_limit: (r.rate_limit as number) ?? global.rate_limit,
+        retries: (r.retries as number) ?? global.retries,
+        intensity: (r.intensity as 'normal' | 'aggressive' | 'light') ?? global.intensity,
         fetch_gpt_report: (r.fetch_gpt_report as boolean) ?? true,
         enable_http_crawl: (r.enable_http_crawl as boolean) ?? true,
         wpscan_enumeration: (r.wpscan_enumeration as string) ?? 'vp,vt,u',
@@ -694,11 +755,19 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
           tags: n.tags ?? [],
           templates: n.templates ?? [],
           custom_templates: n.custom_templates ?? [],
+          auto_update_templates: n.auto_update_templates ?? true,
+          max_templates_per_batch: n.max_templates_per_batch ?? 100,
+        },
+        dalfox: parseDalfox(asMapping(r.dalfox)),
+        s3scanner: {
+          threads: (asMapping(r.s3scanner).threads as number) ?? 0,
+          providers: (asMapping(r.s3scanner).providers as string[]) ?? [...S3SCANNER_DEFAULT_PROVIDERS],
         },
         cpanel_scanner: {
-          run_cpanel2shell: cp.run_cpanel2shell ?? true,
-          cpanel_user_wordlist: cp.cpanel_user_wordlist ?? '/usr/src/app/wordlist/cpanel_users.txt',
-          proxy_type: cp.proxy_type ?? 'rotating',
+          run_cpanel2shell: (cp.run_cpanel2shell as boolean) ?? true,
+          cpanel_user_wordlist: (cp.cpanel_user_wordlist as string) ?? CPANEL_DEFAULT_USER_WORDLIST,
+          // cpanel_scan knows `single`; the editor used to write `static`.
+          proxy_type: cp.proxy_type === 'single' || cp.proxy_type === 'static' ? 'single' : 'rotating',
         },
         vigolium: {
           strategy: vig.strategy ?? 'balanced',

@@ -396,6 +396,7 @@ vulnerability_scan:
   nuclei:
     use_nuclei_config: false
     auto_update_templates: true
+    max_templates_per_batch: 100  # Template budget per tag batch (Temporal nuclei planner)
     severities:
       - unknown
       - info
@@ -438,8 +439,8 @@ vulnerability_scan:
 
   cpanel_scanner:
     run_cpanel2shell: true
-    cpanel_user_wordlist: /usr/src/app/wordlist/cpanel_users.txt
-    proxy_type: rotating
+    cpanel_user_wordlist: /usr/src/wordlist/cpanel_users.txt
+    proxy_type: rotating          # rotating | single
 
   wpscan_enumeration: vp,vt,u     # WPScan enumeration options
   wpscan_detection_mode: mixed    # mixed | passive | aggressive

@@ -250,7 +250,7 @@
           skip_spidering: false
         cpanel_scanner:
           run_cpanel2shell: true
-          cpanel_user_wordlist: /usr/src/app/wordlist/cpanel_users.txt
+          cpanel_user_wordlist: /usr/src/wordlist/cpanel_users.txt
           proxy_type: rotating
       vigolium_discovery:
         run_vigolium_discovery: true

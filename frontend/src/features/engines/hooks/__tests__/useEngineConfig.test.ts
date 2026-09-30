@@ -286,7 +286,7 @@ email_security:
     const doc = loadMapping(result.current.yaml);
 
     expect(mappingAt(doc, 'vulnerability_scan', 'nuclei')).toMatchObject({ tags: ['cve'], max_templates_per_batch: 200 });
-    expect(mappingAt(doc, 'vulnerability_scan', 'cpanel_scanner')).toMatchObject({ proxy_type: 'static', extra: 3 });
+    expect(mappingAt(doc, 'vulnerability_scan', 'cpanel_scanner')).toMatchObject({ proxy_type: 'single', extra: 3 });
     expect(mappingAt(doc, 'email_security', 'mailbox_verification')).toMatchObject({
       max_candidates: 50, probe_from: 'probe@example.test',
     });

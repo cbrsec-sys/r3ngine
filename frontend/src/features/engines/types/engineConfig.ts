@@ -201,16 +201,49 @@ export interface VigoliumAnalysisConfig {
 
 export interface NucleiConfig {
   use_nuclei_config: boolean;
+  /** `nuclei -update-templates` before a scan that has no pre-batched tags. */
+  auto_update_templates: boolean;
   severities: string[];
   tags: string[];
   templates: string[];
   custom_templates: string[];
+  /** Template budget per tag batch in the Temporal nuclei planner (backend default 100). */
+  max_templates_per_batch: number;
+}
+
+/** `vulnerability_scan.dalfox`. A 0 or empty value leaves the flag out, as the task does. */
+export interface DalfoxConfig {
+  waf_evasion: boolean;
+  deep_scan: boolean;
+  remote_payloads: boolean;
+  remote_wordlists: boolean;
+  /** Whole-run limit in seconds (`--scan-timeout`); 0 means no limit. */
+  scan_timeout: number;
+  /** Blind XSS callback (`-b`). */
+  blind_xss_server: string;
+  /** Empty: the engine-wide `user_agent`. */
+  user_agent: string;
+  /** Per-request timeout in seconds; 0: dalfox's own default. */
+  timeout: number;
+  /** Pause between requests in milliseconds; 0: none. */
+  delay: number;
+  /** `--workers`; 0: the engine-wide threads. */
+  threads: number;
+}
+
+/** `vulnerability_scan.s3scanner`. */
+export interface S3ScannerConfig {
+  /** 0: the engine-wide threads. */
+  threads: number;
+  /** One s3scanner run per provider. */
+  providers: string[];
 }
 
 export interface CpanelScannerConfig {
   run_cpanel2shell: boolean;
   cpanel_user_wordlist: string;
-  proxy_type: 'rotating' | 'static';
+  /** `single` keeps one proxy for every target; `rotating` picks one per target. */
+  proxy_type: 'rotating' | 'single';
 }
 
 export interface VigoliumVulnConfig {
@@ -250,10 +283,12 @@ export interface VulnerabilityScanConfig {
   run_react2shell: boolean;
   /** Dedup, OpenAPI extraction and GraphQL dispatch after the Tier 6 tools. */
   run_post_scan_processing: boolean;
+  /** Nuclei `-c`; a missing key falls back to the engine-wide threads. */
   concurrency: number;
+  /** Nuclei and Nuclei DAST `-rl`; falls back to the engine-wide rate_limit. */
   rate_limit: number;
+  /** Nuclei and Nuclei DAST `-retries`; falls back to the engine-wide retries. */
   retries: number;
-  timeout: number;
   intensity: 'normal' | 'aggressive' | 'light';
   fetch_gpt_report: boolean;
   enable_http_crawl: boolean;
@@ -261,6 +296,8 @@ export interface VulnerabilityScanConfig {
   wpscan_detection_mode: 'mixed' | 'passive' | 'aggressive';
   acunetix?: AcunetixConfig;
   nuclei: NucleiConfig;
+  dalfox: DalfoxConfig;
+  s3scanner: S3ScannerConfig;
   cpanel_scanner: CpanelScannerConfig;
   vigolium: VigoliumVulnConfig;
 }
@@ -328,6 +365,18 @@ export const DEFAULT_GLOBAL: GlobalConfig = {
   intensity: 'normal',
   custom_headers: [],
   enable_http_crawl: true,
+};
+
+/** reNgine.definitions.S3SCANNER_DEFAULT_PROVIDERS */
+export const S3SCANNER_DEFAULT_PROVIDERS = ['gcp', 'aws', 'digitalocean', 'dreamhost', 'linode'];
+
+/** reNgine.definitions.CPANEL_SCANNER_DEFAULT_WORDLIST */
+export const CPANEL_DEFAULT_USER_WORDLIST = '/usr/src/wordlist/cpanel_users.txt';
+
+/** What dalfox_xss_scan uses for a missing key. */
+export const DEFAULT_DALFOX_CONFIG: DalfoxConfig = {
+  waf_evasion: false, deep_scan: false, remote_payloads: false, remote_wordlists: false,
+  scan_timeout: 300, blind_xss_server: '', user_agent: '', timeout: 0, delay: 0, threads: 0,
 };
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -433,12 +482,18 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       run_acunetix: true, run_wpscan: true, run_wptaint_scan: true, run_smugglex: true,
       run_second_order: true, run_nuclei_dast: true, run_vigolium: true,
       run_semgrep: true, run_react2shell: true, run_post_scan_processing: true,
-      concurrency: 50, rate_limit: 150, retries: 1, timeout: 5,
+      concurrency: 50, rate_limit: 150, retries: 1,
       intensity: 'normal', fetch_gpt_report: true, enable_http_crawl: true,
       wpscan_enumeration: 'vp,vt,u', wpscan_detection_mode: 'mixed',
       acunetix: { submit_live_subdomains: false, resubmit_after_days: 3, start_scan_on_submit: false },
-      nuclei: { use_nuclei_config: false, severities: ['unknown', 'info', 'low', 'medium', 'high', 'critical'], tags: [], templates: [], custom_templates: [] },
-      cpanel_scanner: { run_cpanel2shell: true, cpanel_user_wordlist: '/usr/src/app/wordlist/cpanel_users.txt', proxy_type: 'rotating' },
+      nuclei: {
+        use_nuclei_config: false, auto_update_templates: true,
+        severities: ['unknown', 'info', 'low', 'medium', 'high', 'critical'], tags: [], templates: [], custom_templates: [],
+        max_templates_per_batch: 100,
+      },
+      dalfox: DEFAULT_DALFOX_CONFIG,
+      s3scanner: { threads: 0, providers: [...S3SCANNER_DEFAULT_PROVIDERS] },
+      cpanel_scanner: { run_cpanel2shell: true, cpanel_user_wordlist: CPANEL_DEFAULT_USER_WORDLIST, proxy_type: 'rotating' },
       vigolium: { strategy: 'balanced', concurrency: 50, rate_limit: 100, timeout: '15s', run_phase_a: true, run_phase_b: true, scope_origin: 'balanced', skip_spidering: false },
     },
   },
