@@ -123,6 +123,34 @@ export const OsintSection: React.FC<Props> = ({ config, enabled, onToggle, onCha
             </Tooltip>
           }
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              checked={config.leaklookup}
+              onChange={(e) => onChange({ leaklookup: e.target.checked })}
+            />
+          }
+          label={
+            <Tooltip title="Queries the leak-lookup.com and ProjectDiscovery APIs for domain leaks. Skipped when neither API key is configured.">
+              <span>Enable LeakLookup</span>
+            </Tooltip>
+          }
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              checked={config.leaksearch}
+              onChange={(e) => onChange({ leaksearch: e.target.checked })}
+            />
+          }
+          label={
+            <Tooltip title="Searches LeakSearch for credential leaks on the target. Skipped when no LeakSearch API key is configured.">
+              <span>Enable LeakSearch</span>
+            </Tooltip>
+          }
+        />
       </FormGroup>
     </SectionCard>
   );

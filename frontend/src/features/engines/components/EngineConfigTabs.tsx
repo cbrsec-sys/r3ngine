@@ -24,6 +24,7 @@ import { VigoliumAnalysisSection } from './sections/VigoliumAnalysisSection';
 import { VulnerabilitySection } from './sections/VulnerabilitySection';
 import { AttackPathSection } from './sections/AttackPathSection';
 import { VigoliumAuditSection } from './sections/VigoliumAuditSection';
+import { Tier7Section } from './sections/Tier7Section';
 import { YamlPreviewPanel } from './YamlPreviewPanel';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
@@ -104,8 +105,10 @@ export const EngineConfigTabs: React.FC<EngineConfigTabsProps> = ({ state, avail
               onChange={(p) => updateSection('subdomain_discovery', p)}
             />
             <DnsSecuritySection
+              config={config.dns_security.config}
               enabled={config.dns_security.enabled}
               onToggle={(v) => toggleSection('dns_security', v)}
+              onChange={(p) => updateSection('dns_security', p)}
             />
             <OsintSection
               config={config.osint.config}
@@ -164,10 +167,8 @@ export const EngineConfigTabs: React.FC<EngineConfigTabsProps> = ({ state, avail
               onChange={(p) => updateSection('email_security', p)}
             />
             <ScreenshotSection
-              config={config.screenshot.config}
               enabled={config.screenshot.enabled}
               onToggle={(v) => toggleSection('screenshot', v)}
-              onChange={(p) => updateSection('screenshot', p)}
             />
           </Box>
         )}
@@ -265,6 +266,12 @@ export const EngineConfigTabs: React.FC<EngineConfigTabsProps> = ({ state, avail
               enabled={config.attack_path_modeling.enabled}
               onToggle={(v) => toggleSection('attack_path_modeling', v)}
               onChange={(p) => updateSection('attack_path_modeling', p)}
+            />
+            <Tier7Section
+              config={config.tier_7.config}
+              enabled={config.tier_7.enabled}
+              onToggle={(v) => toggleSection('tier_7', v)}
+              onChange={(p) => updateSection('tier_7', p)}
             />
             <VigoliumAuditSection
               config={config.vigolium_audit.config}

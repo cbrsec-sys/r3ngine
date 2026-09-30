@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import type { DumpOptions } from 'js-yaml';
 import type {
-  EngineConfig, SectionKey, GlobalConfig,
+  EngineConfig, SectionKey, GlobalConfig, SpiderfootConfig,
 } from '../types/engineConfig';
 import { DEFAULT_ENGINE_CONFIG } from '../types/engineConfig';
 
@@ -60,29 +60,31 @@ export const FORM_OWNED_KEYS: Readonly<Record<SectionKey | keyof GlobalConfig | 
   intensity: null,
 
   subdomain_discovery: owned(
-    'uses_tools', 'threads', 'timeout', 'enable_http_crawl', 'bbot',
+    'uses_tools', 'threads', 'timeout', 'enable_http_crawl',
     'use_subfinder_config', 'use_amass_config', 'amass_wordlist',
   ),
-  dns_security: owned(),
+  dns_security: owned('enable_axfr', 'enable_dnssec_check', 'enable_dns_brute', 'amplification_threshold'),
   // whatbreach is a boolean or a mapping depending on a checkbox, so it is owned whole.
-  osint: owned(
-    'discover', 'dorks', 'custom_dorks', 'intensity', 'documents_limit',
-    'whatbreach', 'credspy', 'leaks_and_secrets',
-  ),
+  osint: {
+    ...owned('discover', 'dorks', 'custom_dorks', 'intensity', 'documents_limit', 'whatbreach', 'credspy'),
+    // gitleaks/trufflehog here are an older spelling of secret_scanning and are carried through.
+    leaks_and_secrets: owned('leaklookup', 'leaksearch'),
+  },
   spiderfoot_scan: owned('modules', 'intensity', 'threads'),
   vigolium_harvest: owned('run_vigolium_harvest', ...VIGOLIUM_STAGE),
   vigolium_discovery: owned('run_vigolium_discovery', ...VIGOLIUM_STAGE),
-  firewall_vpn_scan: owned('run_ike_scan', 'run_sslscan', 'ports'),
+  firewall_vpn_scan: owned('run_ike_scan', 'run_sslscan', 'enable_testssl', 'enable_crt_sh', 'ports'),
   http_crawl: owned('threads', 'follow_redirect'),
   port_scan: owned(
     'ports', 'rate_limit', 'threads', 'timeout', 'passive', 'enable_http_crawl',
     'enable_nmap', 'nmap_cmd', 'nmap_script', 'nmap_script_args', 'exclude_ports', 'exclude_subdomains',
+    'enable_network_enum',
   ),
   email_security: {
     enabled: null,
     mailbox_verification: owned('enabled', 'timeout', 'max_candidates', 'delay_ms', 'http_url'),
   },
-  screenshot: owned('intensity', 'timeout', 'threads', 'enable_http_crawl'),
+  screenshot: owned(),
   fetch_url: owned(
     'uses_tools', 'remove_duplicate_endpoints', 'duplicate_fields', 'enable_http_crawl',
     'gf_patterns', 'ignore_file_extensions', 'threads',
@@ -98,21 +100,23 @@ export const FORM_OWNED_KEYS: Readonly<Record<SectionKey | keyof GlobalConfig | 
     'match_http_status', 'follow_redirect', 'stop_on_error', 'max_repeat_by_signature',
   ),
   waf_detection: owned('enable_http_crawl', 'use_shodan', 'use_censys'),
-  waf_bypass: owned('enabled', 'use_benchmarking', 'use_nuclei', 'timeout', 'threads'),
+  waf_bypass: owned('enabled', 'use_benchmarking', 'use_nuclei'),
   // Read under three spellings, written only as secret_scanning; see secretScanningSettings.
   leaks_and_secrets: null,
-  secret_scanning: owned('gitleaks', 'trufflehog', 'leaklookup'),
+  // Breach lookups are OSINT settings; the old spellings put them here, where nothing reads them.
+  secret_scanning: owned('gitleaks', 'trufflehog', 'betterleaks', 'leaklookup', 'leaksearch'),
   vigolium_analysis: owned('run_vigolium_analysis', ...VIGOLIUM_STAGE),
   vulnerability_scan: {
     ...owned(
       'run_nuclei', 'run_dalfox', 'run_crlfuzz', 'run_s3scanner', 'run_acunetix', 'run_wpscan',
       'run_wptaint_scan', 'run_smugglex', 'run_second_order', 'run_nuclei_dast', 'run_vigolium',
-      'concurrency', 'rate_limit', 'retries', 'timeout', 'intensity', 'fetch_gpt_report',
+      'run_semgrep', 'run_post_scan_processing', 'concurrency', 'rate_limit', 'retries', 'timeout', 'intensity', 'fetch_gpt_report',
       'enable_http_crawl', 'wpscan_enumeration', 'wpscan_detection_mode',
     ),
     acunetix: owned('submit_live_subdomains', 'resubmit_after_days', 'start_scan_on_submit'),
     nuclei: owned('use_nuclei_config', 'severities', 'tags', 'templates', 'custom_templates'),
     cpanel_scanner: owned('run_cpanel2shell', 'cpanel_user_wordlist', 'proxy_type'),
+    react_scanner: owned('run_react2shell'),
     vigolium: owned(
       ...VIGOLIUM_STAGE, 'run_phase_a', 'run_phase_b', 'scope_origin', 'skip_spidering',
     ),
@@ -186,14 +190,20 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
   // ── Tier 1 ──────────────────────────────────────────────────────────────
   if (config.subdomain_discovery.enabled) {
     const c = config.subdomain_discovery.config;
-    const s: Record<string, unknown> = { uses_tools: c.uses_tools, threads: c.threads, timeout: c.timeout, enable_http_crawl: c.enable_http_crawl, bbot: c.bbot };
+    const s: Record<string, unknown> = { uses_tools: c.uses_tools, threads: c.threads, timeout: c.timeout, enable_http_crawl: c.enable_http_crawl };
     if (c.use_subfinder_config) s.use_subfinder_config = true;
     if (c.use_amass_config) s.use_amass_config = true;
     if (c.amass_wordlist) s.amass_wordlist = c.amass_wordlist;
     writeSection('subdomain_discovery', s);
   }
 
-  if (config.dns_security.enabled) writeSection('dns_security', {});
+  if (config.dns_security.enabled) {
+    const c = config.dns_security.config;
+    writeSection('dns_security', {
+      enable_axfr: c.enable_axfr, enable_dnssec_check: c.enable_dnssec_check,
+      enable_dns_brute: c.enable_dns_brute, amplification_threshold: c.amplification_threshold,
+    });
+  }
 
   if (config.osint.enabled) {
     const c = config.osint.config;
@@ -208,6 +218,7 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
         ? (c.whatbreach_download_databases ? { download_found_databases: true } : true)
         : false,
       credspy: c.credspy,
+      leaks_and_secrets: { leaklookup: c.leaklookup, leaksearch: c.leaksearch },
     });
   }
 
@@ -216,19 +227,26 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
     writeSection('spiderfoot_scan', { modules: c.modules, intensity: c.intensity, threads: c.threads });
   }
 
-  if (config.vigolium_harvest.enabled) {
+  if (!config.vigolium_harvest.enabled) {
+    writeSection('vigolium_harvest', { run_vigolium_harvest: false });
+  } else {
     const c = config.vigolium_harvest.config;
     writeSection('vigolium_harvest', { run_vigolium_harvest: true, strategy: c.strategy, concurrency: c.concurrency, rate_limit: c.rate_limit, timeout: c.timeout });
   }
 
-  if (config.vigolium_discovery.enabled) {
+  if (!config.vigolium_discovery.enabled) {
+    writeSection('vigolium_discovery', { run_vigolium_discovery: false });
+  } else {
     const c = config.vigolium_discovery.config;
     writeSection('vigolium_discovery', { run_vigolium_discovery: true, strategy: c.strategy, concurrency: c.concurrency, rate_limit: c.rate_limit, timeout: c.timeout });
   }
 
   if (config.firewall_vpn_scan.enabled) {
     const c = config.firewall_vpn_scan.config;
-    writeSection('firewall_vpn_scan', { run_ike_scan: c.run_ike_scan, run_sslscan: c.run_sslscan, ports: c.ports });
+    writeSection('firewall_vpn_scan', {
+      run_ike_scan: c.run_ike_scan, run_sslscan: c.run_sslscan,
+      enable_testssl: c.enable_testssl, enable_crt_sh: c.enable_crt_sh, ports: c.ports,
+    });
   }
 
   // ── Tier 2 ──────────────────────────────────────────────────────────────
@@ -251,6 +269,7 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
     }
     if (c.exclude_ports.length > 0) s.exclude_ports = c.exclude_ports;
     if (c.exclude_subdomains) s.exclude_subdomains = true;
+    s.enable_network_enum = c.enable_network_enum;
     writeSection('port_scan', s);
   }
 
@@ -266,10 +285,7 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
     writeSection('email_security', { enabled: config.email_security.enabled, mailbox_verification: mv });
   }
 
-  if (config.screenshot.enabled) {
-    const c = config.screenshot.config;
-    writeSection('screenshot', { intensity: c.intensity, timeout: c.timeout, threads: c.threads, enable_http_crawl: c.enable_http_crawl });
-  }
+  if (config.screenshot.enabled) writeSection('screenshot', {});
 
   // ── Tier 3+4 ────────────────────────────────────────────────────────────
   if (config.fetch_url.enabled) {
@@ -316,16 +332,18 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
 
   if (config.waf_bypass.enabled) {
     const c = config.waf_bypass.config;
-    writeSection('waf_bypass', { enabled: true, use_benchmarking: c.use_benchmarking, use_nuclei: c.use_nuclei, timeout: c.timeout, threads: c.threads });
+    writeSection('waf_bypass', { enabled: true, use_benchmarking: c.use_benchmarking, use_nuclei: c.use_nuclei });
   }
 
   if (config.leaks_and_secrets.enabled) {
     const c = config.leaks_and_secrets.config;
     // secret_scanning is the key the scan workflows gate on; the UI section keeps its old name.
-    writeSection('secret_scanning', { gitleaks: c.gitleaks, trufflehog: c.trufflehog, leaklookup: c.leaklookup });
+    writeSection('secret_scanning', { gitleaks: c.gitleaks, trufflehog: c.trufflehog, betterleaks: c.betterleaks });
   }
 
-  if (config.vigolium_analysis.enabled) {
+  if (!config.vigolium_analysis.enabled) {
+    writeSection('vigolium_analysis', { run_vigolium_analysis: false });
+  } else {
     const c = config.vigolium_analysis.config;
     writeSection('vigolium_analysis', { run_vigolium_analysis: true, strategy: c.strategy, concurrency: c.concurrency, rate_limit: c.rate_limit, timeout: c.timeout });
   }
@@ -338,7 +356,8 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
       run_s3scanner: c.run_s3scanner, run_acunetix: c.run_acunetix, run_wpscan: c.run_wpscan,
       run_wptaint_scan: c.run_wptaint_scan, run_smugglex: c.run_smugglex,
       run_second_order: c.run_second_order, run_nuclei_dast: c.run_nuclei_dast,
-      run_vigolium: c.run_vigolium,
+      run_vigolium: c.run_vigolium, run_semgrep: c.run_semgrep,
+      run_post_scan_processing: c.run_post_scan_processing,
       concurrency: c.concurrency, rate_limit: c.rate_limit, retries: c.retries,
       timeout: c.timeout, intensity: c.intensity, fetch_gpt_report: c.fetch_gpt_report,
       enable_http_crawl: c.enable_http_crawl,
@@ -348,6 +367,7 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
       s.wpscan_detection_mode = c.wpscan_detection_mode;
     }
     if (c.run_nuclei) s.nuclei = { use_nuclei_config: c.nuclei.use_nuclei_config, severities: c.nuclei.severities, ...(c.nuclei.tags.length ? { tags: c.nuclei.tags } : {}), ...(c.nuclei.templates.length ? { templates: c.nuclei.templates } : {}), ...(c.nuclei.custom_templates.length ? { custom_templates: c.nuclei.custom_templates } : {}) };
+    s.react_scanner = { run_react2shell: c.run_react2shell };
     s.cpanel_scanner = { run_cpanel2shell: c.cpanel_scanner.run_cpanel2shell, cpanel_user_wordlist: c.cpanel_scanner.cpanel_user_wordlist, proxy_type: c.cpanel_scanner.proxy_type };
     if (c.run_vigolium) s.vigolium = { strategy: c.vigolium.strategy, concurrency: c.vigolium.concurrency, rate_limit: c.vigolium.rate_limit, timeout: c.vigolium.timeout, run_phase_a: c.vigolium.run_phase_a, run_phase_b: c.vigolium.run_phase_b, scope_origin: c.vigolium.scope_origin, skip_spidering: c.vigolium.skip_spidering };
     // Tier-2 live-subdomain submission — independent of run_acunetix (Tier 6).
@@ -363,15 +383,18 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
   }
 
   // ── Tier 7 ──────────────────────────────────────────────────────────────
-  if (config.attack_path_modeling.enabled) {
-    writeSection('attack_path_modeling', { enabled: true, top_n: config.attack_path_modeling.config.top_n });
-  }
+  // A missing section runs APME, so switching it off is written explicitly.
+  writeSection('attack_path_modeling', config.attack_path_modeling.enabled
+    ? { enabled: true, top_n: config.attack_path_modeling.config.top_n }
+    : { enabled: false });
 
   if (config.tier_7.enabled) {
     writeSection('tier_7', { high_noise_modules: config.tier_7.config.high_noise_modules });
   }
 
-  if (config.vigolium_audit.enabled) {
+  if (!config.vigolium_audit.enabled) {
+    writeSection('vigolium_audit', { run_vigolium_audit: false });
+  } else {
     const c = config.vigolium_audit.config;
     writeSection('vigolium_audit', { run_vigolium_audit: true, intensity: c.intensity, use_ai: c.use_ai, timeout: c.timeout });
   }
@@ -380,6 +403,16 @@ export function serialiseConfigToYaml(config: EngineConfig, leftovers: Leftovers
 }
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
+
+/** Scanner keys that mark a leaks_and_secrets mapping as secret-scanning settings. */
+const SECRET_SCANNERS = ['gitleaks', 'trufflehog', 'betterleaks'];
+
+/** SpiderFoot reads normal / fast / deep; older engines saved light / aggressive. */
+function spiderfootIntensity(value: unknown): SpiderfootConfig['intensity'] {
+  if (value === 'fast' || value === 'light') return 'fast';
+  if (value === 'deep' || value === 'aggressive') return 'deep';
+  return 'normal';
+}
 
 function parseYamlToConfig(yamlStr: string): EngineConfig {
   const doc: unknown = yamlLoad(yamlStr);
@@ -405,6 +438,13 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     enable_http_crawl: globalValue('enable_http_crawl', g.enable_http_crawl),
   };
 
+  // The backend runs these steps unless their flag is false, so a missing section
+  // is on and switching the card off has to write the flag.
+  function runFlagSection<T>(key: string, flag: string, map: (r: YamlMapping) => T): { enabled: boolean; config: T } {
+    const r = asMapping(raw[key]);
+    return { enabled: r[flag] !== false, config: map(r) };
+  }
+
   function section<T>(key: string, map: (r: YamlMapping) => T, defConfig: T): { enabled: boolean; config: T } {
     const present = key in raw && raw[key] !== null;
     const r = present ? asMapping(raw[key]) : {};
@@ -419,13 +459,24 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       threads: (r.threads as number) ?? def.subdomain_discovery.config.threads,
       timeout: (r.timeout as number) ?? def.subdomain_discovery.config.timeout,
       enable_http_crawl: (r.enable_http_crawl as boolean) ?? true,
-      bbot: (r.bbot as boolean) ?? false,
       use_subfinder_config: (r.use_subfinder_config as boolean) ?? false,
       use_amass_config: (r.use_amass_config as boolean) ?? false,
       amass_wordlist: (r.amass_wordlist as string) ?? '',
     }), def.subdomain_discovery.config) as EngineConfig['subdomain_discovery'],
 
-    dns_security: { enabled: 'dns_security' in raw, config: {} },
+    dns_security: {
+      enabled: 'dns_security' in raw,
+      config: (() => {
+        const r = asMapping(raw.dns_security);
+        const d = def.dns_security.config;
+        return {
+          enable_axfr: (r.enable_axfr as boolean) ?? d.enable_axfr,
+          enable_dnssec_check: (r.enable_dnssec_check as boolean) ?? d.enable_dnssec_check,
+          enable_dns_brute: (r.enable_dns_brute as boolean) ?? d.enable_dns_brute,
+          amplification_threshold: (r.amplification_threshold as number) ?? d.amplification_threshold,
+        };
+      })(),
+    },
 
     osint: section('osint', (r) => ({
       discover: (r.discover as string[]) ?? def.osint.config.discover,
@@ -445,31 +496,36 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
         };
       })(),
       credspy: (r.credspy as boolean) ?? false,
+      // Only osint.leaks_and_secrets runs these; the other spellings never did.
+      leaklookup: (asMapping(r.leaks_and_secrets).leaklookup as boolean) ?? false,
+      leaksearch: (asMapping(r.leaks_and_secrets).leaksearch as boolean) ?? false,
     }), def.osint.config) as EngineConfig['osint'],
 
     spiderfoot_scan: section('spiderfoot_scan', (r) => ({
       modules: (r.modules as string) ?? 'all',
-      intensity: (r.intensity as 'normal' | 'aggressive' | 'light') ?? 'normal',
+      intensity: spiderfootIntensity(r.intensity),
       threads: (r.threads as number) ?? 10,
     }), def.spiderfoot_scan.config) as EngineConfig['spiderfoot_scan'],
 
-    vigolium_harvest: section('vigolium_harvest', (r) => ({
+    vigolium_harvest: runFlagSection('vigolium_harvest', 'run_vigolium_harvest', (r) => ({
       strategy: (r.strategy as 'fast' | 'balanced' | 'thorough') ?? 'balanced',
       concurrency: (r.concurrency as number) ?? 20,
       rate_limit: (r.rate_limit as number) ?? 50,
       timeout: (r.timeout as string) ?? '10s',
-    }), def.vigolium_harvest.config) as EngineConfig['vigolium_harvest'],
+    })) as EngineConfig['vigolium_harvest'],
 
-    vigolium_discovery: section('vigolium_discovery', (r) => ({
+    vigolium_discovery: runFlagSection('vigolium_discovery', 'run_vigolium_discovery', (r) => ({
       strategy: (r.strategy as 'fast' | 'balanced' | 'thorough') ?? 'balanced',
       concurrency: (r.concurrency as number) ?? 20,
       rate_limit: (r.rate_limit as number) ?? 50,
       timeout: (r.timeout as string) ?? '10s',
-    }), def.vigolium_discovery.config) as EngineConfig['vigolium_discovery'],
+    })) as EngineConfig['vigolium_discovery'],
 
     firewall_vpn_scan: section('firewall_vpn_scan', (r) => ({
       run_ike_scan: (r.run_ike_scan as boolean) ?? true,
       run_sslscan: (r.run_sslscan as boolean) ?? true,
+      enable_testssl: (r.enable_testssl as boolean) ?? false,
+      enable_crt_sh: (r.enable_crt_sh as boolean) ?? false,
       ports: (r.ports as number[]) ?? [443, 4444, 8443, 10443, 5443],
     }), def.firewall_vpn_scan.config) as EngineConfig['firewall_vpn_scan'],
 
@@ -491,6 +547,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       nmap_script_args: (r.nmap_script_args as string) ?? '',
       exclude_ports: (r.exclude_ports as string[]) ?? [],
       exclude_subdomains: (r.exclude_subdomains as boolean) ?? false,
+      enable_network_enum: (r.enable_network_enum as boolean) ?? false,
     }), def.port_scan.config) as EngineConfig['port_scan'],
 
     // Mirrors task_plan.email_security_enabled / parse_mailbox_config: anything but an
@@ -512,12 +569,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       };
     })(),
 
-    screenshot: section('screenshot', (r) => ({
-      intensity: (r.intensity as 'normal' | 'aggressive' | 'light') ?? 'normal',
-      timeout: (r.timeout as number) ?? 10,
-      threads: (r.threads as number) ?? 40,
-      enable_http_crawl: (r.enable_http_crawl as boolean) ?? true,
-    }), def.screenshot.config) as EngineConfig['screenshot'],
+    screenshot: { enabled: 'screenshot' in raw && raw.screenshot !== null, config: {} },
 
     fetch_url: section('fetch_url', (r) => ({
       uses_tools: (r.uses_tools as string[]) ?? def.fetch_url.config.uses_tools,
@@ -580,25 +632,26 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     waf_bypass: section('waf_bypass', (r) => ({
       use_benchmarking: (r.use_benchmarking as boolean) ?? true,
       use_nuclei: (r.use_nuclei as boolean) ?? true,
-      timeout: (r.timeout as number) ?? 10,
-      threads: (r.threads as number) ?? 10,
     }), def.waf_bypass.config) as EngineConfig['waf_bypass'],
 
     leaks_and_secrets: {
-      enabled: Object.keys(mergedLeaks).length > 0 || 'leaks_and_secrets' in raw || 'secret_scanning' in raw,
+      // osint.leaks_and_secrets also holds OSINT's breach lookups, so it only turns this
+      // section on when it carries scanner settings (the oldest spelling of this section).
+      enabled: 'secret_scanning' in raw || 'leaks_and_secrets' in raw
+        || SECRET_SCANNERS.some((k) => k in asMapping(asMapping(raw.osint).leaks_and_secrets)),
       config: {
         gitleaks: (mergedLeaks.gitleaks as boolean) ?? true,
         trufflehog: (mergedLeaks.trufflehog as boolean) ?? true,
-        leaklookup: (mergedLeaks.leaklookup as boolean) ?? true,
+        betterleaks: (mergedLeaks.betterleaks as boolean) ?? false,
       },
     },
 
-    vigolium_analysis: section('vigolium_analysis', (r) => ({
+    vigolium_analysis: runFlagSection('vigolium_analysis', 'run_vigolium_analysis', (r) => ({
       strategy: (r.strategy as 'fast' | 'balanced' | 'thorough') ?? 'balanced',
       concurrency: (r.concurrency as number) ?? 20,
       rate_limit: (r.rate_limit as number) ?? 50,
       timeout: (r.timeout as string) ?? '10s',
-    }), def.vigolium_analysis.config) as EngineConfig['vigolium_analysis'],
+    })) as EngineConfig['vigolium_analysis'],
 
     vulnerability_scan: section('vulnerability_scan', (r) => {
       type VulnScan = EngineConfig['vulnerability_scan']['config'];
@@ -618,6 +671,9 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
         run_second_order: (r.run_second_order as boolean) ?? true,
         run_nuclei_dast: (r.run_nuclei_dast as boolean) ?? true,
         run_vigolium: (r.run_vigolium as boolean) ?? true,
+        run_semgrep: (r.run_semgrep as boolean) ?? (asMapping(raw.leaks_and_secrets).run_semgrep as boolean) ?? true,
+        run_react2shell: (asMapping(r.react_scanner).run_react2shell as boolean) ?? true,
+        run_post_scan_processing: (r.run_post_scan_processing as boolean) ?? true,
         concurrency: (r.concurrency as number) ?? 50,
         rate_limit: (r.rate_limit as number) ?? 150,
         retries: (r.retries as number) ?? 1,
@@ -657,19 +713,19 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       };
     }, def.vulnerability_scan.config) as EngineConfig['vulnerability_scan'],
 
-    attack_path_modeling: section('attack_path_modeling', (r) => ({
+    attack_path_modeling: runFlagSection('attack_path_modeling', 'enabled', (r) => ({
       top_n: (r.top_n as number) ?? 5,
-    }), def.attack_path_modeling.config) as EngineConfig['attack_path_modeling'],
+    })) as EngineConfig['attack_path_modeling'],
 
     tier_7: section('tier_7', (r) => ({
       high_noise_modules: (r.high_noise_modules as string[]) ?? def.tier_7.config.high_noise_modules,
     }), def.tier_7.config) as EngineConfig['tier_7'],
 
-    vigolium_audit: section('vigolium_audit', (r) => ({
+    vigolium_audit: runFlagSection('vigolium_audit', 'run_vigolium_audit', (r) => ({
       intensity: (r.intensity as 'quick' | 'balanced' | 'deep') ?? 'balanced',
       use_ai: (r.use_ai as boolean) ?? false,
       timeout: (r.timeout as number) ?? 3600,
-    }), def.vigolium_audit.config) as EngineConfig['vigolium_audit'],
+    })) as EngineConfig['vigolium_audit'],
   };
 }
 

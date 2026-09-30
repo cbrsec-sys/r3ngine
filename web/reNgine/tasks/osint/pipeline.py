@@ -299,8 +299,9 @@ def post_crawl_osint(self, ctx={}, description=None):
     Runs after dir_file_fuzz (Temporal Tier 4a). Reads fuzz-discovered documents
     from the DB and runs exifray + SwaggerSpy path probe against confirmed live hosts.
     """
-    config = self.yaml_configuration.get(POST_CRAWL_OSINT, {})
-    if not config:
+    config = self.yaml_configuration.get(POST_CRAWL_OSINT) or {}
+    osint_cfg = self.yaml_configuration.get(OSINT) or {}
+    if not config and not osint_cfg.get(CREDSPY, False):
         logger.info("post_crawl_osint: no config — skipping for scan_id=%s", self.scan_id)
         return True
 
@@ -315,8 +316,6 @@ def post_crawl_osint(self, ctx={}, description=None):
     # CredSpy runs post-crawl so autodiscover subdomains and MX records from
     # the crawl phase are in the DB before the Microsoft provider check runs.
     # Config key lives under osint: (where the UI writes it).
-    from reNgine.definitions import OSINT, CREDSPY
-    osint_cfg = self.yaml_configuration.get(OSINT, {})
     if osint_cfg.get(CREDSPY, False):
         from reNgine.osint.credspy import run_credspy
         run_credspy(self, host, self.scan, self.results_dir)

@@ -51,7 +51,7 @@ export const EngineConfigWizard: React.FC<EngineConfigWizardProps> = ({ state, a
       content: (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <SubdomainDiscoverySection config={config.subdomain_discovery.config} enabled={config.subdomain_discovery.enabled} onToggle={(v) => toggleSection('subdomain_discovery', v)} onChange={(p) => updateSection('subdomain_discovery', p)} />
-          <DnsSecuritySection enabled={config.dns_security.enabled} onToggle={(v) => toggleSection('dns_security', v)} />
+          <DnsSecuritySection config={config.dns_security.config} enabled={config.dns_security.enabled} onToggle={(v) => toggleSection('dns_security', v)} onChange={(p) => updateSection('dns_security', p)} />
           <OsintSection config={config.osint.config} enabled={config.osint.enabled} onToggle={(v) => toggleSection('osint', v)} onChange={(p) => updateSection('osint', p)} />
           <SpiderfootSection config={config.spiderfoot_scan.config} enabled={config.spiderfoot_scan.enabled} onToggle={(v) => toggleSection('spiderfoot_scan', v)} onChange={(p) => updateSection('spiderfoot_scan', p)} />
           <VigoliumHarvestSection config={config.vigolium_harvest.config} enabled={config.vigolium_harvest.enabled} onToggle={(v) => toggleSection('vigolium_harvest', v)} onChange={(p) => updateSection('vigolium_harvest', p)} />
@@ -68,7 +68,7 @@ export const EngineConfigWizard: React.FC<EngineConfigWizardProps> = ({ state, a
           <HttpCrawlSection config={config.http_crawl.config} enabled={config.http_crawl.enabled} onToggle={(v) => toggleSection('http_crawl', v)} onChange={(p) => updateSection('http_crawl', p)} />
           <PortScanSection config={config.port_scan.config} enabled={config.port_scan.enabled} onToggle={(v) => toggleSection('port_scan', v)} onChange={(p) => updateSection('port_scan', p)} />
           <EmailSecuritySection config={config.email_security.config} enabled={config.email_security.enabled} onToggle={(v) => toggleSection('email_security', v)} onChange={(p) => updateSection('email_security', p)} />
-          <ScreenshotSection config={config.screenshot.config} enabled={config.screenshot.enabled} onToggle={(v) => toggleSection('screenshot', v)} onChange={(p) => updateSection('screenshot', p)} />
+          <ScreenshotSection enabled={config.screenshot.enabled} onToggle={(v) => toggleSection('screenshot', v)} />
         </Box>
       ),
     },

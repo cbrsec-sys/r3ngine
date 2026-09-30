@@ -49,6 +49,10 @@ class EngineType(models.Model):
                 # a top-level leaks_and_secrets, which no workflow gates on.
                 if 'leaks_and_secrets' in tasks and 'secret_scanning' not in tasks:
                     tasks.append('secret_scanning')
+                # CredSpy is switched on under osint but runs in the post-crawl OSINT step.
+                osint = config.get('osint')
+                if isinstance(osint, dict) and osint.get('credspy') and 'post_crawl_osint' not in tasks:
+                    tasks.append('post_crawl_osint')
                 return tasks
         except yaml.YAMLError:
             logger.warning("Engine %s has invalid YAML configuration", self.pk, exc_info=True)

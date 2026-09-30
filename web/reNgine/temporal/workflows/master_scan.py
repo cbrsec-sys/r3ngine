@@ -811,16 +811,18 @@ class MasterScanWorkflow:
                                 retry_policy=RetryPolicy(maximum_attempts=2),
                                 task_queue="python-orchestrator-queue",
                             )
-                            # Attack Path Modeling Engine — must be the final analysis step
-                            await workflow.execute_activity(
-                                "RunGenericTaskActivity",
-                                args=[ctx, "run_apme", "Attack Path Modeling Engine",
-                                      {"scan_history_id": ctx.get("scan_history_id")}],
-                                start_to_close_timeout=timedelta(minutes=30),
-                                heartbeat_timeout=timedelta(minutes=5),
-                                retry_policy=_RETRY_INTERNAL,
-                                task_queue="python-orchestrator-queue"
-                            )
+                            # Attack Path Modeling Engine — must be the final analysis step.
+                            # On unless the engine sets attack_path_modeling.enabled: false.
+                            if (yaml_config.get('attack_path_modeling') or {}).get('enabled', True):
+                                await workflow.execute_activity(
+                                    "RunGenericTaskActivity",
+                                    args=[ctx, "run_apme", "Attack Path Modeling Engine",
+                                          {"scan_history_id": ctx.get("scan_history_id")}],
+                                    start_to_close_timeout=timedelta(minutes=30),
+                                    heartbeat_timeout=timedelta(minutes=5),
+                                    retry_policy=_RETRY_INTERNAL,
+                                    task_queue="python-orchestrator-queue"
+                                )
                         # Post-Tier-7: dispatch any enabled "run after tier_7" plugins
                         # (e.g. compliance_assessment). Runs after APME so full graph data is available.
                         await _dispatch_tier_plugins(
@@ -1264,8 +1266,10 @@ class NucleiPlannerWorkflow:
                     task_queue="python-orchestrator-queue"
                 )
 
-            leaks_config = yaml_config.get('leaks_and_secrets', {})
-            if leaks_config.get('run_semgrep', True):
+            # vulnerability_scan.run_semgrep is what the engine editor writes; the
+            # top-level leaks_and_secrets.run_semgrep is the older spelling.
+            leaks_config = yaml_config.get('leaks_and_secrets') or {}
+            if vuln_config.get('run_semgrep', leaks_config.get('run_semgrep', True)):
                 await workflow.execute_activity(
                     "RunSemgrepActivity",
                     ctx,

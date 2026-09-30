@@ -50,7 +50,7 @@ describe('useEngineConfig YAML parsing', () => {
     expect(config.global.threads).toBe(12);
     expect(config.leaks_and_secrets).toEqual({
       enabled: true,
-      config: { gitleaks: false, trufflehog: false, leaklookup: true },
+      config: { gitleaks: false, trufflehog: false, betterleaks: false },
     });
     expect(config.vulnerability_scan.config.run_nuclei).toBe(false);
     expect(config.vulnerability_scan.config.nuclei.tags).toEqual(['cve']);
@@ -130,22 +130,32 @@ describe('useEngineConfig secret scanning section', () => {
 secret_scanning:
   trufflehog: true
   gitleaks: false
-  leaklookup: true
+  betterleaks: true
 `;
     const { result } = renderHook(() => useEngineConfig(yaml));
     expect(result.current.config.leaks_and_secrets).toEqual({
       enabled: true,
-      config: { gitleaks: false, trufflehog: true, leaklookup: true },
+      config: { gitleaks: false, trufflehog: true, betterleaks: true },
     });
   });
 
   it('writes the section as secret_scanning, including for older saves', () => {
-    const { result } = renderHook(() => useEngineConfig('leaks_and_secrets:\n  leaklookup: false\n'));
-    act(() => result.current.updateSection('leaks_and_secrets', { gitleaks: false }));
+    const { result } = renderHook(() => useEngineConfig('leaks_and_secrets:\n  gitleaks: false\n'));
+    act(() => result.current.updateSection('leaks_and_secrets', { trufflehog: false }));
+    const doc = loadMapping(result.current.yaml);
 
-    expect(result.current.yaml).toMatch(/^secret_scanning:/m);
-    expect(result.current.yaml).not.toMatch(/^leaks_and_secrets:/m);
-    expect(result.current.yaml).toContain('leaklookup: false');
+    expect(doc).not.toHaveProperty('leaks_and_secrets');
+    expect(mappingAt(doc, 'secret_scanning')).toEqual({ gitleaks: false, trufflehog: false, betterleaks: false });
+  });
+
+  it('keeps breach lookups out of secret_scanning, where nothing reads them', () => {
+    const { result } = renderHook(() => useEngineConfig('secret_scanning:\n  gitleaks: true\n  leaklookup: true\n'));
+    act(() => result.current.updateSection('leaks_and_secrets', { trufflehog: false }));
+    const doc = loadMapping(result.current.yaml);
+
+    expect(mappingAt(doc, 'secret_scanning')).not.toHaveProperty('leaklookup');
+    // The old spelling never ran a lookup, so it does not switch the OSINT one on.
+    expect(result.current.config.osint.config.leaklookup).toBe(false);
   });
 });
 
@@ -337,7 +347,7 @@ vulnerability_scan:
     expect(result.current.yaml).not.toContain('some_backend_key');
   });
 
-  it('carries unknown secret scanning keys from every spelling into secret_scanning only', () => {
+  it('keeps osint.leaks_and_secrets and carries its scanner keys into secret_scanning', () => {
     const yaml = `
 osint:
   discover: [emails]
@@ -351,13 +361,15 @@ leaks_and_secrets:
     act(() => result.current.updateSection('osint', { documents_limit: 10 }));
     const doc = loadMapping(result.current.yaml);
 
-    expect(mappingAt(doc, 'osint')).not.toHaveProperty('leaks_and_secrets');
+    // The OSINT pipeline reads this mapping, so a save must not drop it.
+    expect(mappingAt(mappingAt(doc, 'osint'), 'leaks_and_secrets')).toEqual({
+      leaklookup: false, leaksearch: false, gitleaks: false, from_osint: 1,
+    });
     expect(doc).not.toHaveProperty('leaks_and_secrets');
     expect(mappingAt(doc, 'secret_scanning')).toMatchObject({ gitleaks: false, from_osint: 1, from_old_save: 2 });
 
     act(() => result.current.toggleSection('leaks_and_secrets', false));
-    expect(result.current.yaml).not.toContain('secret_scanning');
-    expect(result.current.yaml).not.toContain('from_osint');
+    expect(loadMapping(result.current.yaml)).not.toHaveProperty('secret_scanning');
   });
 
   it('takes section keys from YAML typed into the YAML tab or loaded from a template', () => {
@@ -415,5 +427,80 @@ describe('FORM_OWNED_KEYS', () => {
     expect(mappingAt(written, 'port_scan')).toHaveProperty('nmap_script_args');
     expect(mappingAt(written, 'vulnerability_scan', 'nuclei')).toHaveProperty('custom_templates');
     expect(mappingAt(written, 'email_security', 'mailbox_verification')).toHaveProperty('http_url');
+  });
+});
+
+describe('useEngineConfig steps the backend runs unless switched off', () => {
+  it('shows Vigolium stages on when their section is missing and writes the flag when off', () => {
+    const { result } = renderHook(() => useEngineConfig('threads: 5\n'));
+    expect(result.current.config.vigolium_harvest.enabled).toBe(true);
+
+    act(() => result.current.toggleSection('vigolium_harvest', false));
+    expect(mappingAt(loadMapping(result.current.yaml), 'vigolium_harvest')).toEqual({ run_vigolium_harvest: false });
+  });
+
+  it('reads a stage switched off by its flag as off', () => {
+    const { result } = renderHook(() => useEngineConfig('vigolium_analysis:\n  run_vigolium_analysis: false\n'));
+    expect(result.current.config.vigolium_analysis.enabled).toBe(false);
+  });
+
+  it('writes attack_path_modeling.enabled: false when attack path modeling is off', () => {
+    const { result } = renderHook(() => useEngineConfig('threads: 5\n'));
+    expect(result.current.config.attack_path_modeling.enabled).toBe(true);
+
+    act(() => result.current.toggleSection('attack_path_modeling', false));
+    expect(mappingAt(loadMapping(result.current.yaml), 'attack_path_modeling')).toEqual({ enabled: false });
+  });
+
+  it('writes run_vigolium_audit: false when the Code Scan audit is off', () => {
+    const { result } = renderHook(() => useEngineConfig('threads: 5\n'));
+    act(() => result.current.toggleSection('vigolium_audit', false));
+    expect(mappingAt(loadMapping(result.current.yaml), 'vigolium_audit')).toEqual({ run_vigolium_audit: false });
+  });
+});
+
+describe('useEngineConfig settings moved to where the backend reads them', () => {
+  it('moves the old leaks_and_secrets.run_semgrep into vulnerability_scan', () => {
+    const yaml = 'leaks_and_secrets:\n  run_semgrep: false\nvulnerability_scan:\n  run_nuclei: true\n';
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    expect(result.current.config.vulnerability_scan.config.run_semgrep).toBe(false);
+
+    act(() => result.current.updateSection('vulnerability_scan', { run_dalfox: true }));
+    expect(mappingAt(loadMapping(result.current.yaml), 'vulnerability_scan')).toMatchObject({ run_semgrep: false });
+  });
+
+  it('writes react2shell under react_scanner', () => {
+    const { result } = renderHook(() => useEngineConfig('vulnerability_scan:\n  run_nuclei: true\n'));
+    act(() => result.current.updateSection('vulnerability_scan', { run_react2shell: false }));
+    const vuln = mappingAt(loadMapping(result.current.yaml), 'vulnerability_scan');
+    expect(mappingAt(vuln, 'react_scanner')).toEqual({ run_react2shell: false });
+  });
+
+  it('writes the OSINT breach lookups under osint.leaks_and_secrets', () => {
+    const { result } = renderHook(() => useEngineConfig('osint:\n  discover: [emails]\n'));
+    act(() => result.current.updateSection('osint', { leaklookup: true }));
+    const osint = mappingAt(loadMapping(result.current.yaml), 'osint');
+    expect(mappingAt(osint, 'leaks_and_secrets')).toEqual({ leaklookup: true, leaksearch: false });
+  });
+
+  it('maps the old SpiderFoot intensities to the ones the backend knows', () => {
+    const light = renderHook(() => useEngineConfig('spiderfoot_scan:\n  intensity: light\n'));
+    const aggressive = renderHook(() => useEngineConfig('spiderfoot_scan:\n  intensity: aggressive\n'));
+    expect(light.result.current.config.spiderfoot_scan.config.intensity).toBe('fast');
+    expect(aggressive.result.current.config.spiderfoot_scan.config.intensity).toBe('deep');
+  });
+
+  it('keeps hand-set screenshot keys the form no longer shows', () => {
+    const { result } = renderHook(() => useEngineConfig('screenshot:\n  threads: 40\n'));
+    act(() => result.current.updateGlobal({ threads: 12 }));
+    expect(mappingAt(loadMapping(result.current.yaml), 'screenshot')).toEqual({ threads: 40 });
+  });
+
+  it('round-trips the DNS security options', () => {
+    const { result } = renderHook(() => useEngineConfig('dns_security:\n  enable_dns_brute: true\n'));
+    act(() => result.current.updateSection('dns_security', { amplification_threshold: 20 }));
+    expect(mappingAt(loadMapping(result.current.yaml), 'dns_security')).toEqual({
+      enable_axfr: true, enable_dnssec_check: true, enable_dns_brute: true, amplification_threshold: 20,
+    });
   });
 });

@@ -304,7 +304,8 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict, is_subscan: bool
     add('calculate_risk_scores')
     add('generate_impact_assessment')
     add('sync_graph')
-    add('run_apme')
+    if (yaml_configuration.get('attack_path_modeling') or {}).get('enabled', True):
+        add('run_apme')
     add('scan_notification')
 
     return sorted(plan, key=lambda e: e['tier'])

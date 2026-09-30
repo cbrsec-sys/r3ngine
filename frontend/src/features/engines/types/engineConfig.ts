@@ -24,14 +24,18 @@ export interface SubdomainDiscoveryConfig {
   threads: number;
   timeout: number;
   enable_http_crawl: boolean;
-  bbot: boolean;
   use_subfinder_config: boolean;
   use_amass_config: boolean;
   amass_wordlist: string;
 }
 
-// DnsSecurity has no user-facing config fields; presence in YAML = enabled
-export type DnsSecurityConfig = Record<string, never>;
+export interface DnsSecurityConfig {
+  enable_axfr: boolean;
+  enable_dnssec_check: boolean;
+  enable_dns_brute: boolean;
+  /** Response/query size ratio from which a resolver counts as an amplifier. */
+  amplification_threshold: number;
+}
 
 export interface OsintConfig {
   discover: string[];
@@ -42,11 +46,14 @@ export interface OsintConfig {
   whatbreach: boolean;
   whatbreach_download_databases: boolean;
   credspy: boolean;
+  /** Breach lookups, written to osint.leaks_and_secrets. */
+  leaklookup: boolean;
+  leaksearch: boolean;
 }
 
 export interface SpiderfootConfig {
   modules: string;
-  intensity: 'normal' | 'aggressive' | 'light';
+  intensity: 'normal' | 'fast' | 'deep';
   threads: number;
 }
 
@@ -67,6 +74,8 @@ export interface VigoliumDiscoveryConfig {
 export interface FirewallVpnConfig {
   run_ike_scan: boolean;
   run_sslscan: boolean;
+  enable_testssl: boolean;
+  enable_crt_sh: boolean;
   ports: number[];
 }
 
@@ -90,6 +99,8 @@ export interface PortScanConfig {
   nmap_script_args: string;
   exclude_ports: string[];
   exclude_subdomains: boolean;
+  /** enum4linux-ng, SNMP, LDAP and rdp-sec-check against matching open ports. */
+  enable_network_enum: boolean;
 }
 
 /**
@@ -109,12 +120,8 @@ export interface EmailSecurityConfig {
   http_url: string;
 }
 
-export interface ScreenshotConfig {
-  intensity: 'normal' | 'aggressive' | 'light';
-  timeout: number;
-  threads: number;
-  enable_http_crawl: boolean;
-}
+// Screenshot has no settings the task reads; presence in YAML = enabled.
+export type ScreenshotConfig = Record<string, never>;
 
 // ─── Tier 3+4: Recon & Fuzzing ───────────────────────────────────────────────
 
@@ -175,14 +182,12 @@ export interface WafDetectionConfig {
 export interface WafBypassConfig {
   use_benchmarking: boolean;
   use_nuclei: boolean;
-  timeout: number;
-  threads: number;
 }
 
 export interface LeaksSecretsConfig {
   gitleaks: boolean;
   trufflehog: boolean;
-  leaklookup: boolean;
+  betterleaks: boolean;
 }
 
 export interface VigoliumAnalysisConfig {
@@ -240,6 +245,11 @@ export interface VulnerabilityScanConfig {
   run_second_order: boolean;
   run_nuclei_dast: boolean;
   run_vigolium: boolean;
+  run_semgrep: boolean;
+  /** vulnerability_scan.react_scanner.run_react2shell */
+  run_react2shell: boolean;
+  /** Dedup, OpenAPI extraction and GraphQL dispatch after the Tier 6 tools. */
+  run_post_scan_processing: boolean;
   concurrency: number;
   rate_limit: number;
   retries: number;
@@ -327,10 +337,13 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     config: {
       uses_tools: ['subfinder', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],
       threads: 30, timeout: 5, enable_http_crawl: true,
-      bbot: false, use_subfinder_config: false, use_amass_config: false, amass_wordlist: '',
+      use_subfinder_config: false, use_amass_config: false, amass_wordlist: '',
     },
   },
-  dns_security: { enabled: false, config: {} },
+  dns_security: {
+    enabled: false,
+    config: { enable_axfr: true, enable_dnssec_check: true, enable_dns_brute: false, amplification_threshold: 10 },
+  },
   osint: {
     enabled: false,
     config: {
@@ -344,12 +357,14 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       whatbreach: true,
       whatbreach_download_databases: false,
       credspy: false,
+      leaklookup: false,
+      leaksearch: false,
     },
   },
   spiderfoot_scan: { enabled: false, config: { modules: 'all', intensity: 'normal', threads: 10 } },
   vigolium_harvest: { enabled: true, config: { strategy: 'balanced', concurrency: 20, rate_limit: 50, timeout: '10s' } },
   vigolium_discovery: { enabled: true, config: { strategy: 'balanced', concurrency: 20, rate_limit: 50, timeout: '10s' } },
-  firewall_vpn_scan: { enabled: false, config: { run_ike_scan: true, run_sslscan: true, ports: [443, 4444, 8443, 10443, 5443] } },
+  firewall_vpn_scan: { enabled: false, config: { run_ike_scan: true, run_sslscan: true, enable_testssl: false, enable_crt_sh: false, ports: [443, 4444, 8443, 10443, 5443] } },
   http_crawl: { enabled: true, config: { threads: 30, follow_redirect: true } },
   port_scan: {
     enabled: true,
@@ -357,14 +372,14 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       ports: ['top-100'], rate_limit: 150, threads: 30, timeout: 5,
       passive: false, enable_http_crawl: true, enable_nmap: false,
       nmap_cmd: '', nmap_script: '', nmap_script_args: '',
-      exclude_ports: [], exclude_subdomains: false,
+      exclude_ports: [], exclude_subdomains: false, enable_network_enum: false,
     },
   },
   email_security: {
     enabled: true,
     config: { mailbox_verification: true, timeout: 15, max_candidates: 200, delay_ms: 250, http_url: '' },
   },
-  screenshot: { enabled: false, config: { intensity: 'normal', timeout: 10, threads: 40, enable_http_crawl: true } },
+  screenshot: { enabled: false, config: {} },
   fetch_url: {
     enabled: true,
     config: {
@@ -408,8 +423,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     },
   },
   waf_detection: { enabled: false, config: { enable_http_crawl: true, use_shodan: true, use_censys: true } },
-  waf_bypass: { enabled: false, config: { use_benchmarking: true, use_nuclei: true, timeout: 10, threads: 10 } },
-  leaks_and_secrets: { enabled: false, config: { gitleaks: true, trufflehog: true, leaklookup: true } },
+  waf_bypass: { enabled: false, config: { use_benchmarking: true, use_nuclei: true } },
+  leaks_and_secrets: { enabled: false, config: { gitleaks: true, trufflehog: true, betterleaks: false } },
   vigolium_analysis: { enabled: true, config: { strategy: 'balanced', concurrency: 20, rate_limit: 50, timeout: '10s' } },
   vulnerability_scan: {
     enabled: true,
@@ -417,6 +432,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       run_nuclei: true, run_dalfox: false, run_crlfuzz: false, run_s3scanner: true,
       run_acunetix: true, run_wpscan: true, run_wptaint_scan: true, run_smugglex: true,
       run_second_order: true, run_nuclei_dast: true, run_vigolium: true,
+      run_semgrep: true, run_react2shell: true, run_post_scan_processing: true,
       concurrency: 50, rate_limit: 150, retries: 1, timeout: 5,
       intensity: 'normal', fetch_gpt_report: true, enable_http_crawl: true,
       wpscan_enumeration: 'vp,vt,u', wpscan_detection_mode: 'mixed',
@@ -426,7 +442,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       vigolium: { strategy: 'balanced', concurrency: 50, rate_limit: 100, timeout: '15s', run_phase_a: true, run_phase_b: true, scope_origin: 'balanced', skip_spidering: false },
     },
   },
-  attack_path_modeling: { enabled: false, config: { top_n: 5 } },
+  // On by default like the backend: a missing section runs APME.
+  attack_path_modeling: { enabled: true, config: { top_n: 5 } },
   tier_7: { enabled: true, config: { high_noise_modules: ['sourcemap-detect', 'cookie-security-detect'] } },
-  vigolium_audit: { enabled: false, config: { intensity: 'balanced', use_ai: false, timeout: 3600 } },
+  // Code Scan runs the audit unless run_vigolium_audit is false.
+  vigolium_audit: { enabled: true, config: { intensity: 'balanced', use_ai: false, timeout: 3600 } },
 };
