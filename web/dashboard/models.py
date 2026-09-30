@@ -126,8 +126,10 @@ class UserPreferences(models.Model):
 
 
 class LLMConfig(models.Model):
-	provider = models.CharField(max_length=50) # ollama, openai, anthropic, gemini
+	provider = models.CharField(max_length=50) # ollama, openai, openai_compatible, anthropic, gemini
 	api_key = models.CharField(max_length=500, blank=True, null=True)
+	# API root of an openai_compatible provider, e.g. https://gateway.example/v1.
+	base_url = models.CharField(max_length=500, blank=True, null=True)
 	selected_model = models.CharField(max_length=500)
 	is_active = models.BooleanField(default=True)
 

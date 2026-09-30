@@ -15,6 +15,7 @@ class TestLLMSSLAndSecurity(TestCase):
         gen.model_name = "test-model"
         gen.provider = provider_const
         gen.api_key = "test-api-key"
+        gen.base_url = None
         return gen
 
     def test_openai_ssl_verification_enabled(self):
@@ -109,6 +110,81 @@ class TestLLMSSLAndSecurity(TestCase):
         self.assertEqual(headers["x-goog-api-key"], "test-api-key")
 
 
+class TestOpenAICompatibleProvider(TestCase):
+
+    def _make_generator(self, base_url):
+        from reNgine.definitions import OPENAI_COMPATIBLE
+        from reNgine.llm import LLMBaseGenerator
+        gen = LLMBaseGenerator.__new__(LLMBaseGenerator)
+        gen.logger = MagicMock()
+        gen.model_name = "claude-opus-4-8"
+        gen.provider = OPENAI_COMPATIBLE
+        gen.api_key = "gateway-key"
+        gen.base_url = base_url
+        return gen
+
+    def test_chat_goes_to_the_configured_base_url(self):
+        gen = self._make_generator("https://gateway.example.test/v1/")
+        ok = MagicMock(status_code=200)
+        ok.json.return_value = {"choices": [{"message": {"content": "hello"}}]}
+        with patch("requests.post", return_value=ok) as mock_post:
+            result = gen._call_openai_compatible("sys", "user")
+        self.assertEqual(result, "hello")
+        self.assertEqual(mock_post.call_args.args[0], "https://gateway.example.test/v1/chat/completions")
+        self.assertEqual(mock_post.call_args.kwargs["headers"]["Authorization"], "Bearer gateway-key")
+        self.assertEqual(mock_post.call_args.kwargs["json"]["model"], "claude-opus-4-8")
+
+    def test_missing_base_url_is_reported_without_a_request(self):
+        gen = self._make_generator(None)
+        with patch("requests.post") as mock_post:
+            result = gen._call_openai_compatible("sys", "user")
+        self.assertTrue(result.startswith("Error:"))
+        mock_post.assert_not_called()
+
+    def test_base_url_validation(self):
+        from reNgine.llm_client import normalize_base_url
+        self.assertEqual(normalize_base_url(" https://gw.example.test/v1/ "), "https://gw.example.test/v1")
+        self.assertEqual(normalize_base_url("http://10.0.0.5:8000/v1"), "http://10.0.0.5:8000/v1")
+        for bad in ("", "gw.example.test/v1", "file:///etc/passwd", "javascript:alert(1)",
+                    "https://user:pw@gw.example.test/v1", "https://gw.example.test/v1?x=1"):
+            with self.assertRaises(ValueError, msg=bad):
+                normalize_base_url(bad)
+
+    def test_model_list_keeps_non_gpt_ids(self):
+        from reNgine.utils.llm import LLMModelManager
+        listing = MagicMock(status_code=200)
+        listing.json.return_value = {"data": [{"id": "gpt-5.5"}, {"id": "claude-opus-4-8"}, {"id": "gemma-3-27b-it"}]}
+        with patch("requests.get", return_value=listing) as mock_get:
+            models = LLMModelManager().get_models("openai_compatible", "k", base_url="https://gw.example.test/v1")
+        self.assertEqual(mock_get.call_args.args[0], "https://gw.example.test/v1/models")
+        self.assertEqual([m["name"] for m in models], ["claude-opus-4-8", "gemma-3-27b-it", "gpt-5.5"])
+
+    def test_model_list_without_base_url_is_empty(self):
+        from reNgine.utils.llm import LLMModelManager
+        with patch("requests.get") as mock_get:
+            self.assertEqual(LLMModelManager().get_models("openai_compatible", "k"), [])
+        mock_get.assert_not_called()
+
+    def test_connection_test_uses_the_base_url(self):
+        from scanEngine.views import _test_llm_provider
+        ok = MagicMock(status_code=200)
+        ok.json.return_value = {"choices": [{"message": {"content": "CONNECTED"}}]}
+        with patch("requests.post", return_value=ok) as mock_post:
+            result = _test_llm_provider("openai_compatible", "k", "gpt-oss-20b", "https://gw.example.test/v1")
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["response"], "CONNECTED")
+        self.assertEqual(mock_post.call_args.args[0], "https://gw.example.test/v1/chat/completions")
+
+    def test_connection_test_rejects_a_bad_base_url_and_a_missing_model(self):
+        from scanEngine.views import _test_llm_provider
+        with patch("requests.post") as mock_post:
+            bad_url = _test_llm_provider("openai_compatible", "k", "m", "ftp://gw.example.test")
+            no_model = _test_llm_provider("openai", "k", "", "")
+        self.assertEqual(bad_url["status"], "error")
+        self.assertEqual(no_model["status"], "error")
+        mock_post.assert_not_called()
+
+
 class TestLLMSettingsSwitch(TestCase):
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -157,4 +233,41 @@ class TestLLMSettingsSwitch(TestCase):
         )
         self.assertEqual(toolkit.status_code, 200)
         self.assertTrue(toolkit.json()['llm_enabled'])
+
+    def test_saving_an_openai_compatible_provider_stores_the_base_url(self):
+        from dashboard.models import LLMConfig
+
+        self.client.force_login(self.user)
+        res = self.client.post(
+            f'/scanEngine/{self.project.slug}/update_llm_settings',
+            {
+                'action': 'save', 'provider': 'openai_compatible', 'api_key': 'k',
+                'base_url': 'https://gw.example.test/v1/', 'selected_model': 'claude-opus-4-8', 'is_active': 'true',
+            },
+            HTTP_ACCEPT='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        config = LLMConfig.objects.get(provider='openai_compatible')
+        self.assertEqual(config.base_url, 'https://gw.example.test/v1')
+        self.assertTrue(config.is_active)
+
+        toolkit = self.client.get(f'/scanEngine/{self.project.slug}/llm_toolkit', HTTP_ACCEPT='application/json')
+        saved = [c for c in toolkit.json()['llm_configs'] if c['provider'] == 'openai_compatible'][0]
+        self.assertEqual(saved['base_url'], 'https://gw.example.test/v1')
+
+    def test_saving_rejects_a_bad_base_url_and_an_unknown_provider(self):
+        from dashboard.models import LLMConfig
+
+        self.client.force_login(self.user)
+        url = f'/scanEngine/{self.project.slug}/update_llm_settings'
+        bad_url = self.client.post(url, {
+            'action': 'save', 'provider': 'openai_compatible', 'api_key': 'k',
+            'base_url': 'javascript:alert(1)', 'selected_model': 'm',
+        }, HTTP_ACCEPT='application/json')
+        unknown = self.client.post(url, {
+            'action': 'save', 'provider': 'not-a-provider', 'api_key': 'k', 'selected_model': 'm',
+        }, HTTP_ACCEPT='application/json')
+        self.assertEqual(bad_url.status_code, 400)
+        self.assertEqual(unknown.status_code, 400)
+        self.assertFalse(LLMConfig.objects.exists())
 

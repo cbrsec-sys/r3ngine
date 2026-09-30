@@ -778,6 +778,8 @@ OLLAMA = 'ollama'
 OPENAI = 'openai'
 ANTHROPIC = 'anthropic'
 GEMINI = 'gemini'
+# Any server that speaks the OpenAI chat completions API at a configured base URL.
+OPENAI_COMPATIBLE = 'openai_compatible'
 
 SUGGESTED_OLLAMA_MODELS = [
     {

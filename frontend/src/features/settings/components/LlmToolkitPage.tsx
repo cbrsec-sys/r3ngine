@@ -39,6 +39,7 @@ import {
   Wifi,
   XCircle,
   Power,
+  Link2,
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import {
@@ -50,7 +51,9 @@ import {
   useTestLlmConnection,
   useOllamaServiceStatus,
 } from '../api';
+import { OPENAI_COMPATIBLE_PROVIDER } from '../api';
 import type { LLMConfig, LLMModel, TestLlmConnectionResult } from '../api';
+import { OpenAiCompatibleFields } from './OpenAiCompatibleFields';
 
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
@@ -69,6 +72,7 @@ export const LlmToolkitPage: React.FC = () => {
   const [showKey, setShowKey] = useState(false);
   const [form, setForm] = useState({
     api_key: '',
+    base_url: '',
     selected_model: '',
     is_active: false
   });
@@ -87,8 +91,9 @@ export const LlmToolkitPage: React.FC = () => {
   
   const { data: models, isLoading: isModelsLoading } = useLlmModels(
     projectSlug, 
-    selectedProvider, 
-    form.api_key
+    selectedProvider,
+    form.api_key,
+    form.base_url
   );
   
   const { data: pullStatus } = useOllamaPullStatus(projectSlug, pullingModel);
@@ -101,12 +106,14 @@ export const LlmToolkitPage: React.FC = () => {
       if (config) {
         setForm({
           api_key: config.api_key || '',
+          base_url: config.base_url || '',
           selected_model: config.selected_model || '',
           is_active: config.is_active
         });
       } else {
         setForm({
           api_key: selectedProvider === 'ollama' ? 'http://ollama:11434' : '',
+          base_url: '',
           selected_model: '',
           is_active: false
         });
@@ -160,7 +167,7 @@ export const LlmToolkitPage: React.FC = () => {
   // Clear test result when the user changes provider, model, or key
   useEffect(() => {
     setTestResult(null);
-  }, [selectedProvider, form.api_key, form.selected_model]);
+  }, [selectedProvider, form.api_key, form.base_url, form.selected_model]);
 
   const handleMasterToggle = (enabled: boolean) => {
     setLlmEnabled(enabled);
@@ -192,7 +199,7 @@ export const LlmToolkitPage: React.FC = () => {
 
   const handleTest = () => {
     testConnection.mutate(
-      { provider: selectedProvider, api_key: form.api_key, model: form.selected_model },
+      { provider: selectedProvider, api_key: form.api_key, model: form.selected_model, base_url: form.base_url },
       { onSuccess: (data) => setTestResult(data) }
     );
   };
@@ -201,6 +208,7 @@ export const LlmToolkitPage: React.FC = () => {
     updateSettings.mutate({
       provider: selectedProvider,
       api_key: form.api_key,
+      base_url: form.base_url,
       selected_model: form.selected_model,
       is_active: form.is_active,
       action
@@ -236,6 +244,7 @@ export const LlmToolkitPage: React.FC = () => {
   const providers = [
     { id: 'ollama', name: 'Ollama (Local)', icon: <Database size={18} /> },
     { id: 'openai', name: 'OpenAI', icon: <Zap size={18} /> },
+    { id: OPENAI_COMPATIBLE_PROVIDER, name: 'OpenAI-compatible', icon: <Link2 size={18} /> },
     { id: 'anthropic', name: 'Anthropic', icon: <Shield size={18} /> },
     { id: 'gemini', name: 'Google Gemini', icon: <Globe size={18} /> },
   ];
@@ -462,13 +471,25 @@ export const LlmToolkitPage: React.FC = () => {
                   }}
                 />
                 <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block' }}>
-                  {selectedProvider === 'ollama' 
-                    ? 'Internal URL for Ollama service. Default is http://ollama:11434' 
-                    : `Enter your ${selectedProvider} API key to fetch available models.`}
+                  {selectedProvider === 'ollama'
+                    ? 'Internal URL for Ollama service. Default is http://ollama:11434'
+                    : selectedProvider === OPENAI_COMPATIBLE_PROVIDER
+                      ? 'The key the gateway issued you. For a local server without auth, any value works.'
+                      : `Enter your ${selectedProvider} API key to fetch available models.`}
                 </Typography>
               </Box>
 
-              {/* Model Selection */}
+              {selectedProvider === OPENAI_COMPATIBLE_PROVIDER ? (
+                <OpenAiCompatibleFields
+                  baseUrl={form.base_url}
+                  model={form.selected_model}
+                  models={models}
+                  isModelsLoading={isModelsLoading}
+                  onBaseUrlChange={(base_url) => setForm((f) => ({ ...f, base_url }))}
+                  onModelChange={(selected_model) => setForm((f) => ({ ...f, selected_model }))}
+                />
+              ) : (
+              /* Model Selection */
               <Box>
                 <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 1, fontFamily: 'Orbitron' }}>
                   SELECT MODEL
@@ -512,6 +533,7 @@ export const LlmToolkitPage: React.FC = () => {
                   )}
                 </TextField>
               </Box>
+              )}
 
               {/* Default Toggle */}
               <FormControlLabel

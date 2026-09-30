@@ -24,8 +24,29 @@ export interface NotificationSettings {
 export interface LLMConfig {
   provider: string;
   api_key: string;
+  /** API root of an `openai_compatible` provider; empty for the others. */
+  base_url?: string;
   selected_model: string;
   is_active: boolean;
+}
+
+/** Providers with a fixed endpoint need only a key; a gateway also needs its base URL. */
+export const OPENAI_COMPATIBLE_PROVIDER = 'openai_compatible';
+
+export interface LlmSettingsUpdate {
+  provider: string;
+  api_key: string;
+  base_url?: string;
+  selected_model: string;
+  is_active: boolean;
+  action: 'save' | 'pull';
+}
+
+export interface LlmConnectionTest {
+  provider: string;
+  api_key: string;
+  model: string;
+  base_url?: string;
 }
 
 export interface LlmToolkit {
@@ -590,38 +611,53 @@ export const useLlmToolkit = (slug: string) => {
   });
 };
 
-export const useLlmModels = (slug: string, provider: string, apiKey: string) => {
+export async function fetchLlmModels(
+  slug: string, provider: string, apiKey: string, baseUrl = '',
+): Promise<LLMModel[]> {
+  const params: Record<string, string> = { provider, api_key: apiKey };
+  if (provider === OPENAI_COMPATIBLE_PROVIDER) params.base_url = baseUrl;
+  const response = await axios.get(`/scanEngine/${slug}/fetch_llm_models`, { params });
+  return response.data.models;
+}
+
+/** Whether the model list can be asked for yet: a key for cloud providers, plus a URL for a gateway. */
+export function canFetchLlmModels(provider: string, apiKey: string, baseUrl = ''): boolean {
+  if (!provider) return false;
+  if (provider === 'ollama') return true;
+  if (provider === OPENAI_COMPATIBLE_PROVIDER) return !!apiKey && !!baseUrl.trim();
+  return !!apiKey;
+}
+
+export const useLlmModels = (slug: string, provider: string, apiKey: string, baseUrl = '') => {
   return useQuery<LLMModel[]>({
-    queryKey: ['llm-models', slug, provider, apiKey],
-    queryFn: async () => {
-      const response = await axios.get(`/scanEngine/${slug}/fetch_llm_models`, {
-        params: { provider, api_key: apiKey }
-      });
-      return response.data.models;
-    },
-    enabled: !!provider && (provider === 'ollama' || !!apiKey),
+    queryKey: ['llm-models', slug, provider, apiKey, provider === OPENAI_COMPATIBLE_PROVIDER ? baseUrl : ''],
+    queryFn: () => fetchLlmModels(slug, provider, apiKey, baseUrl),
+    enabled: canFetchLlmModels(provider, apiKey, baseUrl),
   });
 };
+
+export async function saveLlmSettings(slug: string, data: LlmSettingsUpdate) {
+  const formData = new FormData();
+  formData.append('provider', data.provider);
+  formData.append('api_key', data.api_key);
+  if (data.provider === OPENAI_COMPATIBLE_PROVIDER) formData.append('base_url', data.base_url ?? '');
+  formData.append('selected_model', data.selected_model);
+  formData.append('is_active', data.is_active ? 'true' : 'false');
+  formData.append('action', data.action);
+
+  const response = await axios.post(`/scanEngine/${slug}/update_llm_settings`, formData, {
+    headers: {
+      'X-CSRFToken': getCsrfToken(),
+      'Accept': 'application/json'
+    }
+  });
+  return response.data;
+}
 
 export const useUpdateLlmSettings = (slug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { provider: string; api_key: string; selected_model: string; is_active: boolean; action: 'save' | 'pull' }) => {
-      const formData = new FormData();
-      formData.append('provider', data.provider);
-      formData.append('api_key', data.api_key);
-      formData.append('selected_model', data.selected_model);
-      formData.append('is_active', data.is_active ? 'true' : 'false');
-      formData.append('action', data.action);
-
-      const response = await axios.post(`/scanEngine/${slug}/update_llm_settings`, formData, {
-        headers: {
-          'X-CSRFToken': getCsrfToken(),
-          'Accept': 'application/json'
-        }
-      });
-      return response.data;
-    },
+    mutationFn: (data: LlmSettingsUpdate) => saveLlmSettings(slug, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['llm-toolkit', slug] });
     },
@@ -694,23 +730,26 @@ export const useOllamaServiceStatus = (slug: string) => {
   });
 };
 
-export const useTestLlmConnection = (slug: string) => {
-  return useMutation<TestLlmConnectionResult, Error, { provider: string; api_key: string; model: string }>({
-    mutationFn: async (data) => {
-      const formData = new FormData();
-      formData.append('provider', data.provider);
-      formData.append('api_key', data.api_key);
-      formData.append('model', data.model);
+export async function testLlmConnection(slug: string, data: LlmConnectionTest): Promise<TestLlmConnectionResult> {
+  const formData = new FormData();
+  formData.append('provider', data.provider);
+  formData.append('api_key', data.api_key);
+  formData.append('model', data.model);
+  if (data.provider === OPENAI_COMPATIBLE_PROVIDER) formData.append('base_url', data.base_url ?? '');
 
-      const response = await axios.post(`/scanEngine/${slug}/test_llm_connection`, formData, {
-        headers: {
-          'X-CSRFToken': getCsrfToken(),
-          'Accept': 'application/json',
-        },
-        validateStatus: () => true,
-      });
-      return response.data as TestLlmConnectionResult;
+  const response = await axios.post(`/scanEngine/${slug}/test_llm_connection`, formData, {
+    headers: {
+      'X-CSRFToken': getCsrfToken(),
+      'Accept': 'application/json',
     },
+    validateStatus: () => true,
+  });
+  return response.data as TestLlmConnectionResult;
+}
+
+export const useTestLlmConnection = (slug: string) => {
+  return useMutation<TestLlmConnectionResult, Error, LlmConnectionTest>({
+    mutationFn: (data) => testLlmConnection(slug, data),
   });
 };
 

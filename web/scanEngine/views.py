@@ -746,6 +746,7 @@ def llm_toolkit_section(request, slug):
                 {
                     'provider': c.provider,
                     'api_key': c.api_key,
+                    'base_url': c.base_url or '',
                     'selected_model': c.selected_model,
                     'is_active': c.is_active
                 } for c in configs
@@ -778,14 +779,29 @@ def update_llm_settings(request, slug):
             'llm_enabled': enabled,
         })
 
+    from reNgine.definitions import OLLAMA, OPENAI_COMPATIBLE
+    from reNgine.llm_client import CLOUD_PROVIDERS, INVALID_BASE_URL_MESSAGE, normalize_base_url
+
     provider = request.POST.get('provider')
     api_key = request.POST.get('api_key')
     selected_model = request.POST.get('selected_model')
     is_active = request.POST.get('is_active') == 'true'
 
+    if provider != OLLAMA and provider not in CLOUD_PROVIDERS:
+        return http.JsonResponse({'status': 'error', 'message': 'Unknown LLM provider.'}, status=400)
+
+    base_url = None
+    if provider == OPENAI_COMPATIBLE:
+        try:
+            base_url = normalize_base_url(request.POST.get('base_url'))
+        except ValueError:
+            return http.JsonResponse({'status': 'error', 'message': INVALID_BASE_URL_MESSAGE}, status=400)
+
     config, created = LLMConfig.objects.get_or_create(provider=provider)
     config.api_key = api_key
     config.selected_model = selected_model
+    if provider == OPENAI_COMPATIBLE:
+        config.base_url = base_url
 
     if is_active:
         # Deactivate others
@@ -805,9 +821,10 @@ def update_llm_settings(request, slug):
 def fetch_llm_models(request, slug):
     provider = request.GET.get('provider')
     api_key = request.GET.get('api_key')
-    
+    base_url = request.GET.get('base_url')
+
     manager = LLMModelManager()
-    models = manager.get_models(provider, api_key)
+    models = manager.get_models(provider, api_key, base_url=base_url)
     
     return http.JsonResponse({'status': 'success', 'models': models})
 
@@ -849,7 +866,7 @@ def stop_ollama_service(request, slug):
     return http.JsonResponse({'status': 'error', 'message': OllamaManager.stop_hint()}, status=501)
 
 
-def _test_llm_provider(provider: str, api_key: str, model: str) -> dict:
+def _test_llm_provider(provider: str, api_key: str, model: str, base_url: str = '') -> dict:
     """Send a minimal prompt to the given provider and return a result dict.
 
     Returns {'status': 'success'|'error', 'message': str, 'response': str}.
@@ -857,7 +874,8 @@ def _test_llm_provider(provider: str, api_key: str, model: str) -> dict:
     """
     import requests as req_lib
     from urllib.parse import urlparse
-    from reNgine.definitions import OLLAMA, OPENAI, ANTHROPIC, GEMINI, OLLAMA_INSTANCE
+    from reNgine import llm_client
+    from reNgine.definitions import OLLAMA, OPENAI, OPENAI_COMPATIBLE, ANTHROPIC, GEMINI, OLLAMA_INSTANCE
 
     TEST_SYSTEM = "You are a connectivity test assistant."
     TEST_PROMPT = "Reply with exactly the word: CONNECTED"
@@ -918,101 +936,47 @@ def _test_llm_provider(provider: str, api_key: str, model: str) -> dict:
             logger.exception("Unexpected error during Ollama connection test")
             return {'status': 'error', 'message': 'Unexpected error during Ollama connection test.', 'response': ''}
 
-    elif provider == OPENAI:
+    labels = {
+        OPENAI: 'OpenAI',
+        OPENAI_COMPATIBLE: 'OpenAI-compatible',
+        ANTHROPIC: 'Anthropic',
+        GEMINI: 'Gemini',
+    }
+    label = labels.get(provider)
+    if label:
         if not api_key:
-            return {'status': 'error', 'message': 'OpenAI API key is required.', 'response': ''}
-        use_model = model or 'gpt-3.5-turbo'
+            return {'status': 'error', 'message': f'{label} API key is required.', 'response': ''}
+        if not model:
+            return {'status': 'error', 'message': 'Select a model to test.', 'response': ''}
+        if provider == OPENAI_COMPATIBLE:
+            try:
+                base_url = llm_client.normalize_base_url(base_url)
+            except ValueError:
+                return {'status': 'error', 'message': llm_client.INVALID_BASE_URL_MESSAGE, 'response': ''}
         try:
-            payload = {
-                "model": use_model,
-                "messages": [
-                    {"role": "system", "content": TEST_SYSTEM},
-                    {"role": "user", "content": TEST_PROMPT},
-                ],
-                "max_tokens": 20,
-            }
-            resp = req_lib.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json=payload,
+            response_text = llm_client.complete(
+                provider,
+                api_key=api_key,
+                model=model,
+                system=TEST_SYSTEM,
+                user=TEST_PROMPT,
+                max_tokens=20,
+                base_url=base_url,
                 timeout=30,
             )
-            # Retrying with max_completion_tokens if the model does not support max_tokens parameter
-            if resp.status_code == 400 and ("max_tokens" in resp.text and "max_completion_tokens" in resp.text):
-                payload.pop("max_tokens", None)
-                payload["max_completion_tokens"] = 20
-                resp = req_lib.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json=payload,
-                    timeout=30,
-                )
-            resp.raise_for_status()
-            response_text = resp.json()['choices'][0]['message']['content'].strip()
-            return {'status': 'success', 'message': 'OpenAI connection successful.', 'response': response_text}
+            return {'status': 'success', 'message': f'{label} connection successful.', 'response': response_text.strip()}
         except req_lib.exceptions.HTTPError as exc:
             return {'status': 'error', 'message': _parse_http_error(exc), 'response': ''}
         except req_lib.exceptions.Timeout:
-            return {'status': 'error', 'message': 'OpenAI request timed out.', 'response': ''}
+            return {'status': 'error', 'message': f'{label} request timed out.', 'response': ''}
+        except req_lib.exceptions.ConnectionError:
+            return {'status': 'error', 'message': f'Cannot reach the {label} API — check the URL and network access.', 'response': ''}
+        except llm_client.LLMResponseError:
+            logger.warning("%s connection test got a reply without text", label, exc_info=True)
+            return {'status': 'error', 'message': f'{label} answered, but not with text — check the model id.', 'response': ''}
         except Exception:
-            logger.exception("Unexpected error during OpenAI connection test")
-            return {'status': 'error', 'message': 'Unexpected error during OpenAI connection test.', 'response': ''}
-
-    elif provider == ANTHROPIC:
-        if not api_key:
-            return {'status': 'error', 'message': 'Anthropic API key is required.', 'response': ''}
-        use_model = model or 'claude-3-haiku-20240307'
-        try:
-            resp = req_lib.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": use_model,
-                    "max_tokens": 20,
-                    "system": TEST_SYSTEM,
-                    "messages": [{"role": "user", "content": TEST_PROMPT}],
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            block = resp.json()['content'][0]
-            if block.get('type') != 'text':
-                return {'status': 'error', 'message': f"Unexpected response type from Anthropic: {block.get('type')}", 'response': ''}
-            return {'status': 'success', 'message': 'Anthropic connection successful.', 'response': block['text'].strip()}
-        except req_lib.exceptions.HTTPError as exc:
-            return {'status': 'error', 'message': _parse_http_error(exc), 'response': ''}
-        except req_lib.exceptions.Timeout:
-            return {'status': 'error', 'message': 'Anthropic request timed out.', 'response': ''}
-        except Exception:
-            logger.exception("Unexpected error during Anthropic connection test")
-            return {'status': 'error', 'message': 'Unexpected error during Anthropic connection test.', 'response': ''}
-
-    elif provider == GEMINI:
-        if not api_key:
-            return {'status': 'error', 'message': 'Google Gemini API key is required.', 'response': ''}
-        use_model = model or 'gemini-1.5-flash'
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{use_model}:generateContent"
-            resp = req_lib.post(
-                url,
-                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-                json={"contents": [{"parts": [{"text": f"{TEST_SYSTEM}\n\n{TEST_PROMPT}"}]}]},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            response_text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-            return {'status': 'success', 'message': 'Gemini connection successful.', 'response': response_text}
-        except req_lib.exceptions.HTTPError as exc:
-            return {'status': 'error', 'message': _parse_http_error(exc), 'response': ''}
-        except req_lib.exceptions.Timeout:
-            return {'status': 'error', 'message': 'Gemini request timed out.', 'response': ''}
-        except Exception:
-            logger.exception("Unexpected error during Gemini connection test")
-            return {'status': 'error', 'message': 'Unexpected error during Gemini connection test.', 'response': ''}
+            logger.exception("Unexpected error during %s connection test", label)
+            return {'status': 'error', 'message': f'Unexpected error during {label} connection test.', 'response': ''}
 
     return {'status': 'error', 'message': f"Unknown provider: {provider}", 'response': ''}
 
@@ -1025,11 +989,12 @@ def test_llm_connection(request, slug):
     provider = request.POST.get('provider', '').strip()
     api_key = request.POST.get('api_key', '').strip()
     model = request.POST.get('model', '').strip()
+    base_url = request.POST.get('base_url', '').strip()
 
     if not provider:
         return http.JsonResponse({'status': 'error', 'message': 'Provider is required.'}, status=400)
 
-    result = _test_llm_provider(provider, api_key, model)
+    result = _test_llm_provider(provider, api_key, model, base_url)
     status_code = 200 if result['status'] == 'success' else 400
     return http.JsonResponse(result, status=status_code)
 
