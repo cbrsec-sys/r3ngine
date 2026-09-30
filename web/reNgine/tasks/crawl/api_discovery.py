@@ -8,6 +8,8 @@ import json
 import hashlib
 import re
 import shlex
+import time
+from collections.abc import Iterator
 import requests
 import urllib3
 from pathlib import Path
@@ -70,7 +72,21 @@ _LINKFINDER_MAX_JS_FILES = 50
 #: Bytes kept per JS file; bundles past this are almost always vendor code.
 _LINKFINDER_MAX_JS_BYTES = 512 * 1024
 
+#: Per-read timeout; on its own it lets a server that trickles bytes hold a download.
 _LINKFINDER_FETCH_TIMEOUT = 10
+
+#: Wall-clock cap on one JS download, checked after every socket read.
+_LINKFINDER_FETCH_DEADLINE = 30
+
+#: Wall-clock budget for all JS downloads of one subdomain.
+_LINKFINDER_FETCH_BUDGET = 120
+
+#: Most bytes taken from one socket read.
+_LINKFINDER_FETCH_CHUNK = 8 * 1024
+
+#: Directory under the scan root for downloaded JS. It must stay outside
+#: web_api_discovery/, which Semgrep and Retire.js scan as the target's code.
+_LINKFINDER_JS_DIR = 'linkfinder_js'
 
 #: LinkFinder reports MIME types found in JS as if they were paths.
 _MIME_TYPE = re.compile(r'^(application|text|image|audio|video|font|multipart|message|model)/', re.I)
@@ -436,7 +452,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		# LinkFinder - once per subdomain. It reads the root page (-d follows its
 		# <script> tags) and every JS file the crawlers already recorded for this
 		# subdomain, fetched locally, so a 403 on the HTML page does not hide them.
-		# lf_output only appears once both passes finished: it is the Temporal
+		# lf_output holds only in-scope absolute URLs (the CPDE collector reads
+		# it too) and only appears once both passes finished: it is the Temporal
 		# retry guard.
 		if 'linkfinder' in uses_tools and subdomain_name not in processed_linkfinder_subdomains:
 			processed_linkfinder_subdomains.add(subdomain_name)
@@ -445,7 +462,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				logger.warning('[WEB_API] LinkFinder: cache hit for %s — loading existing results', subdomain_name)
 			else:
 				logger.warning('[WEB_API] LinkFinder: running on %s', subdomain_name)
-				_run_linkfinder(self, url, subdomain, subdomain_name, results_dir, lf_output)
+				_run_linkfinder(self, url, subdomain, results_dir, lf_output, lf_scope_domain)
 				logger.warning('[WEB_API] LinkFinder: finished on %s', subdomain_name)
 			if os.path.exists(lf_output):
 				try:
@@ -826,62 +843,114 @@ def _linkfinder_url(line: str, base_url: str, scope_domain: str) -> str | None:
 	"""Absolute URL for one LinkFinder output line, or None when it is noise or out of scope.
 
 	In scope means the scanned domain or any of its subdomains. The scope comes
-	from the scan's Domain, never from the page's own host.
+	from the scan's Domain, never from the page's own host. An absolute in-scope
+	URL maps to itself, so lf_output (already filtered) can be read back through
+	this function.
 	"""
 	line = line.strip()
 	if not line or not scope_domain or any(c.isspace() for c in line) or _MIME_TYPE.match(line):
 		return None
-	base = urlparse(base_url)
-	if line.startswith('//'):
-		line = f'{base.scheme}:{line}'
-	if line.lower().startswith(('http://', 'https://')):
-		candidate = line
-	elif line.startswith(('/', './', '../')) or _API_PREFIX.match(line) or _WEB_EXTENSION.search(line):
-		candidate = urljoin(base_url, line)
-	else:
+	try:
+		base = urlparse(base_url)
+		if line.startswith('//'):
+			line = f'{base.scheme}:{line}'
+		if line.lower().startswith(('http://', 'https://')):
+			candidate = line
+		elif line.startswith(('/', './', '../')) or _API_PREFIX.match(line) or _WEB_EXTENSION.search(line):
+			candidate = urljoin(base_url, line)
+		else:
+			return None
+		host = (urlparse(candidate).hostname or '').lower()
+	except ValueError:
+		# Malformed hosts such as "http://[x/" are regex noise, not links.
 		return None
-	host = (urlparse(candidate).hostname or '').lower()
 	if host == scope_domain or host.endswith('.' + scope_domain):
 		return candidate
 	return None
 
 
-def _fetch_js_file(js_url: str, dest: str, proxy: str | None) -> bool:
-	"""Download at most _LINKFINDER_MAX_JS_BYTES of a JS file. True when dest holds content."""
-	if urlparse(js_url).scheme not in ('http', 'https'):
+def _fetch_js_file(js_url: str, dest: str, proxy: str | None, max_seconds: float = _LINKFINDER_FETCH_DEADLINE) -> bool:
+	"""Download at most _LINKFINDER_MAX_JS_BYTES of a JS file within max_seconds.
+
+	A download cut short by the size cap or the deadline keeps what was read:
+	LinkFinder matches line by line, so a truncated file still yields links.
+	Returns True when dest holds content; dest only ever appears then.
+	"""
+	try:
+		scheme = urlparse(js_url).scheme
+	except ValueError:
+		return False
+	if scheme not in ('http', 'https'):
 		return False
 	partial = f'{dest}.part'
 	proxies = {'http': proxy, 'https': proxy} if proxy else None
+	deadline = time.monotonic() + max_seconds
+	written = 0
 	try:
 		# Scan targets routinely serve self-signed certificates.
 		with requests.get(js_url, timeout=_LINKFINDER_FETCH_TIMEOUT, verify=False,  # noqa: S501
 						  stream=True, allow_redirects=False, proxies=proxies) as resp:
 			if resp.status_code != 200:
 				return False
-			written = 0
 			with open(partial, 'wb') as fh:
-				for chunk in resp.iter_content(64 * 1024):
+				for chunk in _response_chunks(resp):
 					chunk = chunk[:_LINKFINDER_MAX_JS_BYTES - written]
 					fh.write(chunk)
 					written += len(chunk)
 					if written >= _LINKFINDER_MAX_JS_BYTES:
 						break
-	except (requests.RequestException, OSError) as exc:
+					if time.monotonic() >= deadline:
+						logger.warning(
+							'[WEB_API] LinkFinder: download of %s cut off after %.0fs at %d bytes',
+							js_url, max_seconds, written)
+						break
+	except (requests.RequestException, urllib3.exceptions.HTTPError, OSError) as exc:
 		logger.warning('[WEB_API] LinkFinder: could not fetch %s: %s', js_url, type(exc).__name__)
+		_remove_if_exists(partial)
 		return False
 	if written == 0:
-		os.remove(partial)
+		_remove_if_exists(partial)
 		return False
 	os.replace(partial, dest)
 	return True
 
 
-def _run_linkfinder(task, url: str, subdomain, subdomain_name: str, results_dir: str, lf_output: str) -> None:
-	"""Run LinkFinder on the root page and on the subdomain's known JS files into lf_output."""
+def _run_linkfinder(task, url: str, subdomain, results_dir: str, lf_output: str, scope_domain: str) -> None:
+	"""Run LinkFinder on the root page and on the subdomain's known JS files.
+
+	lf_output receives the de-duplicated in-scope absolute URLs and appears only
+	once every pass finished, so it doubles as the Temporal retry guard.
+	"""
 	partial = f'{lf_output}.part'
 	cmd = f"python3 {_LINKFINDER} -d -i {shlex.quote(url)} -o cli 2>/dev/null | tee {shlex.quote(partial)}"
 	run_command(cmd, shell=True, cwd=results_dir, scan_id=task.scan_id, activity_id=task.activity_id)
 
+	for js_local in _download_linkfinder_js(task, subdomain, url):
+		cmd = f"python3 {_LINKFINDER} -i {shlex.quote(js_local)} -o cli 2>/dev/null | tee -a {shlex.quote(partial)}"
+		run_command(cmd, shell=True, cwd=results_dir, scan_id=task.scan_id, activity_id=task.activity_id)
+
+	raw_lines: list[str] = []
+	if os.path.exists(partial):
+		with open(partial, encoding='utf-8', errors='replace') as fh:
+			raw_lines = fh.readlines()
+	links = dict.fromkeys(
+		link for link in (_linkfinder_url(line, url, scope_domain) for line in raw_lines) if link)
+	with open(partial, 'w', encoding='utf-8') as fh:
+		fh.writelines(f'{link}\n' for link in links)
+	os.replace(partial, lf_output)
+
+
+def _download_linkfinder_js(task, subdomain, url: str) -> list[str]:
+	"""Local copies of the subdomain's known JS files, fetched within _LINKFINDER_FETCH_BUDGET.
+
+	The files go to <scan results>/linkfinder_js/, outside web_api_discovery/,
+	which Semgrep and Retire.js scan: the target's JS would otherwise be reported
+	as findings with container paths. File names are hashes of the URL, so no
+	target-controlled text reaches the path. Files kept by an earlier attempt
+	are reused without spending budget.
+	"""
+	js_dir = os.path.join(task.results_dir, _LINKFINDER_JS_DIR)
+	os.makedirs(js_dir, exist_ok=True)
 	js_urls = (
 		EndPoint.objects.filter(scan_history_id=task.scan_id, subdomain=subdomain)
 		.filter(Q(http_url__iendswith='.js') | Q(http_url__icontains='.js?') | Q(content_type__icontains='javascript'))
@@ -889,18 +958,44 @@ def _run_linkfinder(task, url: str, subdomain, subdomain_name: str, results_dir:
 		.distinct()[:_LINKFINDER_MAX_JS_FILES]
 	)
 	proxy = get_random_proxy() or None
+	budget_end = time.monotonic() + _LINKFINDER_FETCH_BUDGET
+	local_files: list[str] = []
+	skipped = 0
 	for js_url in js_urls:
 		digest = hashlib.sha256(js_url.encode()).hexdigest()[:16]
-		js_local = os.path.join(results_dir, f'js_{subdomain_name}_{digest}.js')
-		if not os.path.exists(js_local) and not _fetch_js_file(js_url, js_local, proxy):
-			continue
-		cmd = f"python3 {_LINKFINDER} -i {shlex.quote(js_local)} -o cli 2>/dev/null | tee -a {shlex.quote(partial)}"
-		run_command(cmd, shell=True, cwd=results_dir, scan_id=task.scan_id, activity_id=task.activity_id)
+		js_local = os.path.join(js_dir, f'js_{digest}.js')
+		if not os.path.exists(js_local):
+			remaining = budget_end - time.monotonic()
+			if remaining <= 0:
+				skipped += 1
+				continue
+			if not _fetch_js_file(js_url, js_local, proxy, min(_LINKFINDER_FETCH_DEADLINE, remaining)):
+				continue
+		local_files.append(js_local)
+	if skipped:
+		logger.warning(
+			'[WEB_API] LinkFinder: %ds download budget spent for %s, %d JS file(s) not fetched',
+			_LINKFINDER_FETCH_BUDGET, url, skipped)
+	return local_files
 
-	if os.path.exists(partial):
-		os.replace(partial, lf_output)
-	else:
-		open(lf_output, 'w').close()
+
+def _response_chunks(resp) -> Iterator[bytes]:
+	"""The response body as it arrives, so a deadline is checked after every socket read.
+
+	iter_content only yields full chunks, which a server sending a byte just
+	inside each read timeout can stretch for hours; urllib3 2's read1 returns
+	whatever one read produced.
+	"""
+	read1 = getattr(resp.raw, 'read1', None)
+	if read1 is None:
+		yield from resp.iter_content(_LINKFINDER_FETCH_CHUNK)
+		return
+	while chunk := read1(_LINKFINDER_FETCH_CHUNK, decode_content=True):
+		yield chunk
+
+def _remove_if_exists(path: str) -> None:
+	if os.path.exists(path):
+		os.remove(path)
 
 
 def _save_linkfinder_results(lf_output: str, base_url: str, scope_domain: str, subdomain, ctx: dict) -> tuple[int, int, int]:
