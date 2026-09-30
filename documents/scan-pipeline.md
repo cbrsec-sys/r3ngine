@@ -23,6 +23,38 @@ The workflow receives a `ctx` dict populated by `TargetProfilingActivity`:
 | `results_dir` | `str` | Container path for scan results |
 | `tasks` | `list[str]` | Task names enabled for this engine |
 | `yaml_configuration` | `dict` | Parsed engine YAML configuration |
+| `hardware_profile` | `dict \| None` | Hardware profile resolved at scan start — only a fallback, see below |
+
+---
+
+## Hardware Profile (live per activity)
+
+A `HardwareProfile` (`threads`, `rate_limit`, `delay`, `retries`) sets how hard a scan
+works the host. Per resource limit: a value set in the tool's engine section wins, then the
+profile, then the engine's global value (`apply_hardware_profile` in
+`temporal/activities/core.py`). The engine editor always writes the global limits, so they
+act as the fallback for engines scanned without a profile, not as an override of the one
+picked for the scan. Timeouts stay with the engine.
+
+The profile is **not** frozen for the life of the scan. Every activity builds a
+`TemporalTaskProxy`, which loads the `ScanHistory` (with `hardware_profile` joined into the
+same query) and calls `hardware_profile_context(scan)` (`tasks/scan_init.py`): the scan's own
+profile, else the active default, else any active profile. Subscans resolve the profile of
+their parent `ScanHistory`. `ctx['hardware_profile']` is used only when the scan row cannot be
+loaded or no profile resolves any more; both cases log a warning. Workflows are untouched and
+stay DB-free.
+
+Consequences:
+
+- Switching the profile of a pending, running or paused scan — or editing the values of the
+  profile it uses — applies to every step that **starts** afterwards. Tools already running
+  keep the settings they were launched with.
+- Endpoint: `POST /api/action/scan/<scan_id>/hardware-profile/` with
+  `{"hardware_profile_id": <id>}` (`SetScanHardwareProfile` in `api/views/scan.py`, same
+  `HasPermission` + `PERM_INITATE_SCANS_SUBSCANS` as stop/pause). The profile must exist and be
+  active (400 otherwise); an unknown scan returns 404.
+- UI: the scan detail page shows a hardware profile selector next to STOP while the scan is
+  pending, running or paused (`ScanHardwareProfileControl.tsx`).
 
 ---
 

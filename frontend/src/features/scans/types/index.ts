@@ -398,6 +398,7 @@ export interface ScanSummaryResponse extends SummaryResponseBase {
     id: number;
     scan_status: number;
     engine_name: string;
+    hardware_profile_id: number | null;
     start_scan_date: string;
     stop_scan_date: string | null;
     duration: number;

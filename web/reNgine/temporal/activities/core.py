@@ -11,6 +11,7 @@ Sibling modules import from here; nothing here imports a sibling module.
 
 import os
 import threading
+from typing import Optional
 
 from temporalio import activity
 from django.utils import timezone
@@ -61,14 +62,16 @@ def resolve_target_host(ctx: dict, subdomain=None, domain=None) -> str:
 _HARDWARE_PROFILE_KEYS = ('threads', 'rate_limit', 'delay', 'retries')
 
 
-def apply_hardware_profile_defaults(yaml_configuration: dict, hw_profile: dict) -> None:
-    """Fill the resource limits an engine leaves unset, in place.
+def apply_hardware_profile(yaml_configuration: dict, hw_profile: dict) -> None:
+    """Apply a scan's hardware profile to its engine configuration, in place.
 
-    Precedence per section: the section's own value, then the engine's global
-    value, then the hardware profile. Timeouts stay with the engine.
+    Per resource limit: a value set in a tool's section wins, then the profile,
+    then the engine's global value. The engine editor always writes the global
+    limits, so letting them beat the profile would reduce the profile chosen for
+    the scan to its delay. Timeouts stay with the engine.
     """
     for key in _HARDWARE_PROFILE_KEYS:
-        if yaml_configuration.get(key) is None and hw_profile.get(key) is not None:
+        if hw_profile.get(key) is not None:
             yaml_configuration[key] = hw_profile[key]
     for section in yaml_configuration.values():
         if not isinstance(section, dict):
@@ -123,10 +126,6 @@ class TemporalTaskProxy:
         os.makedirs(self.results_dir, exist_ok=True)
         import copy
         self.yaml_configuration = copy.deepcopy(ctx.get('yaml_configuration', {}))
-        
-        hw_profile = ctx.get('hardware_profile')
-        if hw_profile:
-            apply_hardware_profile_defaults(self.yaml_configuration, hw_profile)
 
         # Apply ScanProfile settings if provided in ctx.
         # Throttle values are stored as direct attributes (not merged into yaml_configuration)
@@ -161,7 +160,17 @@ class TemporalTaskProxy:
         )
 
         # Django ORM objects
-        self.scan = ScanHistory.objects.filter(pk=self.scan_id).first()
+        self.scan = (
+            ScanHistory.objects.select_related('hardware_profile').filter(pk=self.scan_id).first()
+            if self.scan_id else None
+        )
+
+        # Resolved per activity, not taken from the workflow input, so a profile
+        # switched (or edited) while the scan runs applies to the steps that start next.
+        self.hardware_profile = self._resolve_hardware_profile(ctx)
+        if self.hardware_profile:
+            apply_hardware_profile(self.yaml_configuration, self.hardware_profile)
+
         self.subscan = SubScan.objects.filter(pk=self.subscan_id).first() if self.subscan_id else None
         self.engine = EngineType.objects.filter(pk=self.engine_id).first()
         if not self.engine and self.scan:
@@ -319,6 +328,32 @@ class TemporalTaskProxy:
             add_meta_info (bool): Whether to include scan metadata.
         """
         logger.info("[notify] Task '%s' fields=%s", name or self.task_name, fields)
+
+    def _resolve_hardware_profile(self, ctx: dict) -> Optional[dict]:
+        """Hardware profile the scan has now, else the one frozen in the workflow input.
+
+        Reads the scan loaded by __init__ (profile joined in), so the only extra
+        query is the default-profile lookup of a scan that has no profile of its own.
+        """
+        frozen = ctx.get('hardware_profile')
+        if self.scan is None:
+            if self.scan_id:
+                logger.warning(
+                    "Scan %s not found for task %s; using the hardware profile from the workflow input",
+                    self.scan_id, self.task_name,
+                )
+            return frozen
+
+        from reNgine.tasks.scan_init import hardware_profile_context
+
+        current = hardware_profile_context(self.scan)
+        if current is None and frozen:
+            logger.warning(
+                "No hardware profile resolvable for scan %s (task %s); keeping the one it started with",
+                self.scan_id, self.task_name,
+            )
+            return frozen
+        return current
 
 
 def _start_scan_task_proxy(ctx: dict, task_name: str, description: str):

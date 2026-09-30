@@ -73,7 +73,7 @@ from reNgine.temporal_client import TemporalClientProvider, run_and_close
 
 
 from api.views.scan import (
-    InitiateScan, InitiateSubTask, StopScan, ResumeScan, PauseScan, UnpauseScan,
+    InitiateScan, InitiateSubTask, StopScan, ResumeScan, PauseScan, UnpauseScan, SetScanHardwareProfile,
     FetchSubscanResults, ListSubScans, StartWorkflowView, ScanActivityRetryAPIView,
     DirectoryFileDispatchView, DirectoryFileDeleteView, ExtractAuthLogsView,
 )

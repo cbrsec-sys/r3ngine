@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, type QueryKey } from '@tanstack/
 import type { operations, components } from '@/types/api';
 import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, ScanTierRetryResponse, SecretLeak, DirectoryFile, DirectorySubdomainSummary, EmailBreach, ScanStatusResponse } from '../types';
 import type { Domain, DomainListResponse } from '../../targets/types';
+import { getCsrfToken } from '../../../api/axiosConfig';
 
 /**
  * `GET /api/listDirectories/`: the endpoint files of one subdomain when `subdomain_id` is set,
@@ -317,6 +318,47 @@ export const useStopScan = (projectSlug: string) => {
       queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
       queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
       queryClient.invalidateQueries({ queryKey: ['domains', projectSlug] });
+    },
+  });
+};
+
+export interface ScanHardwareProfileResponse {
+  status: boolean;
+  message: string;
+  hardware_profile?: { id: number; name: string };
+}
+
+/**
+ * `POST /api/action/scan/<id>/hardware-profile/`: switch the hardware profile of a scan.
+ * Works on a running scan; steps that start afterwards use the new profile.
+ */
+export const setScanHardwareProfile = async (
+  scanId: number,
+  hardwareProfileId: number,
+): Promise<ScanHardwareProfileResponse> => {
+  const response = await fetch(`/api/action/scan/${scanId}/hardware-profile/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrfToken() || '',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ hardware_profile_id: hardwareProfileId }),
+  });
+  const body = (await response.json().catch(() => ({}))) as Partial<ScanHardwareProfileResponse>;
+  if (!response.ok || !body.status) {
+    throw new Error(body.message || 'Failed to change the hardware profile');
+  }
+  return body as ScanHardwareProfileResponse;
+};
+
+export const useSetScanHardwareProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ scanId, hardwareProfileId }: { scanId: number; hardwareProfileId: number }) =>
+      setScanHardwareProfile(scanId, hardwareProfileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
     },
   });
 };

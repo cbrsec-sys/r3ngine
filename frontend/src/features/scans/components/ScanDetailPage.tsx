@@ -94,6 +94,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useStopSubScan, useRetryScanTask, useRetryScanTier } from '../api';
 import { getFailureCategoryLabel, summariseTier } from '../utils/failureCategories';
 import { TimelineTierHeader } from './TimelineTierHeader';
+import { ScanHardwareProfileControl } from './ScanHardwareProfileControl';
 import type { Command, SubScan, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote, DiscoveredPort, DiscoveredTechnology, SummaryVulnerability, SummaryVulnerabilityBase, SummaryVulnerabilityHighlight } from '../types';
 import type { Plugin } from '../../plugins/api/pluginsApi';
 import Chart from 'react-apexcharts';
@@ -2502,6 +2503,11 @@ export const ScanDetailPage = () => {
               >
                 STOP
               </Button>
+              <ScanHardwareProfileControl
+                scanId={parseInt(scanId)}
+                scanStatus={scanStatus}
+                currentProfileId={data.scan_info.hardware_profile_id ?? null}
+              />
               <Button
                 variant="contained"
                 startIcon={<Brain size={16} />}

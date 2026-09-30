@@ -449,6 +449,54 @@ class UnpauseScan(APIView):
 		return Response({'status': True, 'resumed_count': resumed_count, 'message': f'Resumed {resumed_count} scans.'})
 
 
+class SetScanHardwareProfile(APIView):
+	"""Switch the hardware profile of a scan, including a pending or running one.
+
+	Every activity re-reads the profile when it starts (TemporalTaskProxy), so the
+	change applies to the steps that start afterwards; tools already running keep
+	the settings they were launched with.
+	"""
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request, scan_id: int) -> Response:
+		try:
+			profile_id = int(request.data.get('hardware_profile_id'))
+		except (TypeError, ValueError):
+			return Response(
+				{'status': False, 'message': 'A valid hardware_profile_id is required.'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		scan = ScanHistory.objects.filter(pk=scan_id).first()
+		if scan is None:
+			return Response({'status': False, 'message': 'Scan not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+		profile = HardwareProfile.objects.filter(pk=profile_id, is_active=True).first()
+		if profile is None:
+			return Response(
+				{'status': False, 'message': 'Hardware profile not found or inactive.'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		try:
+			scan.hardware_profile = profile
+			scan.save(update_fields=['hardware_profile'])
+		except Exception:
+			logger.exception('Failed to set hardware profile %s on scan %s', profile_id, scan_id)
+			return Response(
+				{'status': False, 'message': INTERNAL_ERROR_MESSAGE},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
+
+		logger.info('Scan %s switched to hardware profile %s by user %s', scan_id, profile.id, request.user.pk)
+		return Response({
+			'status': True,
+			'message': 'Hardware profile updated; it applies to scan steps that start from now on.',
+			'hardware_profile': {'id': profile.id, 'name': profile.name},
+		})
+
+
 class FetchSubscanResults(APIView):
 	permission_classes = [IsPenetrationTester]
 	def get(self, request):

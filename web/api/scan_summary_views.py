@@ -373,6 +373,7 @@ class ScanSummaryAPIView(APIView):
                 'id': scan.id,
                 'scan_status': scan.scan_status,
                 'engine_name': scan.scan_type.engine_name if scan.scan_type else "Standard",
+                'hardware_profile_id': scan.hardware_profile_id,
                 'start_scan_date': scan.start_scan_date,
                 'stop_scan_date': scan.stop_scan_date,
                 'duration': int((scan.stop_scan_date - scan.start_scan_date).total_seconds()) if scan.stop_scan_date and scan.start_scan_date else int((timezone.now() - scan.start_scan_date).total_seconds()) if scan.start_scan_date else 0,

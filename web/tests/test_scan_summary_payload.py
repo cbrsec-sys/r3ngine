@@ -26,7 +26,7 @@ from dashboard.models import Project
 from reNgine.definitions import (
     ABORTED_TASK, FAILED_TASK, INITIATED_TASK, RUNNING_TASK, SUCCESS_TASK,
 )
-from scanEngine.models import EngineType
+from scanEngine.models import EngineType, HardwareProfile
 from startScan.models import Command, S3Bucket, ScanActivity, ScanHistory, Vulnerability, SecretLeak
 from targetApp.models import (
     DNSRecord, DomainInfo, DomainRegistration, Domain, NameServer, Registrar, WhoisStatus,
@@ -200,6 +200,14 @@ class TimelineFieldRegressionTests(ScanSummaryPayloadTestCase):
         self.assertEqual(entry['target_host'], '')
         self.assertEqual(entry['traceback'], '')
         self.assertEqual(entry['execution_id'], '')
+
+    def test_scan_info_carries_the_hardware_profile_id(self) -> None:
+        """The scan detail page preselects the current profile in its switcher."""
+        self.assertIsNone(self._payload()['scan_info']['hardware_profile_id'])
+
+        profile = HardwareProfile.objects.create(name='sp-profile', threads=8)
+        ScanHistory.objects.filter(pk=self.scan.pk).update(hardware_profile=profile)
+        self.assertEqual(self._payload()['scan_info']['hardware_profile_id'], profile.id)
 
     def test_spiderfoot_detection_still_reads_the_activity_list(self) -> None:
         """is_spiderfoot_running is derived in Python now — same matching rules."""

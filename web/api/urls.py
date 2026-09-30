@@ -503,6 +503,10 @@ urlpatterns = [
         UnpauseScan.as_view(),
         name='unpause_scan'),
     path(
+        'action/scan/<int:scan_id>/hardware-profile/',
+        SetScanHardwareProfile.as_view(),
+        name='set_scan_hardware_profile'),
+    path(
         'fetch/results/subscan/',
         FetchSubscanResults.as_view(),
         name='fetch_subscan_results'),
