@@ -33,7 +33,7 @@
 #   Net enum        : enum4linux-ng (SMB), onesixtyone+snmpwalk (SNMP), ldapsearch (LDAP), rdp-sec-check
 #   Brute force     : hydra
 #   Bypass          : bup (bypass-url-parser)
-#   Exploit         : searchsploit, search_vulns
+#   Exploit         : search_vulns
 #   OSINT identity  : maigret (username), h8mail (email)
 #   Stress          : k6, wrk, hping3, locust
 
@@ -629,8 +629,6 @@ user_hunt: {}
 
 # search_vulns — CVE lookup per discovered service/version. Fans out from
 #                HostReconWorkflow and MasterScanWorkflow after port scan.
-
-# searchsploit — Exploit-DB lookup per service. Same fan-out as search_vulns.
 
 # ===========================================================================
 # STRESS TESTING (standalone, triggered separately)

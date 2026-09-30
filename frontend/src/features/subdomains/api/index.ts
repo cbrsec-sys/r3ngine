@@ -252,33 +252,6 @@ export const refreshToolArgs = async (tool: string): Promise<ToolArgsPayload> =>
   return response.data;
 };
 
-/** One Exploit-DB entry returned by the searchsploit action. */
-export interface ExploitResult {
-  Title: string;
-  Date: string;
-  Author: string;
-  Type: string;
-  Platform: string;
-  Port: number;
-  Path: string;
-  Codes: string;
-}
-
-export type SearchsploitResponse =
-  | { status: true; results: ExploitResult[] }
-  | { status: false; message?: string };
-
-export const searchsploitForSubdomain = async (
-  subdomainId: number,
-  query: string,
-): Promise<SearchsploitResponse> => {
-  const response = await axios.post<SearchsploitResponse>(
-    `/api/action/subdomain/${subdomainId}/searchsploit/`,
-    { query },
-  );
-  return response.data;
-};
-
 /** Body of a successful `POST /api/action/ad-assessment/from-subdomain/` (HTTP 201). */
 export interface AdAssessmentFromSubdomainResponse {
   assessment_id: number;

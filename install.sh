@@ -223,7 +223,7 @@ tput setaf 4;
 echo "#########################################################################"
 echo "Installing reNgine"
 echo "#########################################################################"
-# The image build unpacks exploitdb, nuclei templates and dozens of tools, and
+# The image build unpacks nuclei templates, browsers and dozens of tools, and
 # BuildKit keeps intermediate layers while it runs; a nearly full disk fails
 # half an hour in with "no space left on device".
 MIN_FREE_GB=${MIN_FREE_GB:-60}

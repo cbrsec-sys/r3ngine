@@ -578,11 +578,6 @@
       "count": 1
     }
   },
-  "src/features/subdomains/SearchsploitModal.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/features/subdomains/index.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 8

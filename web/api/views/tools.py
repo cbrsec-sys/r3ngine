@@ -238,40 +238,6 @@ class UpdateEngine(APIView):
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class RunSearchsploitAction(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        from startScan.models import Subdomain
-        import subprocess
-        import json
-        try:
-            subdomain = Subdomain.objects.get(id=pk)
-        except Subdomain.DoesNotExist:
-            return Response({'status': False, 'message': 'Subdomain not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        query = request.data.get('query')
-        if not query:
-            return Response({'status': False, 'message': 'query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        import os
-        import shutil
-        if not os.path.exists('/root/.searchsploit_rc') and os.path.exists('/usr/src/exploitdb/.searchsploit_rc'):
-            try:
-                shutil.copy('/usr/src/exploitdb/.searchsploit_rc', '/root/.searchsploit_rc')
-            except Exception as e:
-                logger.error("Failed to copy searchsploit_rc dynamically", exc_info=True)
-
-        cmd = ['searchsploit', '--json', query]
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-            data = json.loads(result.stdout)
-            exploits = data.get('RESULTS_EXPLOIT', [])
-            return Response({'status': True, 'results': exploits})
-        except Exception:
-            logger.exception('Exploit search failed')
-            return Response({'status': False, 'message': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 class LaunchADAssessmentFromSubdomain(APIView):
 	"""Create an ADAssessment pre-populated from a Subdomain's root domain.
 

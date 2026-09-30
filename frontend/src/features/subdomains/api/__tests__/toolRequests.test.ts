@@ -8,7 +8,7 @@ const axiosMock = vi.hoisted(() => ({
 }));
 vi.mock('axios', () => ({ default: axiosMock }));
 
-import { createAdAssessmentFromSubdomain, refreshToolArgs, searchsploitForSubdomain } from '..';
+import { createAdAssessmentFromSubdomain, refreshToolArgs } from '..';
 
 beforeEach(() => {
   axiosMock.get.mockReset();
@@ -23,22 +23,6 @@ describe('refreshToolArgs', () => {
     expect(axiosMock.get).toHaveBeenCalledWith('/api/action/tool/a%2Fb/args/', {
       params: { refresh: 1 },
     });
-  });
-});
-
-describe('searchsploitForSubdomain', () => {
-  it('posts the query for the subdomain', async () => {
-    const body = { status: true, results: [] };
-    axiosMock.post.mockResolvedValue({ data: body });
-    await expect(searchsploitForSubdomain(12, 'nginx 1.18')).resolves.toEqual(body);
-    expect(axiosMock.post).toHaveBeenCalledWith('/api/action/subdomain/12/searchsploit/', {
-      query: 'nginx 1.18',
-    });
-  });
-
-  it('propagates HTTP errors to the caller', async () => {
-    axiosMock.post.mockRejectedValue(new Error('500'));
-    await expect(searchsploitForSubdomain(12, 'x')).rejects.toThrow('500');
   });
 });
 

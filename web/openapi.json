@@ -561,29 +561,6 @@
             },
             "parameters": []
         },
-        "/api/action/subdomain/{id}/searchsploit/": {
-            "post": {
-                "operationId": "api_action_subdomain_searchsploit_create",
-                "description": "",
-                "parameters": [],
-                "responses": {
-                    "201": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "api"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "id",
-                    "in": "path",
-                    "required": true,
-                    "type": "string"
-                }
-            ]
-        },
         "/api/action/tool/run/": {
             "post": {
                 "operationId": "api_action_tool_run_create",
@@ -13244,29 +13221,6 @@
                 ]
             },
             "parameters": []
-        },
-        "/mapi/action/subdomain/{id}/searchsploit/": {
-            "post": {
-                "operationId": "mapi_action_subdomain_searchsploit_create",
-                "description": "",
-                "parameters": [],
-                "responses": {
-                    "201": {
-                        "description": ""
-                    }
-                },
-                "tags": [
-                    "mapi"
-                ]
-            },
-            "parameters": [
-                {
-                    "name": "id",
-                    "in": "path",
-                    "required": true,
-                    "type": "string"
-                }
-            ]
         },
         "/mapi/action/tool/run/": {
             "post": {

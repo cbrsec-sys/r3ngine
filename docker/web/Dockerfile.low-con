@@ -494,11 +494,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
     rm -rf /tmp/cie && \
     command -v check_if_email_exists
 
-# Searchsploit — offline Exploit-DB CLI search
-RUN git clone --depth 1 https://gitlab.com/exploit-database/exploitdb /usr/src/exploitdb && \
-    ln -sf /usr/src/exploitdb/searchsploit /usr/local/bin/searchsploit && \
-    cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc
-
 # WPScan — WordPress vulnerability scanner
 RUN --mount=type=cache,target=/root/.gem \
     gem install wpscan --no-document

@@ -109,7 +109,7 @@ from api.views.notes import ListTodoNotes, ToggleTodoStatus, ToggleNoteImportanc
 from api.views.llm import GPTAttackSuggestion, LLMVulnerabilityReportGenerator, OllamaManager
 from api.views.tools import (
     UploadWordlist, GetWordlistContent, GetEngineDetails, CreateEngine, UpdateEngine,
-    RunSearchsploitAction, LaunchADAssessmentFromSubdomain,
+    LaunchADAssessmentFromSubdomain,
     _WORKFLOW_REGISTRY,
     _resolve_tool, _ToolCommandView, UpdateTool, GO_BIN_DIR, GITHUB_TOOLS_DIR, _BINARY_NAME_RE,
     _remove_installed_tool_files, UninstallTool, GetExternalToolCurrentVersion,

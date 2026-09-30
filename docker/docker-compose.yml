@@ -158,7 +158,6 @@ services:
       # No /var/run/docker.sock: plugin restarts exit the process (restart: always),
       # tool probes run on the orchestrator, and Tor/Ollama are profile services.
       - ./web/entrypoint.sh:/usr/src/app/entrypoint.sh:ro
-      - exploitdb:/usr/src/exploitdb
       - assessments_data:/usr/src/assessments
     ports:
       # Loopback only: nginx reaches gunicorn over the compose network, so
@@ -475,7 +474,6 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - ./temporal-python-orchestrator/entrypoint.sh:/usr/src/app/temporal-entrypoint.sh:ro
-      - exploitdb:/usr/src/exploitdb
     networks:
       - r3ngine_network
     healthcheck:
@@ -524,7 +522,6 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - ./temporal-go-executor/entrypoint.sh:/usr/src/app/executor-entrypoint.sh:ro
-      - exploitdb:/usr/src/exploitdb
     networks:
       - r3ngine_network
     healthcheck:
@@ -573,8 +570,6 @@ volumes:
     name: r3ngine_neo4j_data
   plugins_data:
     name: r3ngine_plugins_data
-  exploitdb:
-    name: r3ngine_exploitdb
   assessments_data:
     name: r3ngine_assessments_data
 
