@@ -36,6 +36,9 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
     if subdomain_id:
         subdomains = subdomains.filter(pk=subdomain_id)
     seed_urls = []
+    # save_endpoint caches model instances (_domain_obj, _scan_obj) in the ctx it
+    # is given; keep them out of the returned ctx, which Temporal serialises.
+    save_ctx = dict(ctx)
 
     for subdomain in subdomains:
         if url_filter:
@@ -58,7 +61,7 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
         else:
             endpoint, _ = save_endpoint(
                 raw_url,
-                ctx=ctx,
+                ctx=save_ctx,
                 crawl=False,
                 is_default=True,
                 subdomain=subdomain,

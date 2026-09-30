@@ -91,6 +91,35 @@ class TestSeedEndpointsForCrawlActivity(TestCase):
         self.assertIsInstance(result['seed_urls'], list)
 
     @patch('reNgine.temporal.activities.enumeration.activity')
+    def test_result_stays_serialisable_when_save_endpoint_caches_models(self, mock_activity):
+        """save_endpoint caches model instances in its ctx; they must not reach Temporal."""
+        import json
+        from reNgine.temporal_activities import seed_endpoints_for_crawl_activity
+
+        mock_sub = MagicMock()
+        mock_sub.name = 'new.example.com'
+        endpoint = MagicMock()
+        endpoint.http_url = 'http://new.example.com'
+
+        def caching_save_endpoint(url, ctx=None, **kwargs):
+            ctx['_domain_obj'] = object()
+            ctx['_scan_obj'] = object()
+            return endpoint, True
+
+        ctx = self._make_ctx()
+        with patch('startScan.models.Subdomain') as MockSub, \
+             patch('startScan.models.EndPoint') as MockEP, \
+             patch('reNgine.utils.task.save_endpoint', side_effect=caching_save_endpoint):
+            MockSub.objects.filter.return_value = [mock_sub]
+            MockEP.objects.filter.return_value.first.return_value = None
+            result = seed_endpoints_for_crawl_activity(ctx)
+
+        self.assertNotIn('_domain_obj', result)
+        self.assertNotIn('_scan_obj', ctx)
+        self.assertEqual(result['seed_urls'], ['http://new.example.com'])
+        json.dumps(result)
+
+    @patch('reNgine.temporal.activities.enumeration.activity')
     def test_activity_skips_existing_endpoints(self, mock_activity):
         """Subdomains that already have a default endpoint are not re-seeded."""
         from reNgine.temporal_activities import seed_endpoints_for_crawl_activity
