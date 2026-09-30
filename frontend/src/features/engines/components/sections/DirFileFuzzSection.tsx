@@ -10,13 +10,16 @@ import { useThemeTokens } from '../../../../theme/useThemeTokens';
 const STATUS_OPTIONS = ['200', '204', '301', '302', '403', '500'];
 
 const BOOL_FIELDS = [
-  ['run_dirsearch', 'dirsearch'],
-  ['run_feroxbuster', 'feroxbuster'],
+  ['run_dirsearch', 'dirsearch (extra pass)'],
+  ['run_feroxbuster', 'feroxbuster (extra pass)'],
   ['auto_calibration', 'Auto calibration'],
   ['enable_http_crawl', 'HTTP crawl'],
   ['follow_redirect', 'Follow redirects'],
   ['stop_on_error', 'Stop on error'],
 ] as const;
+
+/** Backend normalises extensions to one dotted, case-insensitive form. */
+const extensionKey = (ext: string): string => ext.trim().replace(/^\./, '').toLowerCase();
 
 interface Props {
   config: DirFileFuzzConfig;
@@ -33,11 +36,17 @@ export const DirFileFuzzSection: React.FC<Props> = ({ config, enabled, onToggle,
   return (
     <SectionCard
       title="Dir / File Fuzz"
-      description="Directory and file enumeration via dirsearch / feroxbuster (Tier 4)."
+      description="ffuf always fuzzes every target (Tier 4). dirsearch and feroxbuster are optional extra passes over the same targets and wordlist, repeating those requests."
       enabled={enabled}
       onToggle={onToggle}
     >
       <Grid container spacing={1} sx={{ mb: 1 }}>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <FormControlLabel
+            control={<Checkbox checked disabled size="small" sx={chkSx} />}
+            label={<Typography variant="body2">ffuf (always runs)</Typography>}
+          />
+        </Grid>
         {BOOL_FIELDS.map(([field, label]) => (
           <Grid key={field} size={{ xs: 12, sm: 6 }}>
             <FormControlLabel
@@ -60,6 +69,7 @@ export const DirFileFuzzSection: React.FC<Props> = ({ config, enabled, onToggle,
         value={config.extensions}
         onChange={(v) => onChange({ extensions: v })}
         placeholder="php"
+        dedupeKey={extensionKey}
       />
 
       <ChipSelect

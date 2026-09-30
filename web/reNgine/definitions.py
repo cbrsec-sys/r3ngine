@@ -730,7 +730,6 @@ DEFAULT_DIR_FILE_FUZZ_EXTENSIONS =  [
     '.asp',
     '.aspx',
     '.txt',
-    '.conf',
     '.sql',
     '.json',
     '.yml',

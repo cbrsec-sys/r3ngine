@@ -553,7 +553,7 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
     }), def.param_discovery.config) as EngineConfig['param_discovery'],
 
     dir_file_fuzz: section('dir_file_fuzz', (r) => ({
-      run_dirsearch: (r.run_dirsearch as boolean) ?? true,
+      run_dirsearch: (r.run_dirsearch as boolean) ?? false,
       run_feroxbuster: (r.run_feroxbuster as boolean) ?? false,
       auto_calibration: (r.auto_calibration as boolean) ?? true,
       enable_http_crawl: (r.enable_http_crawl as boolean) ?? true,

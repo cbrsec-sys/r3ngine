@@ -130,7 +130,12 @@ Runs after Tier 3 (needs Tier 3 URLs).
 |---|---|---|
 | `dir_file_fuzz` | `RunDirFileFuzzActivity` → `ParseFuzzResultsActivity` | Up to 4 hours |
 
-Tools: `dirsearch`, `ffuf`.
+Tools: `ffuf` always runs on every target. `dirsearch` (`run_dirsearch`, off by default) and
+`feroxbuster` (`run_feroxbuster`, off by default) are optional extra passes over the same targets
+and wordlist, so enabling them repeats those requests. When the wordlist contains dirsearch-style
+`%EXT%` placeholders (the default `dicc`), ffuf and feroxbuster get an expanded copy in the scan
+results dir (each `%EXT%` word once per extension, other words as-is) instead of `-e`/`--extensions`;
+dirsearch keeps the original list and expands `%EXT%` itself.
 
 Consolidation: `ParseEnumerationResultsActivity` logs total endpoint count.
 

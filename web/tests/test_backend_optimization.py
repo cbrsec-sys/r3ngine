@@ -254,12 +254,11 @@ class BackendOptimizationTest(TransactionTestCase):
         task_instance.starting_point_path = ""
         task_instance.subscan = None
         task_instance.yaml_configuration = {
-            'fuzzing': {
-                'ffuf': True,
-                'dirsearch': True
+            'dir_file_fuzz': {
+                'run_dirsearch': True,
             }
         }
-        
+
         # Signature: (self, ctx={}, description=None)
         actual_func(task_instance, self.ctx)
         

@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import logging
 import shlex
@@ -62,6 +63,71 @@ _FUZZ_BATCH_SIZE = 100
 def _fuzz_target_marker(results_dir, target_url):
 	digest = hashlib.md5(target_url.encode('utf-8'), usedforsecurity=False).hexdigest()
 	return os.path.join(results_dir, f'fuzz_done_{digest}.marker')
+
+
+_EXT_PLACEHOLDER = '%EXT%'
+
+
+def expand_ext_wordlist(wordlist_path: str, extensions: list[str], output_dir: str) -> tuple[str, bool]:
+	"""Resolve dirsearch-style ``%EXT%`` placeholders into a plain wordlist for ffuf/feroxbuster.
+
+	ffuf's ``-e`` appends every extension to every word and sends ``%EXT%`` literally,
+	so a dirsearch wordlist such as dicc costs ``words x (1 + extensions)`` requests.
+	The expanded copy holds each ``%EXT%`` word once per extension and every other
+	word as-is, which is what dirsearch requests. It is keyed on the wordlist
+	identity and the extensions, so targets and retries of a scan share one file.
+
+	Returns ``(path, expanded)``: the original path and ``False`` when the wordlist
+	has no placeholder or cannot be read or expanded.
+	"""
+	try:
+		stat = os.stat(wordlist_path)
+		with open(wordlist_path, encoding='utf-8', errors='surrogateescape') as fh:
+			has_placeholder = any(_EXT_PLACEHOLDER in line for line in fh)
+	except OSError as exc:
+		logger.warning('Cannot read wordlist %s, ffuf keeps -e expansion: %s', wordlist_path, exc)
+		return wordlist_path, False
+	if not has_placeholder:
+		return wordlist_path, False
+
+	bare_extensions = [ext.lstrip('.') for ext in extensions]
+	cache_key = f'{wordlist_path}|{stat.st_mtime_ns}|{stat.st_size}|{",".join(bare_extensions)}'
+	digest = hashlib.sha256(cache_key.encode('utf-8', 'surrogateescape')).hexdigest()[:16]
+	expanded_path = os.path.join(output_dir, f'ffuf_wordlist_{digest}.txt')
+
+	if os.path.isfile(expanded_path):
+		with open(expanded_path, encoding='utf-8', errors='surrogateescape') as fh:
+			entry_count = sum(1 for _ in fh)
+		logger.info('Reusing expanded ffuf wordlist %s (%d entries)', expanded_path, entry_count)
+		return expanded_path, True
+
+	entries: dict[str, None] = {}
+	with open(wordlist_path, encoding='utf-8', errors='surrogateescape') as fh:
+		for line in fh:
+			word = line.strip().lstrip('/')
+			if not word:
+				continue
+			if _EXT_PLACEHOLDER in word:
+				for ext in bare_extensions:
+					entries.setdefault(word.replace(_EXT_PLACEHOLDER, ext), None)
+			else:
+				entries.setdefault(word, None)
+
+	part_path = f'{expanded_path}.{os.getpid()}.{threading.get_ident()}.part'
+	try:
+		os.makedirs(output_dir, exist_ok=True)
+		with open(part_path, 'w', encoding='utf-8', errors='surrogateescape') as fh:
+			fh.writelines(f'{word}\n' for word in entries)
+		os.replace(part_path, expanded_path)
+	except OSError as exc:
+		logger.warning('Cannot write expanded wordlist %s, ffuf keeps -e expansion: %s', expanded_path, exc)
+		with contextlib.suppress(OSError):
+			os.remove(part_path)
+		return wordlist_path, False
+
+	logger.info('Expanded %s for ffuf: %d entries (%d extensions) in %s',
+		wordlist_path, len(entries), len(bare_extensions), expanded_path)
+	return expanded_path, True
 
 
 def filter_fuzz_batch_with_redis(batch, scan_history_id, subdomain_id, max_repeat, tool_name):
@@ -453,6 +519,11 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		extensions = config.get(EXTENSIONS, DEFAULT_DIR_FILE_FUZZ_EXTENSIONS)
 
 		extensions = [ext if ext.startswith('.') else f'.{ext}' for ext in extensions]
+		# ffuf replays the whole wordlist once per extension, so a duplicate costs a full pass.
+		unique_extensions = {}
+		for ext in extensions:
+			unique_extensions.setdefault(ext.lower(), ext)
+		extensions = list(unique_extensions.values())
 		extensions_str = ','.join(map(str, extensions))
 		follow_redirect = config.get(FOLLOW_REDIRECT, False)
 		max_time = config.get(MAX_TIME, 0)
@@ -466,7 +537,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		auto_calibration = config.get(AUTO_CALIBRATION, True)
 		delay = rate_limit / (threads * 100) if threads else 0
 		custom_headers = config.get(CUSTOM_HEADERS) or config.get(CUSTOM_HEADER) or []
-		run_dirsearch = config.get(RUN_DIRSEARCH, True)
+		run_dirsearch = config.get(RUN_DIRSEARCH, False)
 		run_feroxbuster = config.get(RUN_FEROXBUSTER, False)
 
 		custom_headers_list = parse_custom_header_to_list(custom_headers)
@@ -482,11 +553,15 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		from reNgine.tasks.api import resolve_wordlist_path
 		wordlist_path = resolve_wordlist_path(config, wordlist_path)
 
+		# dirsearch expands %EXT% itself; ffuf and feroxbuster get a pre-expanded copy instead of -e.
+		ffuf_wordlist_path, wordlist_expanded = expand_ext_wordlist(wordlist_path, extensions, self.results_dir)
+		append_extensions = bool(extensions) and not wordlist_expanded
+
 		input_path = f'{self.results_dir}/input_endpoints_dir_file_fuzz.txt'
 
 		ffuf_base_cmd = 'ffuf'
-		ffuf_base_cmd += f' -w {wordlist_path}'
-		ffuf_base_cmd += f' -e {extensions_str}' if extensions else ''
+		ffuf_base_cmd += f' -w {ffuf_wordlist_path}'
+		ffuf_base_cmd += f' -e {extensions_str}' if append_extensions else ''
 		ffuf_base_cmd += f' -maxtime {max_time}' if max_time > 0 else ''
 		ffuf_base_cmd += f' -rate {rate_limit}' if rate_limit > 0 else ''
 		if recursive_level > 0:
@@ -537,13 +612,13 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				if 'cookie' in header.lower() or 'authorization' in header.lower():
 					logger.warning('Authenticated Dirsearch fuzzing enabled via header: %s', header)
 		else:
-			logger.info('Dirsearch disabled via run_dirsearch config key. Only ffuf will run.')
+			logger.info('Dirsearch disabled (run_dirsearch is off).')
 
 		ferox_base_cmd = None
 		if run_feroxbuster:
 			ferox_base_cmd = 'feroxbuster --no-state --silent --json'
-			ferox_base_cmd += f' --wordlist {wordlist_path}'
-			if extensions:
+			ferox_base_cmd += f' --wordlist {ffuf_wordlist_path}'
+			if append_extensions:
 				ferox_base_cmd += f' --extensions {extensions_str}'
 			if threads and threads > 0:
 				ferox_base_cmd += f' --threads {threads}'

@@ -397,7 +397,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   dir_file_fuzz: {
     enabled: false,
     config: {
-      run_dirsearch: true, run_feroxbuster: false, auto_calibration: true, enable_http_crawl: true,
+      run_dirsearch: false, run_feroxbuster: false, auto_calibration: true, enable_http_crawl: true,
       extensions: ['html', 'php', 'git', 'yaml', 'conf', 'cnf', 'config', 'gz', 'env', 'log',
                    'db', 'mysql', 'bak', 'asp', 'aspx', 'txt', 'sql', 'json', 'yml', 'pdf'],
       wordlist_name: 'dicc', rate_limit: 150, threads: 30, timeout: 5,

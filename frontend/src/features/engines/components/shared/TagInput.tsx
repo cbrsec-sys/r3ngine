@@ -9,9 +9,30 @@ interface TagInputProps {
   onChange: (next: string[]) => void;
   placeholder?: string;
   helperText?: string;
+  /** Maps a tag to the key used to detect duplicates; later duplicates are ignored. */
+  dedupeKey?: (tag: string) => string;
 }
 
-export const TagInput: React.FC<TagInputProps> = ({ label, value, onChange, placeholder, helperText }) => {
+const trimmed = (tag: string): string => tag.trim();
+
+const withoutDuplicates = (tags: string[], dedupeKey: (tag: string) => string): string[] => {
+  const seen = new Set<string>();
+  return tags.filter((tag) => {
+    const key = dedupeKey(tag);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const TagInput: React.FC<TagInputProps> = ({
+  label,
+  value,
+  onChange,
+  placeholder,
+  helperText,
+  dedupeKey = trimmed,
+}) => {
   const { tokens, isLight } = useThemeTokens();
 
   return (
@@ -20,7 +41,7 @@ export const TagInput: React.FC<TagInputProps> = ({ label, value, onChange, plac
       freeSolo
       options={[]}
       value={value}
-      onChange={(_event, next) => onChange(next)}
+      onChange={(_event, next) => onChange(withoutDuplicates(next, dedupeKey))}
       renderValue={(tagValues, getItemProps) =>
         tagValues.map((option, index) => {
           const { key, ...itemProps } = getItemProps({ index });

@@ -12,13 +12,19 @@ vi.mock('../../../../../theme/useThemeTokens', async () => {
   };
 });
 
-const renderInput = (value: string[], onChange = vi.fn()) => {
+const renderInput = (value: string[], onChange = vi.fn(), dedupeKey?: (tag: string) => string) => {
   render(
     <ThemeProvider theme={hackerTheme}>
-      <TagInput label="Tags" value={value} onChange={onChange} />
+      <TagInput label="Tags" value={value} onChange={onChange} dedupeKey={dedupeKey} />
     </ThemeProvider>,
   );
   return onChange;
+};
+
+const typeAndEnter = (text: string) => {
+  const input = screen.getByRole('combobox');
+  fireEvent.change(input, { target: { value: text } });
+  fireEvent.keyDown(input, { key: 'Enter' });
 };
 
 describe('TagInput', () => {
@@ -41,5 +47,18 @@ describe('TagInput', () => {
     fireEvent.change(input, { target: { value: 'xss' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onChange).toHaveBeenCalledWith(['xss']);
+  });
+
+  it('ignores a value that is already present', () => {
+    const onChange = renderInput(['php', 'html']);
+    typeAndEnter(' php ');
+    expect(onChange).not.toHaveBeenCalledWith(expect.arrayContaining([' php ']));
+    expect(onChange).toHaveBeenLastCalledWith(['php', 'html']);
+  });
+
+  it('uses dedupeKey to detect duplicates', () => {
+    const onChange = renderInput(['php'], vi.fn(), (tag) => tag.trim().replace(/^\./, '').toLowerCase());
+    typeAndEnter('.PHP');
+    expect(onChange).toHaveBeenLastCalledWith(['php']);
   });
 });

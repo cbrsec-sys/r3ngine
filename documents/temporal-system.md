@@ -132,7 +132,7 @@ Activities are defined in `web/reNgine/temporal_activities.py`. Key activities:
 | `RunPortScanActivity` | python | Nmap port scanning |
 | `RunVigoliumDiscoveryActivity` | python | Vigolium service discovery |
 | `RunFetchURLActivity` | python | URL fetching (gau, gospider, waybackurls, katana) |
-| `RunDirFileFuzzActivity` | python | Directory/file fuzzing (dirsearch, ffuf) |
+| `RunDirFileFuzzActivity` | python | Directory/file fuzzing (ffuf; optional dirsearch/feroxbuster passes) |
 | `ParseFuzzResultsActivity` | python | Parses fuzz results into DB |
 | `RunWebAPIDiscoveryActivity` | python | OpenAPI/GraphQL discovery |
 | `RunWAFDetectionActivity` | python | WAF detection (wafw00f) |

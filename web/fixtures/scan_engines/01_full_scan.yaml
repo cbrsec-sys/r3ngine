@@ -114,7 +114,7 @@
         threads: 30
       dir_file_fuzz:
         auto_calibration: true
-        run_dirsearch: true
+        run_dirsearch: false
         run_feroxbuster: false
         enable_http_crawl: true
         rate_limit: 150

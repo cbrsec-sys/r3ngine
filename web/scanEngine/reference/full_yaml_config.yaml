@@ -249,7 +249,7 @@ fetch_url:
 # ---------------------------------------------------------------------------
 dir_file_fuzz:
   auto_calibration: true
-  run_dirsearch: true
+  run_dirsearch: false
   enable_http_crawl: true
   rate_limit: 150
   extensions:

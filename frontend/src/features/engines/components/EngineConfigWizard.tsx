@@ -85,7 +85,7 @@ export const EngineConfigWizard: React.FC<EngineConfigWizardProps> = ({ state, a
     },
     {
       label: 'Tier 4 — Fuzzing',
-      description: 'Directory and file enumeration.',
+      description: 'Directory and file enumeration: ffuf on every target, dirsearch / feroxbuster as optional extra passes.',
       content: <DirFileFuzzSection config={config.dir_file_fuzz.config} enabled={config.dir_file_fuzz.enabled} onToggle={(v) => toggleSection('dir_file_fuzz', v)} onChange={(p) => updateSection('dir_file_fuzz', p)} />,
     },
     {

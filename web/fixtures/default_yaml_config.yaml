@@ -84,11 +84,11 @@ osint: {
 }
 dir_file_fuzz: {
   'auto_calibration': true,
-  'run_dirsearch': true,
+  'run_dirsearch': false,
   'run_feroxbuster': false,
   'enable_http_crawl': true,
   'rate_limit': 150,
-  'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','conf','sql','json','yml','pdf'],
+  'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','sql','json','yml','pdf'],
   'follow_redirect': false,
   'max_time': 300,
   'match_http_status': [200, 204],

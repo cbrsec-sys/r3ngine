@@ -15,11 +15,11 @@ from reNgine.tasks.fuzzing import dir_file_fuzz
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _make_proxy(yaml_config=None):
+def _make_proxy(yaml_config=None, results_dir='/tmp/test_ffuf'):
     """Minimal scan proxy for prepare_only=True tests."""
     proxy = types.SimpleNamespace(
         yaml_configuration=yaml_config or {},
-        results_dir='/tmp/test_ffuf',
+        results_dir=results_dir,
         scan=MagicMock(),
         scan_id=1,
         activity_id=1,
@@ -29,9 +29,9 @@ def _make_proxy(yaml_config=None):
     return proxy
 
 
-def _prepare(yaml_config, ctx_override=None):
+def _prepare(yaml_config, ctx_override=None, wordlist_path=None, results_dir='/tmp/test_ffuf'):
     """Call dir_file_fuzz with prepare_only=True, returning the built command dict."""
-    proxy = _make_proxy(yaml_config)
+    proxy = _make_proxy(yaml_config, results_dir=results_dir)
     ctx = {"urls_override": ctx_override or ["http://example.com/"]}
 
     def _fake_ensure(task_proxy, func, ctx, description=None):
@@ -41,7 +41,7 @@ def _prepare(yaml_config, ctx_override=None):
                side_effect=_fake_ensure), \
          patch('os.path.exists', return_value=True), \
          patch('reNgine.tasks.api.resolve_wordlist_path',
-               side_effect=lambda cfg, path: path):
+               side_effect=lambda cfg, path: wordlist_path or path):
         return dir_file_fuzz(proxy, ctx=ctx, prepare_only=True)
 
 
@@ -485,6 +485,57 @@ class TestFeroxbusterConfig(TestCase):
         result = _prepare({'dir_file_fuzz': {}})
         self.assertIn('ferox_base_cmd', result,
                       "prepare_only dict must contain ferox_base_cmd key")
+
+
+class TestExtensionDeduplication(TestCase):
+    """Duplicate extensions make ffuf replay the whole wordlist once more per duplicate."""
+
+    CONFIG = {
+        'dir_file_fuzz': {
+            'auto_calibration': True,
+            'extensions': ['php', 'conf', '.PHP', 'html', '.conf', 'Html', 'txt'],
+            'recursive_level': 0,
+            'run_dirsearch': True,
+            'run_feroxbuster': True,
+        }
+    }
+
+    def test_ffuf_extensions_deduplicated_case_insensitive_in_order(self):
+        cmd = _prepare(self.CONFIG)['ffuf_base_cmd']
+        self.assertIn(' -e .php,.conf,.html,.txt ', cmd)
+
+    def test_dirsearch_extensions_deduplicated(self):
+        cmd = _prepare(self.CONFIG)['dirsearch_base_cmd']
+        self.assertIn(' -e php,conf,html,txt', cmd)
+
+    def test_feroxbuster_extensions_deduplicated(self):
+        cmd = _prepare(self.CONFIG)['ferox_base_cmd']
+        self.assertIn(' --extensions .php,.conf,.html,.txt', cmd)
+
+    def test_default_extensions_have_no_duplicates(self):
+        from reNgine.definitions import DEFAULT_DIR_FILE_FUZZ_EXTENSIONS
+        lowered = [ext.lower() for ext in DEFAULT_DIR_FILE_FUZZ_EXTENSIONS]
+        self.assertEqual(len(lowered), len(set(lowered)))
+
+    def test_engine_fixtures_have_no_duplicate_extensions(self):
+        import yaml
+        from pathlib import Path
+
+        fixtures_dir = Path(__file__).resolve().parents[1] / 'fixtures'
+        configs = {'default_yaml_config.yaml': yaml.safe_load((fixtures_dir / 'default_yaml_config.yaml').read_text())}
+        for path in sorted((fixtures_dir / 'scan_engines').glob('*.yaml')):
+            for entry in yaml.safe_load(path.read_text()) or []:
+                raw = entry.get('fields', {}).get('yaml_configuration')
+                if raw:
+                    configs[f"{path.name}:{entry['fields'].get('engine_name')}"] = yaml.safe_load(raw)
+
+        self.assertIn('default_yaml_config.yaml', configs)
+        for name, config in configs.items():
+            extensions = (config or {}).get('dir_file_fuzz', {}).get('extensions') or []
+            lowered = [str(ext).lower().lstrip('.') for ext in extensions]
+            with self.subTest(engine=name):
+                self.assertEqual(len(lowered), len(set(lowered)), f"duplicate extensions: {extensions}")
+
 
 class TestFfufStreamingHeartbeat(TestCase):
     """Bug #7: ffuf must not be routed to Go executor (blocks heartbeats)."""
