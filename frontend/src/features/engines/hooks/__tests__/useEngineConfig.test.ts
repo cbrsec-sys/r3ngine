@@ -99,3 +99,50 @@ secret_scanning:
     expect(result.current.yaml).toContain('leaklookup: false');
   });
 });
+
+describe('useEngineConfig email security section', () => {
+  it('treats a missing section as enabled, like the backend', () => {
+    const { result } = renderHook(() => useEngineConfig('port_scan: {}\n'));
+    expect(result.current.config.email_security).toEqual({
+      enabled: true,
+      config: { mailbox_verification: true, timeout: 15, max_candidates: 200, delay_ms: 250, http_url: '' },
+    });
+  });
+
+  it('reads the section switch and the mailbox verification settings', () => {
+    const yaml = `
+email_security:
+  enabled: true
+  mailbox_verification:
+    enabled: false
+    max_candidates: 50
+    http_url: https://reacher.example.test
+`;
+    const { result } = renderHook(() => useEngineConfig(yaml));
+    const { enabled, config } = result.current.config.email_security;
+
+    expect(enabled).toBe(true);
+    expect(config.mailbox_verification).toBe(false);
+    expect(config.max_candidates).toBe(50);
+    expect(config.timeout).toBe(15);
+    expect(config.http_url).toBe('https://reacher.example.test');
+  });
+
+  it('writes an explicit enabled: false when the section is switched off', () => {
+    const { result } = renderHook(() => useEngineConfig('port_scan: {}\n'));
+    act(() => result.current.toggleSection('email_security', false));
+
+    expect(result.current.yaml).toMatch(/^email_security:\n {2}enabled: false$/m);
+  });
+
+  it('keeps mailbox verification off after an edit mode reload', () => {
+    const { result } = renderHook(() => useEngineConfig('port_scan: {}\n'));
+    act(() => result.current.updateSection('email_security', { mailbox_verification: false }));
+    const saved = result.current.yaml;
+
+    const { result: reopened } = renderHook(() => useEngineConfig(saved));
+    expect(reopened.current.config.email_security.enabled).toBe(true);
+    expect(reopened.current.config.email_security.config.mailbox_verification).toBe(false);
+    expect(reopened.current.yaml).not.toContain('http_url');
+  });
+});

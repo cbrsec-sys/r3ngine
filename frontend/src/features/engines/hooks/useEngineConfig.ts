@@ -97,6 +97,18 @@ function serialiseConfigToYaml(config: EngineConfig): string {
     writeSection('port_scan', s);
   }
 
+  // Always written: a missing email_security section means "on" to the backend,
+  // so switching it off has to be explicit.
+  {
+    const c = config.email_security.config;
+    const mv: Record<string, unknown> = {
+      enabled: c.mailbox_verification, timeout: c.timeout,
+      max_candidates: c.max_candidates, delay_ms: c.delay_ms,
+    };
+    if (c.http_url) mv.http_url = c.http_url;
+    writeSection('email_security', { enabled: config.email_security.enabled, mailbox_verification: mv });
+  }
+
   if (config.screenshot.enabled) {
     const c = config.screenshot.config;
     writeSection('screenshot', { intensity: c.intensity, timeout: c.timeout, threads: c.threads, enable_http_crawl: c.enable_http_crawl });
@@ -335,6 +347,25 @@ function parseYamlToConfig(yamlStr: string): EngineConfig {
       exclude_ports: (r.exclude_ports as string[]) ?? [],
       exclude_subdomains: (r.exclude_subdomains as boolean) ?? false,
     }), def.port_scan.config) as EngineConfig['port_scan'],
+
+    // Mirrors task_plan.email_security_enabled / parse_mailbox_config: anything but an
+    // explicit falsy `enabled` inside a mapping leaves the step on.
+    email_security: (() => {
+      const r = asMapping(raw.email_security);
+      const mv = asMapping(r.mailbox_verification);
+      const on = (v: unknown) => v === undefined || Boolean(v);
+      const d = def.email_security.config;
+      return {
+        enabled: on(r.enabled),
+        config: {
+          mailbox_verification: on(mv.enabled),
+          timeout: (mv.timeout as number) ?? d.timeout,
+          max_candidates: (mv.max_candidates as number) ?? d.max_candidates,
+          delay_ms: (mv.delay_ms as number) ?? d.delay_ms,
+          http_url: (mv.http_url as string) ?? d.http_url,
+        },
+      };
+    })(),
 
     screenshot: section('screenshot', (r) => ({
       intensity: (r.intensity as 'normal' | 'aggressive' | 'light') ?? 'normal',

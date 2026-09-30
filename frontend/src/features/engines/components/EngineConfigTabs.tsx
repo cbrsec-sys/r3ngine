@@ -11,6 +11,7 @@ import { VigoliumDiscoverySection } from './sections/VigoliumDiscoverySection';
 import { FirewallVpnSection } from './sections/FirewallVpnSection';
 import { HttpCrawlSection } from './sections/HttpCrawlSection';
 import { PortScanSection } from './sections/PortScanSection';
+import { EmailSecuritySection } from './sections/EmailSecuritySection';
 import { ScreenshotSection } from './sections/ScreenshotSection';
 import { FetchUrlSection } from './sections/FetchUrlSection';
 import { WebApiDiscoverySection } from './sections/WebApiDiscoverySection';
@@ -155,6 +156,12 @@ export const EngineConfigTabs: React.FC<EngineConfigTabsProps> = ({ state, avail
               enabled={config.port_scan.enabled}
               onToggle={(v) => toggleSection('port_scan', v)}
               onChange={(p) => updateSection('port_scan', p)}
+            />
+            <EmailSecuritySection
+              config={config.email_security.config}
+              enabled={config.email_security.enabled}
+              onToggle={(v) => toggleSection('email_security', v)}
+              onChange={(p) => updateSection('email_security', p)}
             />
             <ScreenshotSection
               config={config.screenshot.config}

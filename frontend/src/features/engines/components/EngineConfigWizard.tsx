@@ -14,6 +14,7 @@ import { VigoliumDiscoverySection } from './sections/VigoliumDiscoverySection';
 import { FirewallVpnSection } from './sections/FirewallVpnSection';
 import { HttpCrawlSection } from './sections/HttpCrawlSection';
 import { PortScanSection } from './sections/PortScanSection';
+import { EmailSecuritySection } from './sections/EmailSecuritySection';
 import { ScreenshotSection } from './sections/ScreenshotSection';
 import { FetchUrlSection } from './sections/FetchUrlSection';
 import { WebApiDiscoverySection } from './sections/WebApiDiscoverySection';
@@ -66,6 +67,7 @@ export const EngineConfigWizard: React.FC<EngineConfigWizardProps> = ({ state, a
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <HttpCrawlSection config={config.http_crawl.config} enabled={config.http_crawl.enabled} onToggle={(v) => toggleSection('http_crawl', v)} onChange={(p) => updateSection('http_crawl', p)} />
           <PortScanSection config={config.port_scan.config} enabled={config.port_scan.enabled} onToggle={(v) => toggleSection('port_scan', v)} onChange={(p) => updateSection('port_scan', p)} />
+          <EmailSecuritySection config={config.email_security.config} enabled={config.email_security.enabled} onToggle={(v) => toggleSection('email_security', v)} onChange={(p) => updateSection('email_security', p)} />
           <ScreenshotSection config={config.screenshot.config} enabled={config.screenshot.enabled} onToggle={(v) => toggleSection('screenshot', v)} onChange={(p) => updateSection('screenshot', p)} />
         </Box>
       ),

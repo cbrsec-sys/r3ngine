@@ -67,6 +67,8 @@ email_security:
     delay_ms: 250
 ```
 
+The engine editor exposes this as the **Email Security** card in the Tier 2 tab (`frontend/src/features/engines/components/sections/EmailSecuritySection.tsx`). The card always writes `email_security.enabled` and `mailbox_verification.enabled` explicitly, because a missing section means "enabled" to the backend.
+
 ## Error handling
 
 | Failure | Behavior |

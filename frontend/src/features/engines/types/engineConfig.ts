@@ -92,6 +92,23 @@ export interface PortScanConfig {
   exclude_subdomains: boolean;
 }
 
+/**
+ * `email_security` in engine YAML. The backend treats a missing section as enabled,
+ * so the section toggle maps to `email_security.enabled`, not to key presence.
+ */
+export interface EmailSecurityConfig {
+  /** Reacher mailbox probing against the target MX (`mailbox_verification.enabled`). */
+  mailbox_verification: boolean;
+  /** Per-address check timeout in seconds (backend clamps to 1–120). */
+  timeout: number;
+  /** Maximum addresses probed per scan (backend clamps to 1–1000). */
+  max_candidates: number;
+  /** Pause between checks in milliseconds (backend clamps to 0–10000). */
+  delay_ms: number;
+  /** Optional self-hosted Reacher origin; empty uses the bundled CLI. */
+  http_url: string;
+}
+
 export interface ScreenshotConfig {
   intensity: 'normal' | 'aggressive' | 'light';
   timeout: number;
@@ -268,6 +285,7 @@ export interface EngineConfig {
   // Tier 2
   http_crawl: SectionState<HttpCrawlConfig>;
   port_scan: SectionState<PortScanConfig>;
+  email_security: SectionState<EmailSecurityConfig>;
   screenshot: SectionState<ScreenshotConfig>;
   // Tier 3+4
   fetch_url: SectionState<FetchUrlConfig>;
@@ -340,6 +358,10 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
       nmap_cmd: '', nmap_script: '', nmap_script_args: '',
       exclude_ports: [], exclude_subdomains: false,
     },
+  },
+  email_security: {
+    enabled: true,
+    config: { mailbox_verification: true, timeout: 15, max_candidates: 200, delay_ms: 250, http_url: '' },
   },
   screenshot: { enabled: false, config: { intensity: 'normal', timeout: 10, threads: 40, enable_http_crawl: true } },
   fetch_url: {
