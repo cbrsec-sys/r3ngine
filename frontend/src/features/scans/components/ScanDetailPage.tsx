@@ -55,6 +55,7 @@ import {
   Zap,
   Terminal,
   AlertTriangle,
+  Play,
   Target,
   Map as MapIcon,
   ChevronRight,
@@ -91,7 +92,8 @@ import {
   Brain
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useStopSubScan, useRetryScanTask, useRetryScanTier } from '../api';
+import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan, useStopSubScan, useRetryScanTask, useRetryScanTier, useResumeScan } from '../api';
+import { isResumableScanStatus } from '../utils/scanStatus';
 import { getFailureCategoryLabel, summariseTier } from '../utils/failureCategories';
 import { TimelineTierHeader } from './TimelineTierHeader';
 import { ScanHardwareProfileControl } from './ScanHardwareProfileControl';
@@ -1671,6 +1673,7 @@ export const ScanDetailPage = () => {
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
   const fetchWhois = useFetchWhois(['scan-summary', projectSlug, parseInt(scanId)]);
   const stopScanMutation = useStopScan(projectSlug);
+  const resumeScanMutation = useResumeScan(projectSlug);
   const stopSubScanMutation = useStopSubScan(projectSlug);
   const retryScanTaskMutation = useRetryScanTask(projectSlug, parseInt(scanId));
   const retryScanTierMutation = useRetryScanTier(projectSlug, parseInt(scanId));
@@ -2503,6 +2506,33 @@ export const ScanDetailPage = () => {
               >
                 STOP
               </Button>
+              {isResumableScanStatus(scanStatus) && (
+                <Button
+                  variant="contained"
+                  startIcon={resumeScanMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <Play size={16} />}
+                  onClick={() => resumeScanMutation.mutate(parseInt(scanId), {
+                    onSuccess: (res) => setTierRetryNotice({
+                      open: true,
+                      severity: res.status ? 'success' : 'error',
+                      message: res.message || (res.status ? 'Scan resumed.' : 'Could not resume the scan.'),
+                    }),
+                    onError: () => setTierRetryNotice({ open: true, severity: 'error', message: 'Could not resume the scan.' }),
+                  })}
+                  disabled={resumeScanMutation.isPending}
+                  sx={{
+                    bgcolor: `${tokens.accent.primary}1A`,
+                    color: tokens.accent.primary,
+                    border: `1px solid ${tokens.accent.primary}4D`,
+                    fontFamily: 'Orbitron',
+                    fontSize: '0.65rem',
+                    fontWeight: 900,
+                    px: 2,
+                    '&:hover': { bgcolor: `${tokens.accent.primary}33` }
+                  }}
+                >
+                  RESUME
+                </Button>
+              )}
               <ScanHardwareProfileControl
                 scanId={parseInt(scanId)}
                 scanStatus={scanStatus}

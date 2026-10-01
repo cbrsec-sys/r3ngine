@@ -39,7 +39,7 @@ from recon_note.models import *
 from reNgine.common_func import *
 from reNgine.utils.database import *
 from reNgine.definitions import (
-    ABORTED_TASK, RUNNING_TASK, SUCCESS_TASK,
+    ABORTED_TASK, FAILED_TASK, PARTIALLY_COMPLETE_TASK, RUNNING_TASK, SUCCESS_TASK,
     PERM_MODIFY_TARGETS, PERM_MODIFY_SCAN_CONFIGURATIONS,
     PERM_MODIFY_WORDLISTS, PERM_INITATE_SCANS_SUBSCANS,
     PERM_MODIFY_SCAN_REPORT, PERM_MODIFY_SCAN_RESULTS,
@@ -308,6 +308,9 @@ class StopScan(APIView):
 		return Response(response)
 
 
+RESUMABLE_SCAN_STATUSES = (FAILED_TASK, ABORTED_TASK, PARTIALLY_COMPLETE_TASK)
+
+
 class ResumeScan(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
@@ -324,19 +327,22 @@ class ResumeScan(APIView):
 			scan = ScanHistory.objects.get(id=scan_id)
 			if scan.scan_status == SUCCESS_TASK:
 				return Response({'status': False, 'message': 'Scan is already completed.'})
-			if scan.recovery_count >= 3:
-				return Response({'status': False, 'message': 'Max recovery limit (3) exceeded. Use the manual Resume button to override.'})
+			# A running, pending or paused scan still has a workflow; resuming it would
+			# start a second one over the same scan. recovery_count only caps automatic
+			# recovery: a manual resume is the override and resets it.
+			if scan.scan_status not in RESUMABLE_SCAN_STATUSES:
+				return Response({'status': False, 'message': 'Only a failed, aborted or partially complete scan can be resumed.'})
 
 			from reNgine.tasks import resume_scan_temporal
 			resume_scan_temporal(scan.id)
-			
+
 			response['status'] = True
 			response['message'] = 'Scan resumption initiated successfully.'
 		except ScanHistory.DoesNotExist:
 			response['message'] = 'Scan not found'
-		except Exception as e:
+		except Exception:
 			logger.error('Error resuming scan %s', scan_id, exc_info=True)
-			response['message'] = str(e)
+			response['message'] = INTERNAL_ERROR_MESSAGE
 		
 		return Response(response)
 

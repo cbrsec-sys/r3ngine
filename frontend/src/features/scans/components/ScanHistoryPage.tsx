@@ -62,6 +62,7 @@ import {
   usePauseScan,
   useUnpauseScan
 } from '../api';
+import { isResumableScanStatus } from '../utils/scanStatus';
 import { useParams, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
@@ -708,7 +709,7 @@ export const ScanHistoryPage: React.FC = () => {
         }}>
           <StopCircle size={14} /> STOP SCAN
         </MenuItem>
-        {activeScanId && (scans?.find((s) => s.id === activeScanId)?.scan_status === 0 || scans?.find((s) => s.id === activeScanId)?.scan_status === 3) && (
+        {activeScanId && isResumableScanStatus(scans?.find((s) => s.id === activeScanId)?.scan_status) && (
           <MenuItem onClick={() => {
             if (activeScanId) {
               resumeScanMutation.mutate(activeScanId);

@@ -376,11 +376,12 @@ export const useResumeScan = (projectSlug: string) => {
         credentials: 'include',
         body: JSON.stringify({ scan_id: id }),
       });
-      return response.json();
+      return response.json() as Promise<{ status: boolean; message?: string }>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
       queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
     },
   });
 };
