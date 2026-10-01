@@ -198,12 +198,13 @@ class TemporalTaskProxy:
         from overwriting SUCCESS rows left by prior attempts (AUD-003).
         """
         from startScan.models import ScanActivity
-        from reNgine.definitions import INITIATED_TASK, RUNNING_TASK
+        from reNgine.definitions import FAILED_TASK, INITIATED_TASK, RUNNING_TASK
         from reNgine.task_plan import get_task_tier
         from django.db import transaction
 
         try:
-            temporal_activity_id = activity.info().activity_id
+            info = activity.info()
+            temporal_activity_id = info.activity_id
             now = timezone.now()
             execution_id = "temporal-%s" % temporal_activity_id
             with transaction.atomic():
@@ -213,6 +214,26 @@ class TemporalTaskProxy:
                 claim_name = self.scan_activity_name
                 activity_row = None
                 preferred_id = self.activity_id
+                if info.attempt > 1:
+                    # An attempt whose worker died (container restart, OOM kill) never
+                    # finalised its row, which would otherwise stay RUNNING beside this one.
+                    interrupted = ScanActivity.objects.filter(
+                        scan_of=self.scan,
+                        name=claim_name,
+                        execution_id=execution_id,
+                        status=RUNNING_TASK,
+                    )
+                    if preferred_id:
+                        # A pinned row is reclaimed below instead.
+                        interrupted = interrupted.exclude(pk=preferred_id)
+                    interrupted.update(
+                        status=FAILED_TASK,
+                        time_ended=now,
+                        error_message=(
+                            "Interrupted: the worker running this attempt stopped "
+                            "(e.g. a container restart); Temporal started attempt %d." % info.attempt
+                        ),
+                    )
                 if preferred_id:
                     # Pin to the pre-created row. Allow RUNNING so a Temporal
                     # activity retry can reclaim the same row instead of forking
