@@ -1,5 +1,7 @@
 import os
+import re
 import json
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 from django.test import TransactionTestCase
@@ -32,8 +34,17 @@ class ToolExecutionTest(TransactionTestCase):
             start_scan_date=timezone.now(),
             scan_type=self.engine
         )
-        self.results_dir = f"/tmp/rengine_results/{self.scan.id}"
-        os.makedirs(self.results_dir, exist_ok=True)
+        tmp = tempfile.TemporaryDirectory(prefix='rengine_tool_exec_')
+        self.addCleanup(tmp.cleanup)
+        self.results_dir = tmp.name
+        # save_email/save_employee start enrich_identities_task in a daemon
+        # thread that outlives the test (writing into results_dir after its
+        # cleanup, and running gosearch where installed). Tests that want it
+        # call it directly; the name is resolved at call time, so this covers
+        # the background threads only.
+        enrich_patcher = patch('reNgine.tasks.osint.enrich_identities_task')
+        enrich_patcher.start()
+        self.addCleanup(enrich_patcher.stop)
         self.scan.results_dir = self.results_dir
         self.scan.save()
         
@@ -57,6 +68,7 @@ class ToolExecutionTest(TransactionTestCase):
         self.task = MagicMock()
         self.task.scan = self.scan
         self.task.scan_id = self.scan.id
+        self.task.results_dir = self.results_dir
         self.task.domain = self.domain
         self.task.yaml_configuration = self.ctx['yaml_configuration']
         self.task.activity_id = 1
@@ -74,17 +86,25 @@ class ToolExecutionTest(TransactionTestCase):
             if not os.path.exists(sample_file):
                  sample_file = "tests/sample_data/wpscan_sample.json"
                 
-            output_file = f"{self.results_dir}/vulnerability/wpscan/{self.domain_name}_wpscan.json"
-            os.makedirs(os.path.dirname(output_file), exist_ok=True)
-            
             with open(sample_file, 'r') as f:
-                with open(output_file, 'w') as out:
-                    out.write(f.read())
-            
+                sample = f.read()
+
+            # wpscan_scan deletes a stale output file before each attempt, so the
+            # sample has to appear when the tool "runs", at the path it was given.
+            def fake_stream(cmd, **kwargs):
+                match = re.search(r'--output (\S+)', cmd)
+                if match:
+                    os.makedirs(os.path.dirname(match.group(1)), exist_ok=True)
+                    with open(match.group(1), 'w') as out:
+                        out.write(sample)
+                return iter([])
+
+            # wpscan_scan only runs where WordPress was fingerprinted.
+            self.subdomain.technologies.add(Technology.objects.create(name='WordPress'))
             print(f"[DEBUG] Subdomains for scan: {Subdomain.objects.filter(scan_history=self.scan).count()}")
             
             # Patch in tasks module
-            with patch('reNgine.tasks.stream_command') as mock_stream:
+            with patch('reNgine.tasks.stream_command', side_effect=fake_stream):
                 res = wpscan_scan(self.task, urls=[f"http://{self.domain_name}"], ctx=self.ctx)
                 print(f"[DEBUG] wpscan_scan result: {res}")
             
@@ -103,6 +123,8 @@ class ToolExecutionTest(TransactionTestCase):
             if not os.path.exists(sample_file):
                 sample_file = "tests/sample_data/cpanel_sample.json"
                 
+            # cpanel_scan only runs where cPanel/WHM was fingerprinted.
+            self.subdomain.technologies.add(Technology.objects.create(name='cPanel'))
             output_file = f"{self.results_dir}/vulnerability/cpanel/{self.domain_name}_cpanel.json"
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
             
@@ -138,7 +160,7 @@ class ToolExecutionTest(TransactionTestCase):
                 with open(output_file, 'w') as out:
                     out.write(f.read())
             
-            with patch('reNgine.tasks.osint.subprocess.run') as mock_run:
+            with patch('reNgine.tasks.osint.people.subprocess.run') as mock_run:
                 res = run_maigret(username, self.scan.id)
                 print(f"[DEBUG] run_maigret result: {res}")
             
@@ -465,7 +487,7 @@ class ToolExecutionTest(TransactionTestCase):
             print(f"[DEBUG] Holehe real result: {res}")
         else:
             # holehe parsing is based on stdout lines
-            with patch('reNgine.tasks.osint.subprocess.Popen') as mock_popen:
+            with patch('reNgine.tasks.osint.people.subprocess.Popen') as mock_popen:
                 process_mock = MagicMock()
                 process_mock.communicate.return_value = ("[+] twitter\n[+] github\n", "")
                 mock_popen.return_value = process_mock
@@ -484,7 +506,8 @@ class ToolExecutionTest(TransactionTestCase):
         if self.is_real_mode:
             pass
         else:
-            with patch('reNgine.tasks.osint.subprocess.Popen') as mock_popen:
+            with patch('reNgine.tasks.osint.people.subprocess.Popen') as mock_popen, \
+                    patch('reNgine.tasks.osint.people.shutil.which', side_effect=lambda cmd: f'/usr/local/bin/{cmd}'):
                 process_mock = MagicMock()
                 # Mock username-anarchy output (one username per line) and gosearch output
                 process_mock.communicate.side_effect = [

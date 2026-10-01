@@ -137,7 +137,7 @@ def collect_from_arjun_files(results_dir: str) -> list[dict]:
         List of CPDE finding dicts with confidence=75.
     """
     findings: list[dict] = []
-    pattern = os.path.join(results_dir, 'arjun_*.json')
+    pattern = os.path.join(results_dir, 'web_api_discovery', 'arjun_*.json')
     file_paths = glob.glob(pattern)
 
     for filepath in file_paths:
@@ -186,13 +186,13 @@ def collect_from_paramspider_files(results_dir: str) -> list[dict]:
     Each line is a URL with FUZZ as the placeholder value.
 
     Args:
-        results_dir: Path to the scan results directory (web_api_discovery/).
+        results_dir: Path to the scan results directory.
 
     Returns:
         List of CPDE finding dicts with confidence=55.
     """
     findings: list[dict] = []
-    ps_results_dir = os.path.join(results_dir, 'results')
+    ps_results_dir = os.path.join(results_dir, 'web_api_discovery', 'results')
     file_paths = glob.glob(os.path.join(ps_results_dir, '*.txt'))
 
     for filepath in file_paths:
@@ -229,7 +229,7 @@ def collect_from_kiterunner_files(results_dir: str) -> list[dict]:
         List of CPDE finding dicts with confidence=65.
     """
     findings: list[dict] = []
-    pattern = os.path.join(results_dir, 'kr_*.json')
+    pattern = os.path.join(results_dir, 'web_api_discovery', 'kr_*.json')
     file_paths = glob.glob(pattern)
 
     for filepath in file_paths:
@@ -271,7 +271,7 @@ def collect_from_linkfinder_files(results_dir: str) -> list[dict]:
         List of CPDE finding dicts with confidence=60.
     """
     findings: list[dict] = []
-    pattern = os.path.join(results_dir, 'lf_*.txt')
+    pattern = os.path.join(results_dir, 'web_api_discovery', 'lf_*.txt')
     file_paths = glob.glob(pattern)
 
     for filepath in file_paths:

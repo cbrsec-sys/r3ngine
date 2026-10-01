@@ -43,7 +43,7 @@ class RetryTaskViewTests(TestCase):
         self.user = User.objects.create_superuser("admin", "a@b.com", "password")
         self.client.force_login(self.user)
 
-    @patch("api.views.run_and_close")
+    @patch("api.views.scan.run_and_close")
     def test_retry_failed_activity_resets_to_initiated(self, mock_run):
         mock_run.return_value = None
         scan = _make_scan(status=FAILED_TASK)
@@ -56,7 +56,7 @@ class RetryTaskViewTests(TestCase):
         # Keep time_started so the timeline does not hide this as a ghost row.
         self.assertIsNotNone(act.time_started)
 
-    @patch("api.views.run_and_close")
+    @patch("api.views.scan.run_and_close")
     def test_retry_flips_scan_to_running(self, mock_run):
         mock_run.return_value = None
         scan = _make_scan(status=FAILED_TASK)
@@ -85,7 +85,7 @@ class RetryTaskViewTests(TestCase):
         resp = self.client.post(url, content_type="application/json")
         self.assertEqual(resp.status_code, 404)
 
-    @patch("api.views.run_and_close")
+    @patch("api.views.scan.run_and_close")
     def test_retry_returns_400_when_scan_paused(self, mock_run):
         from reNgine.definitions import PAUSED_TASK
         scan = _make_scan(status=PAUSED_TASK)
@@ -94,23 +94,35 @@ class RetryTaskViewTests(TestCase):
         resp = self.client.post(url, content_type="application/json")
         self.assertEqual(resp.status_code, 400)
 
-    def test_retry_returns_400_for_subscan_activity(self):
+    @patch("api.views.scan.run_and_close")
+    def test_retry_subscan_activity_carries_subscan_context(self, mock_run):
+        """Subscan-linked activities are retryable like parent-scan rows."""
+        from django.utils import timezone
+        from startScan.models import SubScan, Subdomain
         scan = _make_scan(status=FAILED_TASK)
+        subdomain = Subdomain.objects.create(
+            scan_history=scan, target_domain=scan.domain, name="app.example.test",
+        )
+        subscan = SubScan.objects.create(
+            scan_history=scan, subdomain=subdomain, status=FAILED_TASK,
+            start_scan_date=timezone.now(),
+        )
         act = _make_activity(scan, status=FAILED_TASK)
-        # Patch objects.get so the returned instance reports a non-null subscan_id
-        original_get = ScanActivity.objects.get
+        ScanActivity.objects.filter(pk=act.pk).update(subscan=subscan)
 
-        def patched_get(**kwargs):
-            obj = original_get(**kwargs)
-            obj.subscan_id = 42  # non-null simulates a subscan-linked activity
-            return obj
-
-        url = reverse("api:retry_task", kwargs={"pk": act.pk})
-        with patch.object(ScanActivity.objects, 'get', side_effect=patched_get):
+        with patch("reNgine.temporal_client.TemporalClientProvider.get_client",
+                   new_callable=AsyncMock) as mock_get_client:
+            url = reverse("api:retry_task", kwargs={"pk": act.pk})
             resp = self.client.post(url, content_type="application/json")
-        self.assertEqual(resp.status_code, 400)
+            self.assertEqual(resp.status_code, 200)
+            # Drive the coroutine handed to run_and_close to inspect the ctx.
+            import asyncio
+            asyncio.run(mock_run.call_args[0][1])
+        ctx = mock_get_client.return_value.start_workflow.call_args.kwargs["args"][0]
+        self.assertEqual(ctx["subscan_id"], subscan.id)
+        self.assertEqual(ctx["subdomain_id"], subdomain.id)
 
-    @patch("api.views.run_and_close")
+    @patch("api.views.scan.run_and_close")
     def test_retry_success_activity_on_completed_scan_returns_200(self, mock_run):
         """Guard must accept any activity status when the parent scan is SUCCESS."""
         mock_run.return_value = None
@@ -130,7 +142,7 @@ class RetryTaskViewTests(TestCase):
         resp = self.client.post(url, content_type="application/json")
         self.assertEqual(resp.status_code, 400)
 
-    @patch("api.views.run_and_close")
+    @patch("api.views.scan.run_and_close")
     def test_retry_ctx_includes_original_scan_status(self, mock_run):
         """original_scan_status captured before scan flips to RUNNING must equal SUCCESS_TASK."""
         from unittest.mock import AsyncMock
@@ -155,7 +167,7 @@ class RetryTaskViewTests(TestCase):
         ctx_arg = call_kwargs["args"][0]
         self.assertEqual(ctx_arg.get("original_scan_status"), SUCCESS_TASK)
 
-    @patch("api.views.run_and_close")
+    @patch("api.views.scan.run_and_close")
     @patch("reNgine.utils.scan_cancellation.set_scan_stop_kill_switch")
     def test_retry_aborted_activity_clears_kill_switch(self, mock_kill, mock_run):
         """Abort leaves Redis scan_stop_{id}; retry must clear it or Go kills the run."""
@@ -171,7 +183,7 @@ class RetryTaskViewTests(TestCase):
         self.assertEqual(scan.scan_status, RUNNING_TASK)
         mock_kill.assert_called_with(scan.id, enabled=False)
 
-    @patch("api.views.run_and_close")
+    @patch("api.views.scan.run_and_close")
     def test_retry_aborted_activity_on_aborted_scan_returns_200(self, mock_run):
         mock_run.return_value = None
         scan = _make_scan(status=ABORTED_TASK)
@@ -293,7 +305,7 @@ class SingleTaskRetryWorkflowSourceTests(TestCase):
             / "reNgine"
             / "temporal"
             / "workflows"
-            / "__init__.py"
+            / "jobs.py"
         ).read_text(encoding="utf-8")
         self.assertIn('task_name == "generate_impact_assessment"', source)
         self.assertIn(

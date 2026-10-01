@@ -30,6 +30,7 @@ _TASK_TITLES = {
     'web_api_discovery':          'Web API Discovery',
     # Tier 4
     'dir_file_fuzz':              'Directory & File Fuzzing',
+    'post_crawl_osint':           'Post-Crawl OSINT',
     # Tier 5
     'waf_detection':              'WAF Detection',
     'secret_scanning':            'Secret Scanning',
@@ -80,6 +81,8 @@ _TASK_TIER = {
     'param_discovery':       3,
     'web_api_discovery':     3,
     'dir_file_fuzz':         4,
+    # Tier 4a in both scan workflows: runs once directory fuzzing has finished.
+    'post_crawl_osint':      4,
     'waf_detection':         5,
     'secret_scanning':       5,
     'vigolium_analysis':     5,
@@ -140,7 +143,7 @@ _TIER1_TO_5 = [
     'http_crawl', 'port_scan', 'vigolium_discovery',
     'fetch_url', 'screenshot', 'param_discovery',
     'http_crawl_bridge',
-    'dir_file_fuzz',
+    'dir_file_fuzz', 'post_crawl_osint',
     'web_api_discovery', 'waf_detection', 'secret_scanning',
     'waf_bypass',
 ]
@@ -304,7 +307,8 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict, is_subscan: bool
     add('calculate_risk_scores')
     add('generate_impact_assessment')
     add('sync_graph')
-    add('run_apme')
+    if (yaml_configuration.get('attack_path_modeling') or {}).get('enabled', True):
+        add('run_apme')
     add('scan_notification')
 
     return sorted(plan, key=lambda e: e['tier'])

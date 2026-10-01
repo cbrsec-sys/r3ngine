@@ -1,3 +1,4 @@
+import logging
 import time
 
 from rest_framework.authentication import SessionAuthentication
@@ -10,6 +11,8 @@ from rolepermissions.checkers import has_role
 from mcp.audit import write_audit_event
 from mcp.models import McpAuditEvent, McpSession
 from mcp.pagination import page_queryset
+
+logger = logging.getLogger(__name__)
 
 
 def _is_admin(user):
@@ -86,7 +89,11 @@ class McpAuditedAPIView(APIView):
                 error_message=error_message,
             )
         except Exception:
-            pass
+            # The tool call already ran; losing its audit row must never go unnoticed.
+            logger.exception(
+                "MCP audit write failed for %s %s (key=%s)",
+                audited.method, audited.path, getattr(audited.mcp_key, 'pk', None),
+            )
         return response
 
 

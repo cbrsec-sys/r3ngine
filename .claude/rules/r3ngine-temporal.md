@@ -17,8 +17,8 @@ Use this rule when working on features that interact with Temporal:
 
 | File | Role |
 |------|------|
-| `web/reNgine/temporal/workflows/__init__.py` | Workflow definitions (deterministic orchestrators only) |
-| `web/reNgine/temporal/activities/__init__.py` | Activity definitions (all side-effecting work) |
+| `web/reNgine/temporal/workflows/*.py` | Workflow definitions (deterministic orchestrators only): `_common.py` (retry presets, shared helpers), `master_scan.py`, `subscan.py`, `stress.py`, `jobs.py`, `recon.py`, `assessment_workflow.py`; `__init__.py` only re-exports |
+| `web/reNgine/temporal/activities/*.py` | Activity definitions (all side-effecting work): `core.py` (`_run_task`, `TemporalTaskProxy`, cancellation), then one module per domain; `__init__.py` only re-exports |
 | `web/reNgine/temporal_workflows.py` | Backward-compatible shim → re-exports from `temporal/workflows/` |
 | `web/reNgine/temporal_activities.py` | Backward-compatible shim → re-exports from `temporal/activities/` |
 | `web/reNgine/temporal_client.py` | Client for starting and cancelling workflows from Django |
@@ -40,7 +40,7 @@ Use this rule when working on features that interact with Temporal:
 ## Determinism violations — never do these in a workflow
 
 ```python
-# ❌ All forbidden in temporal/workflows/__init__.py
+# ❌ All forbidden in any temporal/workflows/*.py module
 import datetime
 datetime.datetime.now()          # use workflow.now() instead
 random.choice(items)             # non-deterministic
@@ -62,7 +62,7 @@ default is *unlimited* attempts with a 100s maximum interval. Scan tasks report 
 returning `False`, which `_run_task` turns into an exception, so one unreachable backend
 produced 200+ failed timeline rows over 13 hours before anyone noticed.
 
-Use the presets at the top of `temporal/workflows/__init__.py` — do not inline a new
+Use the presets in `temporal/workflows/_common.py` — do not inline a new
 `RetryPolicy` when one of these fits:
 
 | Preset | Attempts | Use for |
@@ -83,6 +83,14 @@ Three things to check before picking one:
   the parent workflow's `run_timeout`.
 - **Retries are visible.** Attempt 1 claims the pre-planned `ScanActivity` row; every later
   attempt inserts a new one, so N attempts mean N rows in the scan timeline.
+
+**`heartbeat_timeout` needs heartbeats.** An activity scheduled with a `heartbeat_timeout`
+shorter than its `start_to_close_timeout` is killed after that interval unless it calls
+`activity.heartbeat()`, then retried — a healthy long run fails on a timer. Task functions
+behind `_run_task` and `stream_command` already heartbeat; any other activity that blocks
+(a whole-task call, a wait on another workflow) goes under `@keep_alive` from
+`reNgine.temporal.heartbeat`, placed below `@activity.defn`. `tests/test_activity_heartbeats.py`
+fails for an activity that has neither.
 
 `execute_child_workflow` is the opposite case: its default is a single attempt, so omitting
 the policy there is safe.
@@ -158,9 +166,9 @@ Cancel is tracked via `TemporalWorkflowExecution` FK on `ScanHistory`.
 
 ## Adding a new scanning activity
 
-1. Add the activity function to `web/reNgine/temporal/activities/__init__.py` (decorate with `@activity.defn`).
+1. Add the activity function to the matching domain module in `web/reNgine/temporal/activities/` (decorate with `@activity.defn`) and re-export it from `activities/__init__.py`.
 2. Register it in the worker in `run_temporal_orchestrator.py` (add to `activities=[]`).
-3. Call it from the appropriate tier in `MasterScanWorkflow` or `SubScanWorkflow` in `temporal/workflows/__init__.py`, **with an explicit `retry_policy`** (see "Retry policies" above).
+3. Call it from the appropriate tier in `MasterScanWorkflow` (`temporal/workflows/master_scan.py`) or `SubScanWorkflow` (`temporal/workflows/subscan.py`), **with an explicit `retry_policy`** (see "Retry policies" above).
 4. Add the task name to `_TASK_TIER` in `web/reNgine/task_plan.py`, otherwise its retry rows land in Tier 7 in the timeline.
 5. If the activity shells out to a tool, consider using the Go executor (`go-executor-queue`) for subprocess management.
 
@@ -168,7 +176,9 @@ Cancel is tracked via `TemporalWorkflowExecution` FK on `ScanHistory`.
 
 ## Go executor activities
 
-The Go executor (`web/executor/main.go`) handles tool subprocesses on `go-executor-queue`. Use it for tools with complex subprocess lifecycle (nmap, ffuf, nuclei, etc.).
+The Go executor (`web/executor/main.go`) handles tool subprocesses on `go-executor-queue` — on a remote worker, on `go-executor-queue-<WORKER_NAME>` (`queue.go`). Use it for tools with complex subprocess lifecycle (nmap, ffuf, nuclei, etc.).
+
+The queue name is host-specific, so never hard-code it: the activity/task side gets it from `reNgine.utils.task_queues.go_executor_queue()` (reads `WORKER_NAME`; `python_orchestrator_queue()` is its Python counterpart) and passes it into the workflow's input, and the workflow forwards that value — a workflow must not read the environment. `GoExecutorTaskWorkflow` (`input_data["executor_task_queue"]`) is the reference.
 
 To add a new Go activity:
 1. Add a handler in `main.go`.
@@ -178,8 +188,9 @@ To add a new Go activity:
 result = await workflow.execute_activity(
     "GoToolActivity",
     args=[tool_config],
-    task_queue="go-executor-queue",
+    task_queue=tool_config["executor_task_queue"],  # set by the caller from go_executor_queue()
     start_to_close_timeout=timedelta(hours=2),
+    retry_policy=_RETRY_LONG_SCAN,
 )
 ```
 
@@ -210,12 +221,12 @@ Every activity **must** emit a START log and a COMPLETE (or ERROR) log. This is 
 
 Activity log output goes to both `temporal.log` (file, via `temporal_file` handler) and the console (via propagation to the `reNgine` catch-all).
 
-Scan task helpers called from activities (`tasks.py`, `common_func.py`, `*_tasks.py`) use plain `logging.getLogger(__name__)` — their output goes to the `task` handler (stdout, `module.funcName | LEVEL | message` format). Do not mix the two patterns within a single file.
+Scan task helpers called from activities (`tasks/` package, `common_func/` package, `*_tasks.py`) use plain `logging.getLogger(__name__)` — their output goes to the `task` handler (stdout, `module.funcName | LEVEL | message` format). Do not mix the two patterns within a single file.
 
 ## Integration guidelines
 
 - Orchestrate scans from `temporal_client.py`; avoid mixing workflow start logic directly into views.
 - Validate all user input before passing it into workflow arguments (target URLs, scan config).
-- Do not duplicate activity logic — reuse shared helpers in the `tasks/` package and `common_func.py`.
+- Do not duplicate activity logic — reuse shared helpers in the `tasks/` and `common_func/` packages.
 - All activities must be idempotent by design (Temporal may retry them).
 - All activities must log START and COMPLETE/ERROR — see logging section above.

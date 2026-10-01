@@ -31,7 +31,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
     from reNgine.job_tracker import update_job as _update_job
     from scanEngine.models import Proxy
 
-    logger.info(f"Starting automated proxy fetch and verification task (limit={limit}).")
+    logger.info("Starting automated proxy fetch and verification task (limit=%s).", limit)
     if job_id:
         _update_job(job_id, 'RUNNING', 10, 'Downloading new proxies')
 
@@ -106,7 +106,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
         if 'github.com' in url and '/blob/' in url:
             url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
 
-        logger.info(f"Downloading proxy list from: {url}")
+        logger.info("Downloading proxy list from: %s", url)
         try:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
@@ -127,15 +127,15 @@ def fetch_proxies_task(limit=1000, job_id=None):
                             all_proxies.add(token)
                             added_this_url += 1
 
-                logger.info(f"Successfully added {added_this_url} raw proxies from {url}")
+                logger.info("Successfully added %s raw proxies from %s", added_this_url, url)
             else:
-                logger.warning(f"Failed to download proxy list from {url}. Status code: {response.status_code}")
+                logger.warning("Failed to download proxy list from %s. Status code: %s", url, response.status_code)
         except Exception as e:
-            logger.error(f"Error fetching proxies from {url}: {str(e)}")
+            logger.error("Error fetching proxies from %s: %s", url, str(e))
 
     unique_proxies = list(all_proxies)[:limit]
     total = len(unique_proxies)
-    logger.info(f"Total unique raw proxies fetched: {total} (capped at {limit})")
+    logger.info("Total unique raw proxies fetched: %s (capped at %s)", total, limit)
 
     if job_id:
         _update_job(job_id, 'RUNNING', 30, f'Verifying {total} proxies')
@@ -163,7 +163,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
                 completed_count[0] += 1
                 done = completed_count[0]
             if done % 50 == 0 or done == total:
-                logger.info(f"Verification progress: {done}/{total} - Found {len(live_proxies)} live proxies so far.")
+                logger.info("Verification progress: %s/%s - Found %s live proxies so far.", done, total, len(live_proxies))
                 progress = 30 + int((done / total) * 65)
                 if _job_id:
                     _update_job(
@@ -171,7 +171,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
                         f'Checking proxies: {done}/{total} ({len(live_proxies)} live)',
                     )
 
-    logger.info(f"Proxy verification complete. Found {len(live_proxies)} live proxies out of {total} tested.")
+    logger.info("Proxy verification complete. Found %s live proxies out of %s tested.", len(live_proxies), total)
     if job_id:
         _update_job(job_id, 'RUNNING', 95, 'Formatting live proxies')
 
@@ -213,7 +213,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
         proxy_obj.save()
         logger.info("Automatically saved live proxies to database (verified_at=%s).", proxy_obj.proxies_verified_at)
     except Exception as e:
-        logger.error(f"Failed to auto-save proxies: {e}")
+        logger.error("Failed to auto-save proxies: %s", e)
 
     if job_id:
         _update_job(job_id, 'SUCCESS', 100, 'Proxy list updated and saved automatically', result={"count": len(final_list), "proxies": proxy_str})

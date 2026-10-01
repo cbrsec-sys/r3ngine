@@ -1,5 +1,54 @@
 # Changelog
 
+### [v3.7.8] - 2026-10-01
+
+#### Added
+
+- **CI without a full stack** (PR #129):
+  - `.github/workflows/ci.yml` runs Django tests against throwaway Postgres, `makemigrations --check`, flake8 (bug classes), bandit (report), frontend `tsc` / lint / vitest / build, and Go executor vet/build/test.
+  - Vitest wired; pre-existing ESLint issues baselined in `frontend/eslint-suppressions.json`.
+  - Static guards: every workflow `execute_activity` must set an explicit `retry_policy`; silent broad `except` handlers and client-facing `str(e)` leaks are rejected by tests.
+
+- **Remote workers**:
+  - Server-generated tokens shown once, stored as SHA-256 (`scanEngine` migration `0019`); only sys admins create/delete; heartbeat bypasses login redirect and trusts `X-Real-IP`.
+  - Per-worker Go executor queues (`go-executor-queue-<WORKER_NAME>`); workers verify the master TLS cert (`MASTER_CA_BUNDLE` / `MASTER_TLS_VERIFY`).
+  - Inactive workers are rejected on heartbeat (merge harden).
+
+- **SecurityTrails** subdomain source (opt-in via vault key; skipped cleanly when unset).
+- **Compact vulnerability list**: `GET /api/listVulnerability/?compact=1` for table/Exploits tabs (default payload unchanged).
+- **OpenAI-compatible LLM provider** with configurable base URL; rate-limit retries and longer Anthropic replies.
+- **Engine editor** surfaces for dalfox, nuclei, s3scanner, OSINT/discovery switches, email security, and related scan options the backend already read.
+
+#### Changed
+
+- **Maintainability (PR #129)**:
+  - Split `temporal/activities`, `temporal/workflows`, `common_func`, API views/serializers, and OSINT/crawl tasks into domain packages with compatibility shims.
+  - Logger calls pass values as arguments; activity START/COMPLETE lines reach `temporal.log`.
+  - Frontend API calls go through typed feature `api` modules; `getSafeUrl` / `openSafeUrl` for links from API data; unused packages removed; Nivo replaced by ECharts where applicable.
+
+- **Query performance**: list endpoints used by UI tables batch per-row reads after pagination (`list_serializer_class`); `DirectoryViewSet` is read-only (405 on writes).
+
+- **Infrastructure images**:
+  - Temporal `auto-setup:1.22.4` → `temporalio/server:1.31.3` (+ schema/namespace jobs); upgrade via `make temporal-upgrade` / `documents/upgrading-infrastructure.md`.
+  - Neo4j `5.12.0` → `5.26-community` (backup volume first); Redis pinned `8.10-alpine`; nginx `1.31-alpine`.
+  - No `docker.sock` in app containers; Tor/Ollama are compose profiles (`TOR_CONTROL_PASSWORD` required for Tor).
+
+#### Fixed
+
+- **CVE enrichment retry storm**: keep `last_enriched_at` / `force=` skip logic and EnrichScanCVEs timeouts (`2h` / heartbeat `15m`) when merging PR #129 module splits.
+- **Temporal reliability**: `@keep_alive` heartbeats for long activities; schedule delete only ignores not-found; feroxbuster/ffuf no longer swallow DB flush errors; scan abort cancels Go-executor promptly.
+- **Shell injection**: crawled URLs/hostnames `shlex`-quoted in tool commands (arjun, LinkFinder, ffuf, feroxbuster, …).
+- **File deletion**: screenshot purge and scan-result cleanup confined under `RENGINE_RESULTS` (no more `rm -rf` of the whole results root).
+- **Exception text**: API responses return `INTERNAL_ERROR_MESSAGE` instead of `str(e)`; OllamaManager and MCP AD/compliance error paths included; static guard covers `response[key] = str(exc)`.
+- **Exploit-DB / Searchsploit** removed (volume race on clean install; no scan task used it).
+- **Frontend**: assessment execution under TanStack router, WHOIS/buckets/DNS display, compact vuln table, Resume on scan page, and related type-driven UI bugs.
+- **scanEngine 0019**: null/empty legacy worker tokens get unique unusable placeholder hashes so the irreversible unique `auth_token_hash` migration cannot collide or crash.
+
+#### Notes
+
+- Existing installs: run `make temporal-upgrade` (with Temporal/orchestrator/executor stopped) before `make up` on the new Temporal images; back up Neo4j before the 5.26 store upgrade; `scanEngine.0019` is irreversible.
+- Deploy checklist and rollback notes: `documents/upgrading-infrastructure.md`. Open follow-ups: `documents/TODO.md`.
+
 ### [v3.7.7] - 2026-09-27
 
 #### Added

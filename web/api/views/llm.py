@@ -43,6 +43,7 @@ from reNgine.definitions import (
     PERM_MODIFY_TARGETS, PERM_MODIFY_SCAN_CONFIGURATIONS,
     PERM_MODIFY_WORDLISTS, PERM_INITATE_SCANS_SUBSCANS,
     PERM_MODIFY_SCAN_REPORT, PERM_MODIFY_SCAN_RESULTS,
+    INTERNAL_ERROR_MESSAGE,
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -189,7 +190,8 @@ class OllamaManager(APIView):
 			else:
 				response['status'] = True
 		except Exception as e:
-			response['error'] = str(e)		
+			logger.error('Ollama model pull failed', exc_info=True)
+			response['error'] = INTERNAL_ERROR_MESSAGE
 		return Response(response)
 	
 	def delete(self, request):
@@ -213,7 +215,8 @@ class OllamaManager(APIView):
 			else:
 				response['status'] = True
 		except Exception as e:
-			response['error'] = str(e)
+			logger.error('Ollama model delete failed', exc_info=True)
+			response['error'] = INTERNAL_ERROR_MESSAGE
 		return Response(response)
 	
 	def put(self, request):
@@ -236,6 +239,7 @@ class OllamaManager(APIView):
 			)
 			response['status'] = True
 		except Exception as e:
-			response['error'] = str(e)
+			logger.error('Ollama settings update failed', exc_info=True)
+			response['error'] = INTERNAL_ERROR_MESSAGE
 		return Response(response)
 

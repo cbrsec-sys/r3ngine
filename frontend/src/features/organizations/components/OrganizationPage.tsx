@@ -10,7 +10,7 @@ import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 export const OrganizationPage: React.FC = () => {
-  const { projectSlug } = useParams({ strict: false }) as any;
+  const { projectSlug } = useParams({ from: '/$projectSlug/org' });
   const { data: organizations, isLoading } = useOrganizations();
   const deleteMutation = useDeleteOrganizations();
 

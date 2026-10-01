@@ -25,11 +25,11 @@ import {
   useCapabilities,
   useRunTool,
   useToolArgs,
+  refreshToolArgs,
   type CapabilityTool,
   type ToolArgField,
 } from './api';
 import { useQueryClient } from '@tanstack/react-query';
-import axios from '../../api/axiosConfig';
 
 export interface RunSingleToolModalProps {
   open: boolean;
@@ -322,12 +322,9 @@ export const RunSingleToolModal: React.FC<RunSingleToolModalProps> = ({
                 onClick={() => {
                   if (!selectedTool) return;
                   setSchemaRefreshing(true);
-                  void axios
-                    .get(`/api/action/tool/${encodeURIComponent(selectedTool)}/args/`, {
-                      params: { refresh: 1 },
-                    })
-                    .then((res: { data: unknown }) => {
-                      queryClient.setQueryData(['tool-args', selectedTool], res.data);
+                  void refreshToolArgs(selectedTool)
+                    .then((payload) => {
+                      queryClient.setQueryData(['tool-args', selectedTool], payload);
                     })
                     .catch(() => {
                       onError?.('Could not refresh argument schema from host');

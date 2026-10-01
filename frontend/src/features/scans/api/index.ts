@@ -1,10 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import type { operations, components } from '@/types/api';
-import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, ScanTierRetryResponse, SecretLeak, DirectoryFile } from '../types';
-import type { Domain } from '../../targets/types';
+import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, ScanTierRetryResponse, SecretLeak, DirectoryFile, DirectorySubdomainSummary, EmailBreach, ScanStatusResponse } from '../types';
+import type { Domain, DomainListResponse } from '../../targets/types';
+import { getCsrfToken } from '../../../api/axiosConfig';
 
+/**
+ * `GET /api/listDirectories/`: the endpoint files of one subdomain when `subdomain_id` is set,
+ * otherwise one summary row per subdomain of the scan that has endpoints.
+ */
 export const useDirectories = (params: { scan_id?: string | number, subdomain_id?: string | number, page?: number }) => {
-  return useQuery<{ count: number, next: string | null, previous: string | null, results: DirectoryFile[] }>({
+  return useQuery<{ count: number, next: string | null, previous: string | null, results: (DirectoryFile | DirectorySubdomainSummary)[] }>({
     queryKey: ['directories', params],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
@@ -34,7 +39,7 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["api_listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      const data: DomainListResponse = await response.json();
       return data.results || [];
     },
     enabled: !!projectSlug,
@@ -317,6 +322,47 @@ export const useStopScan = (projectSlug: string) => {
   });
 };
 
+export interface ScanHardwareProfileResponse {
+  status: boolean;
+  message: string;
+  hardware_profile?: { id: number; name: string };
+}
+
+/**
+ * `POST /api/action/scan/<id>/hardware-profile/`: switch the hardware profile of a scan.
+ * Works on a running scan; steps that start afterwards use the new profile.
+ */
+export const setScanHardwareProfile = async (
+  scanId: number,
+  hardwareProfileId: number,
+): Promise<ScanHardwareProfileResponse> => {
+  const response = await fetch(`/api/action/scan/${scanId}/hardware-profile/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrfToken() || '',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ hardware_profile_id: hardwareProfileId }),
+  });
+  const body = (await response.json().catch(() => ({}))) as Partial<ScanHardwareProfileResponse>;
+  if (!response.ok || !body.status) {
+    throw new Error(body.message || 'Failed to change the hardware profile');
+  }
+  return body as ScanHardwareProfileResponse;
+};
+
+export const useSetScanHardwareProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ scanId, hardwareProfileId }: { scanId: number; hardwareProfileId: number }) =>
+      setScanHardwareProfile(scanId, hardwareProfileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
+    },
+  });
+};
+
 export const useResumeScan = (projectSlug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -330,11 +376,12 @@ export const useResumeScan = (projectSlug: string) => {
         credentials: 'include',
         body: JSON.stringify({ scan_id: id }),
       });
-      return response.json();
+      return response.json() as Promise<{ status: boolean; message?: string }>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
       queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
     },
   });
 };
@@ -471,7 +518,7 @@ export const useSecretLeaks = (projectSlug: string, scanId: number) => {
 };
 
 export const useEmailBreaches = (scanId: number) => {
-  return useQuery<any[]>({
+  return useQuery<EmailBreach[]>({
     queryKey: ['email-breaches', scanId],
     queryFn: async () => {
       const response = await fetch(`/api/emailBreaches/?scan_id=${scanId}`, {
@@ -513,7 +560,7 @@ export const useCheckEmailBreach = () => {
 
 
 export const useScanStatus = (projectSlug: string, options: { enabled?: boolean } = {}) => {
-  return useQuery({
+  return useQuery<ScanStatusResponse>({
     queryKey: ['scan-status', projectSlug],
     queryFn: async () => {
       const response = await fetch(`/api/scan_status/?project=${projectSlug}`, {
@@ -632,11 +679,13 @@ export const useStressTelemetry = (scanId: number | string | undefined) => {
     refetchInterval: 15000, // Refresh every 15s during test runs
   });
 };
-export const useFetchWhois = (projectSlug: string, scanId: number) => {
+/** Runs a fresh WHOIS lookup (stored on the target) and refetches the summary showing it. */
+export const useFetchWhois = (summaryQueryKey: QueryKey) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (target: string) => {
-      const response = await fetch(`/api/tools/whois/?target=${target}&is_reload=true`, {
+      const params = new URLSearchParams({ target, is_reload: 'true' });
+      const response = await fetch(`/api/tools/whois/?${params.toString()}`, {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -645,7 +694,7 @@ export const useFetchWhois = (projectSlug: string, scanId: number) => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scan-summary', projectSlug, scanId] });
+      queryClient.invalidateQueries({ queryKey: summaryQueryKey });
     },
   });
 };

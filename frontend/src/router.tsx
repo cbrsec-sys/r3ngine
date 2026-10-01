@@ -4,13 +4,13 @@ import { Shell } from "./components/Shell";
 
 import { Box, Typography, Button, CircularProgress } from "@mui/material";
 import PluginPageLoader from './features/plugins/components/PluginPageLoader';
-import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import { usePluginRegistry } from './features/plugins/api/pluginsApi';
 import { AlertCircle, Home, RefreshCw } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import { LoginPage } from "./features/auth/components/LoginPage";
 import { LogoutPage } from "./features/auth/components/LogoutPage";
 import { OnboardingPage } from "./features/auth/components/OnboardingPage";
+import type { CurrentUser } from "./features/auth/api";
 
 // Lazy Routes
 const DashboardPage = lazyRouteComponent(() => import("./features/dashboard").then(m => ({ default: m.DashboardPage })));
@@ -58,7 +58,7 @@ interface RouterContext {
   auth: {
     isAuthenticated: boolean;
     isLoading: boolean;
-    user: any;
+    user: CurrentUser | null;
   };
 }
 
@@ -523,13 +523,7 @@ const pluginMainRoute = createRoute({
       );
     }
 
-    const { data: pluginsRegistry, isLoading, error } = useQuery<any[]>({
-      queryKey: ['pluginsRegistry'],
-      queryFn: async () => {
-        const res = await axios.get('/api/plugins/registry/');
-        return res.data;
-      }
-    });
+    const { data: pluginsRegistry, isLoading, error } = usePluginRegistry();
 
     if (isLoading) {
       return (

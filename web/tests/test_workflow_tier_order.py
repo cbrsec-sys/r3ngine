@@ -93,7 +93,7 @@ class TestSubScanWorkflowTierOrder(TestCase):
         They are stripped from active_tasks before tier construction and executed
         as a concurrent flat gather after the tier pipeline.
         """
-        from reNgine.temporal_workflows import _STANDALONE_SUBSCAN_WORKFLOWS
+        from reNgine.temporal.workflows import _STANDALONE_SUBSCAN_WORKFLOWS
         # Pass all standalone types as if they were active tasks
         tiers = self._build_tiers(list(_STANDALONE_SUBSCAN_WORKFLOWS))
         all_tiered = set()

@@ -108,6 +108,9 @@ DATABASES['default'].update({  # noqa: F405
     'OPTIONS': {
         'sslmode': 'disable',
     },
+    # Separate test databases let two suites run side by side (None keeps
+    # Django's default, test_<NAME>).
+    'TEST': {'NAME': os.environ.get('RENGINE_TEST_DB_NAME') or None},
 })
 
 

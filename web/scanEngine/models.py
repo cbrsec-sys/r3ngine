@@ -44,9 +44,18 @@ class EngineType(models.Model):
             config = yaml.safe_load(self.yaml_configuration)
             if isinstance(config, dict):
                 # Tasks are the top level keys in the YAML config
-                return list(config.keys())
-        except Exception:
-            pass
+                tasks = list(config.keys())
+                # The engine editor used to save the secret scanning section as
+                # a top-level leaks_and_secrets, which no workflow gates on.
+                if 'leaks_and_secrets' in tasks and 'secret_scanning' not in tasks:
+                    tasks.append('secret_scanning')
+                # CredSpy is switched on under osint but runs in the post-crawl OSINT step.
+                osint = config.get('osint')
+                if isinstance(osint, dict) and osint.get('credspy') and 'post_crawl_osint' not in tasks:
+                    tasks.append('post_crawl_osint')
+                return tasks
+        except yaml.YAMLError:
+            logger.warning("Engine %s has invalid YAML configuration", self.pk, exc_info=True)
         return []
 
     def has_task(self, task_name):
@@ -388,11 +397,15 @@ class ScanProfile(models.Model):
         return d
 
 
+WORKER_TOKEN_PREFIX = 'r3n_wkr_'
+
+
 class ScanWorker(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
-    auth_token = models.CharField(max_length=255, unique=True) # Used to secure worker access
+    # SHA-256 of the worker's bearer token; the token itself is shown once at creation.
+    auth_token_hash = models.CharField(max_length=64, unique=True)
     task_queue = models.CharField(max_length=100)
     hostname = models.CharField(max_length=100, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)

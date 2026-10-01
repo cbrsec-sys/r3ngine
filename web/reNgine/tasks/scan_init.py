@@ -6,6 +6,7 @@ import uuid
 import asyncio
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from reNgine.common_func import *
 from reNgine.definitions import *
@@ -138,7 +139,7 @@ def finish_osint(results, scan_history_id):
     during the pipeline run.
     """
     from reNgine.tasks.osint import osint_orchestrator
-    logger.info(f"[finish_osint] Starting Deep Pursuit pipeline for scan {scan_history_id}")
+    logger.info("[finish_osint] Starting Deep Pursuit pipeline for scan %s", scan_history_id)
     osint_orchestrator(scan_history_id=scan_history_id)
     return results
 
@@ -146,7 +147,7 @@ def finish_osint_discovery(results, results_dir):
     """Callback for OSINT discovery tasks. Strips metadata from results."""
     opsec = get_opsec_manager()
     opsec.strip_directory(results_dir)
-    logger.info(f"OSINT discovery completed and cleaned up in {results_dir}")
+    logger.info("OSINT discovery completed and cleaned up in %s", results_dir)
     return results
 
 
@@ -212,7 +213,7 @@ def initiate_scan_temporal(
 		enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 		gf_patterns = config.get(GF_PATTERNS, [])
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
-		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+		api_discovery_tools = resolve_api_discovery_tools(api_discovery_config)
 		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Get domain ----
@@ -311,37 +312,7 @@ def initiate_scan_temporal(
 				subdomain.technologies.add(tech)
 			subdomain.save()
 
-		# ---- Get Hardware Profile Details ----
-		from scanEngine.models import HardwareProfile
-		hardware_profile_ctx = None
-		if scan.hardware_profile:
-			profile = scan.hardware_profile
-			hardware_profile_ctx = {
-				'id': profile.id,
-				'name': profile.name,
-				'threads': profile.threads,
-				'rate_limit': profile.rate_limit,
-				'timeout': profile.timeout,
-				'delay': profile.delay,
-				'retries': profile.retries,
-			}
-		else:
-			try:
-				profile = HardwareProfile.objects.filter(is_default=True, is_active=True).first()
-				if not profile:
-					profile = HardwareProfile.objects.filter(is_active=True).first()
-				if profile:
-					hardware_profile_ctx = {
-						'id': profile.id,
-						'name': profile.name,
-						'threads': profile.threads,
-						'rate_limit': profile.rate_limit,
-						'timeout': profile.timeout,
-						'delay': profile.delay,
-						'retries': profile.retries,
-					}
-			except Exception:
-				pass
+		hardware_profile_ctx = hardware_profile_context(scan)
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
 		_proxy = Proxy.objects.first()
@@ -379,8 +350,7 @@ def initiate_scan_temporal(
 				try:
 					client = await TemporalClientProvider.get_client()
 					logger.info(
-						f'[initiate_scan_temporal] Starting MasterScanWorkflow '
-						f'attempt {attempt}/{max_retries} workflow_id={workflow_id}'
+						"[initiate_scan_temporal] Starting MasterScanWorkflow attempt %s/%s workflow_id=%s", attempt, max_retries, workflow_id
 					)
 					handle = await client.start_workflow(
 						"MasterScanWorkflow",
@@ -395,12 +365,12 @@ def initiate_scan_temporal(
 				except TemporalServiceError as e:
 					if attempt == max_retries:
 						logger.error(
-							f'[initiate_scan_temporal] Failed after {max_retries} retries: {e}'
+							"[initiate_scan_temporal] Failed after %s retries: %s", max_retries, e
 						)
 						raise
 					wait_time = backoff_base ** (attempt - 1)
 					logger.warning(
-						f'[initiate_scan_temporal] Attempt {attempt} failed, retrying in {wait_time}s: {e}'
+						"[initiate_scan_temporal] Attempt %s failed, retrying in %ss: %s", attempt, wait_time, e
 					)
 					await asyncio.sleep(wait_time)
 
@@ -409,8 +379,7 @@ def initiate_scan_temporal(
 		started_workflow_id = run_and_close(loop, _start_workflow_with_retry())
 
 		logger.info(
-			f'Started MasterScanWorkflow id={started_workflow_id} '
-			f'for scan_history_id={scan.id}'
+			"Started MasterScanWorkflow id=%s for scan_history_id=%s", started_workflow_id, scan.id
 		)
 
 		# Track workflow execution so cancel_workflow can find it
@@ -436,7 +405,7 @@ def initiate_scan_temporal(
 				status=CELERY_TASK_STATUS_MAP.get(scan.scan_status, 'RUNNING')
 			)
 		except Exception as e:
-			logger.warning(f"Could not send scan notification: {e}")
+			logger.warning("Could not send scan notification: %s", e)
 
 		return {
 			'success': True,
@@ -496,7 +465,7 @@ def initiate_subscan_temporal(
 	else:
 		scan_types = list(scan_type)
 
-	logger.info(f"Initiating subdomain subscans '{scan_types}' via Temporal workflow orchestrator")
+	logger.info("Initiating subdomain subscans '%s' via Temporal workflow orchestrator", scan_types)
 	created_subscans = []
 	try:
 		# ---- Get Subdomain, Domain and ScanHistory ----
@@ -514,7 +483,7 @@ def initiate_subscan_temporal(
 		
 		# ---- Get web_api_discovery config ----
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
-		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+		api_discovery_tools = resolve_api_discovery_tools(api_discovery_config)
 		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Skip subscan types that are already active for this subdomain ----
@@ -543,8 +512,7 @@ def initiate_subscan_temporal(
 				None,
 			)
 			logger.info(
-				f"Skipping duplicate subscan launch for subdomain_id={subdomain.id}. "
-				f"Active types already exist: {scan_types}. existing_workflow_id={existing_workflow_id}"
+				"Skipping duplicate subscan launch for subdomain_id=%s. Active types already exist: %s. existing_workflow_id=%s", subdomain.id, scan_types, existing_workflow_id
 			)
 			return {
 				'success': True,
@@ -593,39 +561,9 @@ def initiate_subscan_temporal(
 				status='RUNNING'
 			)
 		except Exception as notif_err:
-			logger.warning(f"Could not send subscan start notification: {notif_err}")
+			logger.warning("Could not send subscan start notification: %s", notif_err)
 
-		# ---- Get Hardware Profile Details ----
-		from scanEngine.models import HardwareProfile
-		hardware_profile_ctx = None
-		if scan.hardware_profile:
-			profile = scan.hardware_profile
-			hardware_profile_ctx = {
-				'id': profile.id,
-				'name': profile.name,
-				'threads': profile.threads,
-				'rate_limit': profile.rate_limit,
-				'timeout': profile.timeout,
-				'delay': profile.delay,
-				'retries': profile.retries,
-			}
-		else:
-			try:
-				profile = HardwareProfile.objects.filter(is_default=True, is_active=True).first()
-				if not profile:
-					profile = HardwareProfile.objects.filter(is_active=True).first()
-				if profile:
-					hardware_profile_ctx = {
-						'id': profile.id,
-						'name': profile.name,
-						'threads': profile.threads,
-						'rate_limit': profile.rate_limit,
-						'timeout': profile.timeout,
-						'delay': profile.delay,
-						'retries': profile.retries,
-					}
-			except Exception:
-				pass
+		hardware_profile_ctx = hardware_profile_context(scan)
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
 		_proxy = Proxy.objects.first()
@@ -658,7 +596,7 @@ def initiate_subscan_temporal(
 			subdomain=subdomain
 		)
 		if endpoint and endpoint.is_alive:
-			logger.warning(f'Found subdomain root HTTP URL {endpoint.http_url}')
+			logger.warning("Found subdomain root HTTP URL %s", endpoint.http_url)
 			subdomain.http_url = endpoint.http_url
 			subdomain.http_status = endpoint.http_status
 			subdomain.response_time = endpoint.response_time
@@ -688,8 +626,7 @@ def initiate_subscan_temporal(
 				try:
 					client = await TemporalClientProvider.get_client()
 					logger.info(
-						f'[initiate_subscan_temporal] Starting SubScanWorkflow '
-						f'attempt {attempt}/{max_retries} workflow_id={workflow_id}'
+						"[initiate_subscan_temporal] Starting SubScanWorkflow attempt %s/%s workflow_id=%s", attempt, max_retries, workflow_id
 					)
 					handle = await client.start_workflow(
 						"SubScanWorkflow",
@@ -705,12 +642,12 @@ def initiate_subscan_temporal(
 				except TemporalServiceError as e:
 					if attempt == max_retries:
 						logger.error(
-							f'[initiate_subscan_temporal] Failed after {max_retries} retries: {e}'
+							"[initiate_subscan_temporal] Failed after %s retries: %s", max_retries, e
 						)
 						raise
 					wait_time = backoff_base ** (attempt - 1)
 					logger.warning(
-						f'[initiate_subscan_temporal] Attempt {attempt} failed, retrying in {wait_time}s: {e}'
+						"[initiate_subscan_temporal] Attempt %s failed, retrying in %ss: %s", attempt, wait_time, e
 					)
 					await asyncio.sleep(wait_time)
 
@@ -719,8 +656,7 @@ def initiate_subscan_temporal(
 		started_workflow_id = run_and_close(loop, _start_subscan_workflow_with_retry())
 
 		logger.info(
-			f"Started SubScanWorkflow id={started_workflow_id} "
-			f"for subscan_id={first_subscan_id} (types={pending_scan_types})"
+			"Started SubScanWorkflow id=%s for subscan_id=%s (types=%s)", started_workflow_id, first_subscan_id, pending_scan_types
 		)
 
 		# Save workflow ID in all subscans' workflow_ids list
@@ -819,7 +755,7 @@ def report(self, ctx={}, description=None):
 			engine_id=engine_id,
 			status=status_h)
 	except Exception as e:
-		logger.warning(f"Could not send scan notification: {e}")
+		logger.warning("Could not send scan notification: %s", e)
 
 
 def _unsuccessful_task_names(scan):
@@ -1028,7 +964,7 @@ def resume_scan_temporal(scan_id, auto=False):
 			)
 			retry_failed_tasks_temporal(scan, auto=auto)
 			return
-		logger.info(f"Scan {scan_id} has no remaining tasks to resume.")
+		logger.info("Scan %s has no remaining tasks to resume.", scan_id)
 		scan.scan_status = SUCCESS_TASK
 		scan.stop_scan_date = timezone.now()
 		scan.save()
@@ -1085,12 +1021,12 @@ def resume_scan_temporal(scan_id, auto=False):
 				try:
 					handle = client.get_workflow_handle(candidate)
 					await handle.cancel()
-					logger.info(f"Cancelled old workflow before recovery: {candidate}")
+					logger.info("Cancelled old workflow before recovery: %s", candidate)
 				except RPCError as e:
 					if e.status not in (RPCStatusCode.NOT_FOUND,):
-						logger.warning(f"Could not cancel old workflow {candidate}: {e}")
+						logger.warning("Could not cancel old workflow %s: %s", candidate, e)
 				except Exception as e:
-					logger.warning(f"Could not cancel old workflow {candidate}: {e}")
+					logger.warning("Could not cancel old workflow %s: %s", candidate, e)
 
 		await client.start_workflow(
 			"MasterScanWorkflow",
@@ -1117,7 +1053,7 @@ def resume_scan_temporal(scan_id, auto=False):
 		}
 	)
 	
-	logger.info(f"Resumed scan {scan_id} with remaining tasks: {remaining_tasks}")
+	logger.info("Resumed scan %s with remaining tasks: %s", scan_id, remaining_tasks)
 
 
 # Workflow IDs that are infrastructure / schedules, never scan tool work.
@@ -1384,3 +1320,32 @@ def recover_stuck_scans():
 		"[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d retried_failed=%d",
 		active, recovered, retried,
 	)
+
+
+def hardware_profile_context(scan) -> Optional[dict]:
+	"""Throttling settings for the scan: its own profile, else the default, else any active one.
+
+	None leaves every tool on its engine defaults, so a failed lookup is logged
+	rather than silently changing how hard the scan hits the target.
+	"""
+	from scanEngine.models import HardwareProfile
+
+	profile = scan.hardware_profile
+	if profile is None:
+		try:
+			active = HardwareProfile.objects.filter(is_active=True)
+			profile = active.filter(is_default=True).first() or active.first()
+		except Exception:
+			logger.warning("Hardware profile lookup failed for scan %s; using engine defaults", scan.id, exc_info=True)
+			return None
+	if profile is None:
+		return None
+	return {
+		'id': profile.id,
+		'name': profile.name,
+		'threads': profile.threads,
+		'rate_limit': profile.rate_limit,
+		'timeout': profile.timeout,
+		'delay': profile.delay,
+		'retries': profile.retries,
+	}

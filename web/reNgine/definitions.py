@@ -196,7 +196,8 @@ TRUFFLEHOG = 'trufflehog'
 RUN_CPANEL2SHELL = 'run_cpanel2shell'
 CPANEL_USER_WORDLIST = 'cpanel_user_wordlist'
 CPANEL_SCANNER_PROXY_TYPE = 'proxy_type'
-CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/app/wordlist/auth/cpanel_users.txt'
+# Downloaded by the orchestrator and executor entrypoints into the shared wordlist volume.
+CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/wordlist/cpanel_users.txt'
 
 RUN_REACT2SHELL = 'run_react2shell'
 USE_WORDFENCE_CANDIDATE = 'use_wordfence_candidate'
@@ -230,7 +231,9 @@ ENUMEREPO = 'enumerepo'
 POST_CRAWL_OSINT = 'post_crawl_osint'
 METAGOOFIL = 'metagoofil'
 AMASS_INTEL = 'amass_intel'
+AMASS_INTEL_DISCOVERY = 'amass_intel_discovery'
 DIRSEARCH = 'dirsearch'
+RUN_FFUF = 'run_ffuf'
 RUN_DIRSEARCH = 'run_dirsearch'
 RUN_FEROXBUSTER = 'run_feroxbuster'
 
@@ -730,7 +733,6 @@ DEFAULT_DIR_FILE_FUZZ_EXTENSIONS =  [
     '.asp',
     '.aspx',
     '.txt',
-    '.conf',
     '.sql',
     '.json',
     '.yml',
@@ -776,6 +778,8 @@ OLLAMA = 'ollama'
 OPENAI = 'openai'
 ANTHROPIC = 'anthropic'
 GEMINI = 'gemini'
+# Any server that speaks the OpenAI chat completions API at a configured base URL.
+OPENAI_COMPATIBLE = 'openai_compatible'
 
 SUGGESTED_OLLAMA_MODELS = [
     {
@@ -1099,3 +1103,7 @@ TARGET_TYPE_CHOICES = [
     (TARGET_TYPE_CRYPTO_ADDRESS, 'Crypto Address'),
     (TARGET_TYPE_CODE_PATH, 'Code Path / Repository'),
 ]
+
+
+# Returned to clients in place of exception text; the details go to the server log.
+INTERNAL_ERROR_MESSAGE = 'Internal error; see server logs for details.'

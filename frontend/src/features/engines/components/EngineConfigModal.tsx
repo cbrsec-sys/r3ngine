@@ -61,7 +61,7 @@ export const EngineConfigModal: React.FC<EngineConfigModalProps> = ({
   const { tokens } = useThemeTokens();
   const isLight = tokens.mode === 'light';
 
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const { data: toolSettings } = useToolSettings(projectSlug);
 
   const [name, setName] = useState(initialName);

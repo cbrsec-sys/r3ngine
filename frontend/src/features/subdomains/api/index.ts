@@ -243,3 +243,37 @@ export const useAddManualSubdomain = (projectSlug: string) => {
 };
 
 
+
+/** Re-parses the installed binary's help (bypassing the server cache) for the argument schema. */
+export const refreshToolArgs = async (tool: string): Promise<ToolArgsPayload> => {
+  const response = await axios.get<ToolArgsPayload>(`/api/action/tool/${encodeURIComponent(tool)}/args/`, {
+    params: { refresh: 1 },
+  });
+  return response.data;
+};
+
+/** Body of a successful `POST /api/action/ad-assessment/from-subdomain/` (HTTP 201). */
+export interface AdAssessmentFromSubdomainResponse {
+  assessment_id: number;
+  assessment_name: string;
+  target_domain: string;
+  status: 'created';
+}
+
+/**
+ * Creates a PENDING AD Intelligence assessment for the subdomain's root domain.
+ * Rejects with the backend's `error` message (or `HTTP <status>`) on failure.
+ */
+export const createAdAssessmentFromSubdomain = async (
+  subdomainId: number,
+): Promise<AdAssessmentFromSubdomainResponse> => {
+  const res = await fetch('/api/action/ad-assessment/from-subdomain/', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() ?? '' },
+    body: JSON.stringify({ subdomain_id: subdomainId }),
+  });
+  const json = (await res.json()) as Partial<AdAssessmentFromSubdomainResponse> & { error?: string };
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+  return json as AdAssessmentFromSubdomainResponse;
+};

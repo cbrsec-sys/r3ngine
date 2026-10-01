@@ -43,7 +43,7 @@ const AttackSurfaceContent: React.FC<AttackSurfaceTabProps> = ({ projectSlug, sc
       } : layoutName === 'klay' ? {
         klay: { direction: 'DOWN', spacing: 50 }
       } : {})
-    } as any).run();
+    }).run();
   }, [layoutName]);
 
   const exportPNG = useCallback(() => {
