@@ -84,6 +84,8 @@ class WorkerHeartbeatAPIView(APIView):
 		worker = ScanWorker.objects.filter(name=worker_name).first()
 		if not worker or not token_matches(token, worker.auth_token_hash):
 			return Response({'status': False, 'message': 'Invalid token or worker not found'}, status=status.HTTP_403_FORBIDDEN)
+		if not worker.is_active:
+			return Response({'status': False, 'message': 'Worker is inactive'}, status=status.HTTP_403_FORBIDDEN)
 
 		worker.last_heartbeat = timezone.now()
 		worker.ip_address = client_ip(request)

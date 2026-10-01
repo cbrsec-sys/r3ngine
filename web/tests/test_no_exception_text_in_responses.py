@@ -56,6 +56,23 @@ def _uses(node: ast.AST, name: str) -> bool:
     return any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(node))
 
 
+def _leaks_via_assignment(node: ast.AST, exc_name: str) -> bool:
+    """Catch ``response['error'] = str(e)`` (and ``response.error = str(e)``).
+
+    The Response/dict-literal walk misses subscript assignment after the dict
+    already exists, which is how OllamaManager used to leak exception text.
+    """
+    if isinstance(node, ast.Assign):
+        if not _uses(node.value, exc_name):
+            return False
+        for target in node.targets:
+            if isinstance(target, (ast.Subscript, ast.Attribute)):
+                return True
+    if isinstance(node, ast.AugAssign):
+        return isinstance(node.target, (ast.Subscript, ast.Attribute)) and _uses(node.value, exc_name)
+    return False
+
+
 def find_leaks(source: str, filename: str) -> list[str]:
     leaks = []
     for handler in ast.walk(ast.parse(source, filename=filename)):
@@ -65,7 +82,9 @@ def find_leaks(source: str, filename: str) -> list[str]:
             continue
         for stmt in handler.body:
             for node in ast.walk(stmt):
-                if (_is_response_call(node) or isinstance(node, ast.Dict)) and _uses(node, handler.name):
+                if (
+                    (_is_response_call(node) or isinstance(node, ast.Dict)) and _uses(node, handler.name)
+                ) or _leaks_via_assignment(node, handler.name):
                     leaks.append(f'{filename}:{node.lineno}')
                     break
     return leaks
@@ -104,3 +123,11 @@ class FindLeaksTest(unittest.TestCase):
     def test_user_facing_exception_types_are_allowed(self):
         src = 'try:\n    f()\nexcept ValueError as e:\n    return Response({"error": str(e)})\n'
         self.assertEqual(find_leaks(src, 'v.py'), [])
+
+    def test_subscript_assignment_of_exception_is_flagged(self):
+        src = (
+            'try:\n    f()\nexcept Exception as e:\n'
+            '    response = {"status": False}\n'
+            '    response["error"] = str(e)\n'
+        )
+        self.assertEqual(find_leaks(src, 'v.py'), ['v.py:5'])

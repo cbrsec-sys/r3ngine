@@ -115,6 +115,20 @@ class WorkerHeartbeatTests(TestCase):
 
         self.assertEqual(resp.status_code, 400)
 
+    def test_inactive_worker_is_rejected(self):
+        self.worker.is_active = False
+        self.worker.save(update_fields=['is_active'])
+
+        resp = self.client.post(
+            HEARTBEAT_URL,
+            {'worker_name': 'worker-1', 'token': 'secret-token'},
+            format='json',
+        )
+
+        self.assertEqual(resp.status_code, 403)
+        self.worker.refresh_from_db()
+        self.assertIsNone(self.worker.last_heartbeat)
+
 
 class ClientIpTests(SimpleTestCase):
 
