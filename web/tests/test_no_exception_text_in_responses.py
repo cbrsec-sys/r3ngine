@@ -30,6 +30,8 @@ VIEW_MODULE_GLOBS = (
 # connection tests, which show the provider's own error body (_parse_http_error).
 USER_FACING_EXCEPTIONS = frozenset({
     'ValueError', 'ValidationError', 'ToolArgsError', 'ToolRunError', 'HTTPError',
+    # Domain exceptions whose message/detail is intentionally returned to the client.
+    'AttackPathProposalError', 'McpPluginUnavailable', 'AdAssessmentNotFound',
 })
 
 

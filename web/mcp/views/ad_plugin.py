@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from mcp.plugins_gate import McpPluginUnavailable, require_plugin
 from mcp.views.base import McpDataView
 from mcp.views.dispatch import McpIntelDispatchView
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -258,7 +259,7 @@ class McpAdIngestView(McpIntelDispatchView):
         except Exception as exc:
             logger.error('[MCP AD Ingest] Failed: %s', exc, exc_info=True)
             return Response(
-                {'error': str(exc)},
+                {'error': INTERNAL_ERROR_MESSAGE},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         finally:
@@ -368,7 +369,7 @@ class McpAdAttackPathsView(McpDataView):
                 'assessment_id': assessment.id,
                 'category': category,
                 'results': [],
-                'error': str(exc),
+                'error': INTERNAL_ERROR_MESSAGE,
                 'count': 0,
             })
 
@@ -387,7 +388,7 @@ class McpAdReportView(McpDataView):
         except Exception as exc:
             logger.error('[MCP AD Report] compile failed: %s', exc, exc_info=True)
             return Response(
-                {'error': str(exc)},
+                {'error': INTERNAL_ERROR_MESSAGE},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

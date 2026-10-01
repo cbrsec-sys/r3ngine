@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from mcp.plugins_gate import gate_plugin
 from mcp.views.base import McpDataView
 from mcp.views.dispatch import McpIntelDispatchView
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ class McpComplianceGetReportView(McpDataView):
                     attestation = json.load(fh)
             except Exception as exc:
                 logger.warning('Failed to read attestation for %s: %s', pk, exc)
-                attestation = {'error': str(exc)}
+                attestation = {'error': INTERNAL_ERROR_MESSAGE}
 
         meta = ComplianceAssessmentListSerializer(assessment).data
         return Response({
