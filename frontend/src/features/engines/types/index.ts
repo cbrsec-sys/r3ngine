@@ -6,6 +6,14 @@ export interface Engine {
   tasks: string[];
 }
 
+/** Row of `GET /api/listConfigurations/` (`ConfigurationSerializer`, all `Configuration` fields). */
+export interface Configuration {
+  id: number;
+  name: string;
+  short_name: string;
+  content: string;
+}
+
 export interface Wordlist {
   id: number;
   name: string;

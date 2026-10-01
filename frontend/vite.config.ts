@@ -72,8 +72,8 @@ export default defineConfig(({ command }) => ({
             return 'vendor-cytoscape';
           }
 
-          // D3 ecosystem (standalone imports; @nivo brings its own d3 pieces)
-          if (p.includes('/d3-') || p.includes('/d3/') || p.includes('d3-scale')) {
+          // D3 ecosystem
+          if (p.includes('/d3-') || p.includes('/d3/')) {
             return 'vendor-d3';
           }
 
@@ -116,11 +116,6 @@ export default defineConfig(({ command }) => ({
             p.includes('@braintree/sanitize-url')
           ) {
             return 'vendor-mermaid';
-          }
-
-          // Nivo charts (stress tab)
-          if (p.includes('@nivo/')) {
-            return 'vendor-nivo';
           }
 
           // Self-hosted font CSS packages

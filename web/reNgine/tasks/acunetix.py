@@ -93,8 +93,7 @@ def _normalize_acunetix_target_url(target_url: str, target_name: str) -> str:
 		if parsed_host == target_name:
 			return normalized_url.rstrip('/')
 		logger.warning(
-			f"Ignoring mismatched Acunetix target URL '{normalized_url}' for target '{target_name}'. "
-			"Falling back to the subdomain name."
+			"Ignoring mismatched Acunetix target URL '%s' for target '%s'. Falling back to the subdomain name.", normalized_url, target_name
 		)
 	return f"https://{target_name}".rstrip('/')
 
@@ -169,8 +168,7 @@ def _create_or_reuse_acunetix_target(base_url: str, headers: dict, verify, timeo
 	)
 	if create_resp.status_code not in (200, 201):
 		logger.error(
-			f"Failed to create Acunetix target for {target_name}. "
-			f"status={create_resp.status_code} body={create_resp.text[:500]}"
+			"Failed to create Acunetix target for %s. status=%s body=%s", target_name, create_resp.status_code, create_resp.text[:500]
 		)
 		return None
 
@@ -212,8 +210,7 @@ def _start_acunetix_scan_direct(base_url: str, headers: dict, verify, timeout: i
 	)
 	if scan_resp.status_code not in (200, 201):
 		logger.error(
-			f"Failed to start Acunetix scan for target_id={target_id}. "
-			f"status={scan_resp.status_code} body={scan_resp.text[:500]}"
+			"Failed to start Acunetix scan for target_id=%s. status=%s body=%s", target_id, scan_resp.status_code, scan_resp.text[:500]
 		)
 		return None
 	return scan_resp.json()
@@ -232,7 +229,7 @@ def _fetch_acunetix_vulnerabilities(vulns_url: str, headers: dict, verify, timeo
 			verify=verify,
 			timeout=timeout,
 		)
-		logger.info(f"Acunetix vulnerabilities response code: {resp.status_code} for {next_url}")
+		logger.info("Acunetix vulnerabilities response code: %s for %s", resp.status_code, next_url)
 		if resp.status_code != 200:
 			return resp, collected_vulnerabilities
 
@@ -274,7 +271,7 @@ def acunetix_scan(
 		except ValueError as e:
 			return _fail(self, f"Invalid subdomain provided to acunetix_scan: {e}")
 
-	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
+	logger.info("Starting Acunetix scan for domain ID: %s", domain_id)
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
 	domain = Domain.objects.get(pk=domain_id)
 
@@ -307,9 +304,9 @@ def acunetix_scan(
 	creds = AcunetixAPIKey.objects.first()
 	if not (creds and creds.server_url and creds.api_key):
 		return _fail(self, "Acunetix API keys not fully configured in vault.")
-	logger.info(f"Acunetix credentials configured for: {creds.server_url}")
+	logger.info("Acunetix credentials configured for: %s", creds.server_url)
 	try:
-		logger.info(f"Starting Acunetix scan for {target_url}")
+		logger.info("Starting Acunetix scan for %s", target_url)
 
 		base_url = f"{creds.server_url}".rstrip('/')
 		headers = {
@@ -364,15 +361,15 @@ def acunetix_scan(
 				scan_data = scan_resp.json()
 				current_session = scan_data.get('current_session', {})
 				current_status = current_session.get('status')
-				logger.info(f"Acunetix scan {scan_id} status: {current_status} (retry {retries}/{max_retries})")
+				logger.info("Acunetix scan %s status: %s (retry %s/%s)", scan_id, current_status, retries, max_retries)
 
 				if current_status == 'completed':
-					logger.info(f"Acunetix scan for {target_name} completed.")
+					logger.info("Acunetix scan for %s completed.", target_name)
 					break
 				elif current_status in ['failed', 'aborted']:
 					return _fail(self, f"Acunetix scan for {target_name} ended with status: {current_status}.")
 			else:
-				logger.warning(f"Failed to fetch scan status for {scan_id}, status code: {scan_resp.status_code}")
+				logger.warning("Failed to fetch scan status for %s, status code: %s", scan_id, scan_resp.status_code)
 
 			time.sleep(poll_interval)
 			retries += 1
@@ -430,7 +427,7 @@ def acunetix_scan(
 			)
 
 		if v_list:
-			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
+			logger.info("Found %s vulnerabilities in Acunetix scan report.", len(v_list))
 			for vuln in v_list:
 				vuln_detail_url = _build_vuln_detail_url(base_url, scan_id, session_id, vuln['vuln_id'])
 
@@ -679,6 +676,13 @@ def _submit_acunetix_host(
 				target_id=target_id,
 			)
 			scan_started = bool(scan_info)
+			if not scan_started:
+				_record_submission(
+					task, command,
+					"FAILED — target_id=%s url=%s target added but scan did not start" % (target_id, target_url),
+					return_code=1,
+				)
+				return False
 
 		_persist_acunetix_submission(host, target_url, target_id, scan_history_id)
 	except Exception as exc:

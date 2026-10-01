@@ -1,6 +1,6 @@
 import React from 'react';
 import { Grid, Card, CardContent, Typography, Box } from '@mui/material';
-import { Monitor, Globe, Link, Lock } from 'lucide-react';
+import { Monitor, Globe, Link, Lock, type LucideProps } from 'lucide-react';
 import type { MonitoringStats as StatsType } from '../types';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getSurfaceSx } from '../../../theme/semanticColors';
@@ -8,7 +8,8 @@ import { getSurfaceSx } from '../../../theme/semanticColors';
 const StatCard: React.FC<{
   title: string;
   value: number;
-  icon: React.ReactNode;
+  /** A lucide icon element; it is cloned at two sizes. */
+  icon: React.ReactElement<LucideProps>;
   color: string;
 }> = ({ title, value, icon, color }) => {
   const { tokens, isLight } = useThemeTokens();
@@ -25,7 +26,7 @@ const StatCard: React.FC<{
       opacity: 0.1, 
       transform: 'rotate(-15deg)' 
     }}>
-      {React.cloneElement(icon as React.ReactElement<any>, { size: 80, color })}
+      {React.cloneElement(icon, { size: 80, color })}
     </Box>
     <CardContent>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
@@ -39,7 +40,7 @@ const StatCard: React.FC<{
           justifyContent: 'center',
           boxShadow: `0 0 15px ${color}33`
         }}>
-          {React.cloneElement(icon as React.ReactElement<any>, { size: 20 })}
+          {React.cloneElement(icon, { size: 20 })}
         </Box>
         <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: 1 }}>
           {title.toUpperCase()}

@@ -101,8 +101,8 @@ class SystemVersionMiddleware:
             try:
                 with open(version_file_path, 'r') as f:
                     self.system_version = f.read().strip()
-            except Exception:
-                pass
+            except OSError:
+                pass  # keep "Unknown"
 
     def __call__(self, request):
         response = self.get_response(request)
@@ -122,6 +122,7 @@ class SystemVersionMiddleware:
 
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import get_user_model
 import urllib.parse
@@ -142,8 +143,11 @@ def get_user_from_token(token_string):
         token = AccessToken(token_string)
         user_id = token.payload.get('user_id')
         if user_id:
-            return User.objects.get(id=user_id)
-    except Exception:
+            # Same rule as DRF's JWTAuthentication: a deactivated account keeps
+            # no access through a token issued before it was disabled.
+            return User.objects.get(id=user_id, is_active=True)
+    except (TokenError, User.DoesNotExist):
+        # Invalid/expired token or unknown user: stay anonymous (fail closed).
         pass
     return AnonymousUser()
 

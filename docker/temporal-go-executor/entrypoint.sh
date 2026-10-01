@@ -211,4 +211,5 @@ fi
 
 # wait $INTERNAL_TOOLS_PID
 echo "[entrypoint] Starting Temporal Go Executor..."
-exec /usr/local/bin/r3ngine-executor
+# Forward the container command (docker-compose.worker.yml passes --worker-name).
+exec /usr/local/bin/r3ngine-executor "$@"

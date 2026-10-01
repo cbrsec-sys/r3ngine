@@ -13,7 +13,7 @@ import { useSubdomains } from '../../subdomains/api';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 export const TodoPage: React.FC = () => {
-  const { projectSlug } = useParams({ strict: false }) as any;
+  const { projectSlug } = useParams({ from: '/$projectSlug/todo' });
   const { data: todos, isLoading } = useTodoNotes(projectSlug);
   
   // Fetch Scans and Subdomains for the dropdowns

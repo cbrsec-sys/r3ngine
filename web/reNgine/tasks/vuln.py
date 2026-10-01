@@ -1,4 +1,5 @@
 import logging
+import shlex
 import os
 import re
 import json
@@ -414,7 +415,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	if is_wordpress_detected and wordfence_exists:
 		# Wordfence templates live at /root/nuclei-templates/wordfence — already included
 		# in the default -t /root/nuclei-templates recursive scan; no extra -t needed.
-		logger.info(f'[nuclei] WordPress detected; Wordfence templates active at /root/nuclei-templates/wordfence')
+		logger.info("[nuclei] WordPress detected; Wordfence templates active at /root/nuclei-templates/wordfence")
 	logger.info("Running Nuclei vulnerabilities scan")
 	if hasattr(self, 'activity') and self.activity:
 		self.activity.title = "Nuclei Scan"
@@ -627,7 +628,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 					elif hackerone.send_medium and severity_value == 'medium':
 						send_hackerone_report(vuln.id)
 				except Exception as e:
-					logger.warning(f"HackerOne report send failed for vuln {vuln.id}: {e}")
+					logger.warning("HackerOne report send failed for vuln %s: %s", vuln.id, e)
 
 		if not proxy_dead:
 			break
@@ -701,10 +702,18 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {gpt}: {e}")
+					logger.error("Exception for Vulnerability %s: %s", gpt, e)
 
 	logger.info('Vulnerability scan completed...')
 	return None
+
+def _dalfox_setting(dalfox_config: dict, key: str, default):
+	"""A dalfox option under its lowercase key, the spelling the engine editor and the
+	reference YAML use, falling back to the uppercase key older engines were read with."""
+	if key in dalfox_config:
+		return dalfox_config[key]
+	return dalfox_config.get(key.upper(), default)
+
 
 def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	"""XSS Scan using dalfox
@@ -727,10 +736,10 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	if custom_header:
 		custom_headers.append(custom_header)
 	is_waf_evasion = dalfox_config.get(WAF_EVASION, False)
-	use_deep_scan = dalfox_config.get('DEEP_SCAN', False)
-	use_remote_payloads = dalfox_config.get('REMOTE_PAYLOADS', False)
-	use_remote_wordlists = dalfox_config.get('REMOTE_WORDLISTS', False)
-	scan_timeout = dalfox_config.get('SCAN_TIMEOUT', 300)
+	use_deep_scan = _dalfox_setting(dalfox_config, 'deep_scan', False)
+	use_remote_payloads = _dalfox_setting(dalfox_config, 'remote_payloads', False)
+	use_remote_wordlists = _dalfox_setting(dalfox_config, 'remote_wordlists', False)
+	scan_timeout = _dalfox_setting(dalfox_config, 'scan_timeout', 300)
 	blind_xss_server = dalfox_config.get(BLIND_XSS_SERVER)
 	user_agent = dalfox_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
 	timeout = dalfox_config.get(TIMEOUT)
@@ -768,14 +777,16 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' --deep-scan' if use_deep_scan else ''
 	cmd += f' --remote-payloads portswigger,payloadbox' if use_remote_payloads else ''
 	cmd += f' --remote-wordlists burp,assetnote' if use_remote_wordlists else ''
-	cmd += f' -b {blind_xss_server}' if blind_xss_server else ''
+	cmd += f' -b {shlex.quote(str(blind_xss_server))}' if blind_xss_server else ''
 	cmd += f' --delay {delay}' if delay else ''
 	cmd += f' --timeout {timeout}' if timeout else ''
 	cmd += f' --scan-timeout {scan_timeout}' if scan_timeout else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += f' {formatted_headers}'
-	cmd += f' --user-agent {user_agent}' if user_agent else ''
+	# The command runs through bash on the Go executor; a browser user agent is full of
+	# spaces, parentheses and semicolons.
+	cmd += f' --user-agent {shlex.quote(str(user_agent))}' if user_agent else ''
 	cmd += f' --workers {threads}' if threads else ''
 	cmd += f' --format json'
 	if ctx.get('singular_tool_run') and ctx.get('extra_cli_args'):
@@ -850,7 +861,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {gpt}: {e}")
+					logger.error("Exception for Vulnerability %s: %s", gpt, e)
 	return results
 
 
@@ -987,7 +998,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {gpt}: {e}")
+					logger.error("Exception for Vulnerability %s: %s", gpt, e)
 
 	return results
 
@@ -1001,7 +1012,7 @@ def s3scanner(self, ctx={}, description=None):
 	"""
 	input_path = f'{self.results_dir}/subdomain_discovery.txt'
 	if not os.path.isfile(input_path):
-		logger.warning(f's3scanner: subdomain list not found at {input_path}, skipping.')
+		logger.warning("s3scanner: subdomain list not found at %s, skipping.", input_path)
 		return
 	vuln_config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
 	s3_config = vuln_config.get(S3SCANNER) or {}
@@ -1009,7 +1020,7 @@ def s3scanner(self, ctx={}, description=None):
 	providers = s3_config.get(PROVIDERS, S3SCANNER_DEFAULT_PROVIDERS)
 	scan_history = ScanHistory.objects.filter(pk=self.scan_id).first()
 	for provider in providers:
-		cmd = f's3scanner -bucket-file {input_path} -enumerate -provider {provider} -threads {threads} -json'
+		cmd = f's3scanner -bucket-file {input_path} -enumerate -provider {shlex.quote(str(provider))} -threads {threads} -json'
 		for line in stream_command(
 				cmd,
 				history_file=self.history_file,
@@ -1023,7 +1034,7 @@ def s3scanner(self, ctx={}, description=None):
 				result = parse_s3scanner_result(line)
 				s3bucket, created = S3Bucket.objects.get_or_create(**result)
 				scan_history.buckets.add(s3bucket)
-				logger.info(f"s3 bucket added {result['provider']}-{result['name']}-{result['region']}")
+				logger.info("s3 bucket added %s-%s-%s", result['provider'], result['name'], result['region'])
 
 
 def sync_cisa_kev_catalog():
@@ -1040,9 +1051,9 @@ def sync_cisa_kev_catalog():
 			cve_list = [v.get("cveID") for v in data.get("vulnerabilities", [])]
 			if cve_list:
 				CveId.objects.filter(name__in=cve_list).update(is_cisa_kev=True)
-				logger.info(f"Successfully synced CISA KEV catalog. Updated {len(cve_list)} records.")
+				logger.info("Successfully synced CISA KEV catalog. Updated %s records.", len(cve_list))
 	except Exception as e:
-		logger.error(f"Error syncing CISA KEV catalog: {e}")
+		logger.error("Error syncing CISA KEV catalog: %s", e)
 
 
 def sync_semgrep_rules():
@@ -1067,16 +1078,16 @@ def sync_semgrep_rules():
 		target_path = os.path.join(rules_dir, filename)
 		url = f"https://semgrep.dev/c/{config}"
 		try:
-			logger.info(f"Syncing Semgrep rule set: {config} -> {filename}")
+			logger.info("Syncing Semgrep rule set: %s -> %s", config, filename)
 			response = requests.get(url, timeout=60)
 			if response.status_code == 200:
 				with open(target_path, 'wb') as f:
 					f.write(response.content)
-				logger.info(f"Successfully synced Semgrep rule set: {config}")
+				logger.info("Successfully synced Semgrep rule set: %s", config)
 			else:
-				logger.error(f"Failed to download Semgrep rule set {config}: HTTP {response.status_code}")
+				logger.error("Failed to download Semgrep rule set %s: HTTP %s", config, response.status_code)
 		except Exception as e:
-			logger.error(f"Failed to sync Semgrep rule set {config}: {e}")
+			logger.error("Failed to sync Semgrep rule set %s: %s", config, e)
 
 
 def clean_and_validate_url(url, base_domain=None):
@@ -1329,13 +1340,13 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 					# Proxy connection/auth issues, cycle and retry
 					raise requests.exceptions.ProxyError(f"Proxy returned status code {resp.status_code}")
 				else:
-					logger.debug(f"Semgrep downloader got status {resp.status_code} for {full_url}")
+					logger.debug("Semgrep downloader got status %s for %s", resp.status_code, full_url)
 					break
 			except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
 				attempt += 1
 				current_proxy_index += 1
 			except Exception as e:
-				logger.debug(f"Semgrep downloader got non-network error for {full_url}: {e}")
+				logger.debug("Semgrep downloader got non-network error for %s: %s", full_url, e)
 				break
 		return False, None
 
@@ -1440,7 +1451,7 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir, file_to_url_map=No
 		}
 		save_vulnerability(vuln_data, scan_history=scan, target_domain=domain)
 	except Exception as e:
-		logger.error(f"Error saving Semgrep vulnerability: {e}")
+		logger.error("Error saving Semgrep vulnerability: %s", e)
 
 
 def save_semgrep_secret_finding(result, ctx, base_dir, file_to_url_map=None):
@@ -1483,7 +1494,7 @@ def save_semgrep_secret_finding(result, ctx, base_dir, file_to_url_map=None):
 		}
 		save_secret_leak(**leak_data)
 	except Exception as e:
-		logger.error(f"Error saving Semgrep secret: {e}")
+		logger.error("Error saving Semgrep secret: %s", e)
 
 def smugglex_scan(self, urls=[], ctx={}, description=None):
 	"""Smugglex Scan"""
@@ -1511,7 +1522,7 @@ def smugglex_scan(self, urls=[], ctx={}, description=None):
 
 	# add proxy to the command
 	if proxy:
-		cmd += f" --proxy {proxy}"
+		cmd += f" --proxy {shlex.quote(proxy)}"
 
 	# SmuggleX checks
 	cmd += f" -c cl-te,te-cl,te-te,h2c,h2,cl-edge,h2-downgrade"
@@ -1535,7 +1546,7 @@ def smugglex_scan(self, urls=[], ctx={}, description=None):
 					except json.JSONDecodeError:
 						pass
 		except Exception as e:
-			logger.error(f"Smugglex parse error: {e}")
+			logger.error("Smugglex parse error: %s", e)
 
 def second_order_scan(self, urls=[], ctx={}, description=None):
 	"""Second Order Scan — runs the second-order Go tool against each target URL.
@@ -1554,8 +1565,10 @@ def second_order_scan(self, urls=[], ctx={}, description=None):
 
 	logger.info('Second Order scan started')
 
-	config_path = "/usr/local/config/second_order_merged.json"
-	os.makedirs("/usr/local/config", exist_ok=True)
+	# Per scan rather than a shared /usr/local/config: concurrent scans no longer
+	# race on one file, and the task needs no write access outside its results.
+	os.makedirs(self.results_dir, exist_ok=True)
+	config_path = os.path.join(self.results_dir, 'second_order_merged.json')
 
 	with open(config_path, 'w') as fh:
 		json.dump(_SECOND_ORDER_MERGED_CONFIG, fh)
@@ -1568,7 +1581,7 @@ def second_order_scan(self, urls=[], ctx={}, description=None):
 	os.makedirs(out_dir, exist_ok=True)
 
 	for target in targets:
-		cmd = "second-order -target %s -config %s -output %s" % (target, config_path, out_dir)
+		cmd = "second-order -target %s -config %s -output %s" % (shlex.quote(target), shlex.quote(config_path), shlex.quote(out_dir))
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 
 	for fname in os.listdir(out_dir):
@@ -1598,11 +1611,6 @@ def second_order_scan(self, urls=[], ctx={}, description=None):
 
 def nuclei_dast_scan(self, urls=[], ctx={}, description=None):
 	"""Nuclei DAST Scan"""
-	from reNgine.common_func import save_vulnerability, get_http_urls, sanitize_url, get_subdomain_from_url
-	from reNgine.utils.task import stream_command, save_subdomain, save_endpoint
-	from reNgine.tasks.parsers import is_nuclei_finding, parse_nuclei_result
-	import os
-
 	logger.info('Nuclei DAST scan started')
 	input_path = f'{self.results_dir}/input_endpoints_nuclei_dast.txt'
 	if not urls:

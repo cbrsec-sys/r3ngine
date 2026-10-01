@@ -38,15 +38,13 @@ import {
   AlertTriangle,
   Trash2,
   Copy,
-  FileText,
-  Bug
+  FileText
 } from 'lucide-react';
 
 import { useThemeTokens } from '../../theme/useThemeTokens';
 import { getHttpStatusColor } from '../../theme/semanticColors';
 import { useSubdomains } from './api';
 import { TacticalPanel } from '../../components/TacticalPanel';
-import { SearchsploitModal } from './SearchsploitModal';
 
 export const SubdomainsPage: React.FC = () => {
   const { tokens } = useThemeTokens();
@@ -58,9 +56,7 @@ export const SubdomainsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
-  const [isSearchsploitModalOpen, setIsSearchsploitModalOpen] = useState(false);
 
   const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, undefined, false, undefined, undefined, pageSize);
   const [isReady, setIsReady] = useState(false);
@@ -94,19 +90,12 @@ export const SubdomainsPage: React.FC = () => {
     setActiveSearch(searchQuery);
   };
 
-  const handleActionClick = (event: React.MouseEvent<HTMLButtonElement>, id: number) => {
+  const handleActionClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
-    setSelectedId(id);
   };
 
   const handleActionClose = () => {
     setAnchorEl(null);
-    setSelectedId(null);
-  };
-
-  const handleSearchsploitOpen = () => {
-    setIsSearchsploitModalOpen(true);
-    handleActionClose();
   };
 
   return (
@@ -428,7 +417,7 @@ export const SubdomainsPage: React.FC = () => {
                           <FileText size={14} />
                         </IconButton>
                       </Tooltip>
-                      <IconButton size="small" onClick={(e) => handleActionClick(e, sub.id)} sx={{ color: 'text.secondary', p: 0.5 }}>
+                      <IconButton size="small" onClick={handleActionClick} sx={{ color: 'text.secondary', p: 0.5 }}>
                         <MoreHorizontal size={14} />
                       </IconButton>
                     </Box>
@@ -524,10 +513,6 @@ export const SubdomainsPage: React.FC = () => {
           <ListItemIcon><FilePlus size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="ADD NOTE" />
         </MenuItem>
-        <MenuItem onClick={handleSearchsploitOpen}>
-          <ListItemIcon><Bug size={16} color="#00f3ff" /></ListItemIcon>
-          <ListItemText primary="SEARCHSPLOIT" />
-        </MenuItem>
         <MenuItem onClick={handleActionClose} sx={{ color: '#ffae00' }}>
           <ListItemIcon><Shield size={16} color="#ffae00" /></ListItemIcon>
           <ListItemText primary="MARK IMPORTANT" />
@@ -545,11 +530,6 @@ export const SubdomainsPage: React.FC = () => {
           100% { transform: scale(1); opacity: 1; }
         }
       `}</style> */}
-      <SearchsploitModal 
-        open={isSearchsploitModalOpen} 
-        onClose={() => setIsSearchsploitModalOpen(false)} 
-        subdomain={data?.results.find((s) => s.id === selectedId) || null} 
-      />
     </Container>
   );
 };

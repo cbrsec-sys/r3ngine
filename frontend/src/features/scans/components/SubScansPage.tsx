@@ -36,7 +36,7 @@ const isStoppableSubScan = (status: number | undefined | null) =>
 export const SubScansPage: React.FC = () => {
   const theme = useTheme();
   const { tokens, isLight } = useThemeTokens();
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const { data, isLoading, isError } = useSubScans(projectSlug);
   const stopMutation = useBulkStopSubScans(projectSlug);
   const stopOneMutation = useStopSubScan(projectSlug);

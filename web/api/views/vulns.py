@@ -43,6 +43,7 @@ from reNgine.definitions import (
     PERM_MODIFY_TARGETS, PERM_MODIFY_SCAN_CONFIGURATIONS,
     PERM_MODIFY_WORDLISTS, PERM_INITATE_SCANS_SUBSCANS,
     PERM_MODIFY_SCAN_REPORT, PERM_MODIFY_SCAN_RESULTS,
+    INTERNAL_ERROR_MESSAGE,
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -70,6 +71,20 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
 	serializer_class = VulnerabilitySerializer
 	queryset = Vulnerability.objects.none()
+
+	COMPACT_TRUE_VALUES = ('1', 'true')
+
+	def is_compact(self) -> bool:
+		"""`?compact=1` (or `true`) opts the list action into VulnerabilityCompactSerializer."""
+		request = getattr(self, 'request', None)
+		if request is None or self.action != 'list':
+			return False
+		return request.query_params.get('compact', '').strip().lower() in self.COMPACT_TRUE_VALUES
+
+	def get_serializer_class(self):
+		if self.is_compact():
+			return VulnerabilityCompactSerializer
+		return super().get_serializer_class()
 
 	@staticmethod
 	def _normalize_severity_filter(severity_value):
@@ -213,6 +228,12 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		return self.queryset
 
 	def filter_queryset(self, qs):
+		qs = self._search_and_order()
+		if self.is_compact():
+			qs = VulnerabilityCompactSerializer.optimize_queryset(qs)
+		return qs
+
+	def _search_and_order(self):
 		qs = self.queryset.filter()
 		search_value = self.request.GET.get(u'search[value]', '')
 		_order_col = self.request.GET.get(u'order[0][column]', None)
@@ -720,11 +741,11 @@ class CVEDetails(APIView):
 					})
 
 				logger.info("Successfully enriched %s", formatted_cve_id)
-			except Exception as e:
-				logger.error("Enrichment failed for %s: %s", formatted_cve_id, e)
+			except Exception:
+				logger.exception("Enrichment failed for %s", formatted_cve_id)
 				return Response({
 					'status': False,
-					'message': f'Failed to enrich CVE data: {str(e)}'
+					'message': 'Failed to enrich CVE data; see server logs.'
 				})
 
 		# 3. Fetch additional context and references from CIRCL.LU API
@@ -1043,3 +1064,10 @@ class DeleteVulnerability(APIView):
 		Vulnerability.objects.filter(id__in=ids).delete()
 		return Response({'status': True})
 
+
+class VulnerabilityReport(APIView):
+	permission_classes = [IsPenetrationTester]
+	def get(self, request):
+		req = self.request
+		vulnerability_id = req.query_params.get('vulnerability_id')
+		return Response({"status": send_hackerone_report(vulnerability_id)})

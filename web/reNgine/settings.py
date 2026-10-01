@@ -489,8 +489,9 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
-        # Temporal activities — write INFO+ to temporal.log; propagate to 'reNgine' for console
-        'reNgine.temporal_activities': {
+        # Temporal activities (the package and every module in it) — write INFO+ to
+        # temporal.log; propagate to 'reNgine' for console
+        'reNgine.temporal.activities': {
             'handlers': ['temporal_file'],
             'level': 'INFO',
             'propagate': True,
@@ -503,7 +504,7 @@ LOGGING = {
         },
         # All reNgine modules — use the task formatter for consistent grep-friendly output.
         # The task formatter produces: module.funcName | LEVEL | message
-        # Specific child loggers (e.g. reNgine.tasks, reNgine.temporal_activities) are
+        # Specific child loggers (e.g. reNgine.tasks, reNgine.temporal.activities) are
         # listed above with propagate=False to override this catch-all where needed.
         'reNgine': {
             'handlers': ['task', 'error_file'],
@@ -630,6 +631,8 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     r'^/mapi/auth/token/refresh/',
     r'^/mapi/.*$',
     r'^/api/mcp/.*$',
+    # Remote workers have no session; the view authenticates their token itself.
+    r'^/api/settings/workers/heartbeat/$',
 ]
 
 from datetime import timedelta

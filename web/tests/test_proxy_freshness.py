@@ -31,8 +31,8 @@ class GetRandomProxyFreshnessTests(TestCase):
             proxy_ttl_minutes=ttl_minutes,
         )
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_inside_trust_window_returns_without_checking(self, mock_check):
         """A list verified seconds ago is still taken on trust — that is the point."""
         self._make_pool([LIVE], verified_minutes_ago=1)
@@ -42,8 +42,8 @@ class GetRandomProxyFreshnessTests(TestCase):
         self.assertEqual(result, LIVE)
         self.assertEqual(mock_check.call_count, 0)
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_past_trust_window_verifies_before_handing_out(self, mock_check):
         """30 minutes old is inside the TTL but must no longer be trusted blind."""
         mock_check.return_value = True
@@ -55,9 +55,9 @@ class GetRandomProxyFreshnessTests(TestCase):
         self.assertEqual(mock_check.call_count, 1)
         self.assertEqual(mock_check.call_args[0][0], LIVE)
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.PROXY_SAMPLE_ATTEMPTS', 3)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.PROXY_SAMPLE_ATTEMPTS', 3)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_dead_entry_inside_ttl_is_not_returned(self, mock_check):
         """The regression this fixes: a dead proxy inside the TTL used to be served."""
         mock_check.side_effect = lambda url, **kw: url == LIVE
@@ -67,9 +67,9 @@ class GetRandomProxyFreshnessTests(TestCase):
 
         self.assertEqual(result, LIVE)
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.PROXY_SAMPLE_ATTEMPTS', 1)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.PROXY_SAMPLE_ATTEMPTS', 1)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_sampling_falls_back_to_full_revalidation(self, mock_check):
         """One sampled miss must not end the search while other entries remain."""
         mock_check.side_effect = lambda url, **kw: url == LIVE
@@ -81,8 +81,8 @@ class GetRandomProxyFreshnessTests(TestCase):
         # re-validation below found LIVE. Both paths must end on a live proxy.
         self.assertEqual(result, LIVE)
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_past_ttl_still_revalidates(self, mock_check):
         mock_check.side_effect = lambda url, **kw: url == LIVE
         self._make_pool([LIVE], verified_minutes_ago=180, ttl_minutes=120)
@@ -92,16 +92,16 @@ class GetRandomProxyFreshnessTests(TestCase):
         self.assertEqual(result, LIVE)
         self.assertGreaterEqual(mock_check.call_count, 1)
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_all_dead_returns_empty(self, mock_check):
         mock_check.return_value = False
         self._make_pool([DEAD], verified_minutes_ago=30)
 
         self.assertEqual(get_random_proxy(), '')
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_credentialed_proxy_survives_a_failed_sample(self, mock_check):
         """The sampled check must not undo the paid-proxy protection."""
         paid = 'socks5://acct7:s3cr3t@px.io:1080'
@@ -113,8 +113,8 @@ class GetRandomProxyFreshnessTests(TestCase):
         proxy.refresh_from_db()
         self.assertIn(paid, proxy.proxies)
 
-    @patch('reNgine.common_func.PROXY_TRUST_WINDOW_SECONDS', 300)
-    @patch('reNgine.common_func.check_proxy_robust')
+    @patch('reNgine.common_func.proxy_pool.PROXY_TRUST_WINDOW_SECONDS', 300)
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
     def test_tor_mode_still_bypasses_everything(self, mock_check):
         Proxy.objects.create(use_proxy=True, use_tor=True, proxies=LIVE)
 

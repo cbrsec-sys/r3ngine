@@ -68,8 +68,8 @@ Import: `from reNgine.tasks import initiate_scan_temporal` (shim) or `from reNgi
 - Private methods at the bottom of the file.
 - No path constructed from user input without validation (resolve + bounds-check).
 - No raw exception messages returned to the client.
-- `temporal/workflows/__init__.py` must stay deterministic — no DB calls, no I/O, no `datetime.now()`.
-- All scanning logic belongs in `temporal/activities/__init__.py` or the Go executor.
+- Every module in `temporal/workflows/` must stay deterministic — no DB calls, no I/O, no `datetime.now()`.
+- All scanning logic belongs in the `temporal/activities/` modules or the Go executor.
 - Every `execute_activity` call needs an explicit `retry_policy` — Temporal's default is unlimited attempts, and each retry adds a row to the scan timeline. Use the `_RETRY_*` presets; see `r3ngine-temporal.md`.
 - A task function that returns `False` should set `self.error` first, so the timeline shows why it failed rather than "returned False/failed".
 - When mocking extracted modules, patch at the **new module path** (e.g. `reNgine.tasks.vuln.stream_command`), not the shim.
@@ -77,8 +77,8 @@ Import: `from reNgine.tasks import initiate_scan_temporal` (shim) or `from reNgi
 
 ## Temporal Quick Reference
 
-- Workflows (deterministic): `web/reNgine/temporal/workflows/__init__.py`
-- Activities (side-effecting): `web/reNgine/temporal/activities/__init__.py`
+- Workflows (deterministic): `web/reNgine/temporal/workflows/` (`_common`, `master_scan`, `subscan`, `stress`, `jobs`, `recon`, `assessment_workflow`; `__init__.py` re-exports)
+- Activities (side-effecting): `web/reNgine/temporal/activities/` (`core.py` + domain modules)
 - Shims (backward-compatible): `temporal_workflows.py`, `temporal_activities.py` — re-export from packages above
 - Client (start/cancel from Django): `web/reNgine/temporal_client.py`
 - Go executor (subprocess tools): `web/executor/main.go` on `go-executor-queue`

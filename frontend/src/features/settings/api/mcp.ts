@@ -302,3 +302,78 @@ export const useMcpAudit = (filters: McpAuditFilters) =>
       return data;
     },
   });
+
+export interface FollowupStep {
+  id: string;
+  kind: string;
+  status?: string;
+  tool?: string;
+  rationale?: string;
+  error?: string;
+}
+
+export interface FollowupPlan {
+  id: number;
+  project_slug: string;
+  scan_id?: number | null;
+  status: string;
+  rationale: string;
+  steps: FollowupStep[];
+  retry_count: number;
+}
+
+/** Body of the approve/abort/retry/update endpoints under `/api/action/followups/<id>/`. */
+export interface FollowupPlanActionResponse {
+  status: boolean;
+  plan: FollowupPlan;
+}
+
+export async function fetchFollowupPlans(projectSlug: string, status?: string): Promise<FollowupPlan[]> {
+  const { data } = await axios.get<{ results?: FollowupPlan[] }>('/api/action/followups/', {
+    params: { project_slug: projectSlug, status: status || undefined, limit: 30 },
+  });
+  return data.results || [];
+}
+
+/** `steps` replaces the proposed steps before approval; omit it to approve the plan as proposed. */
+export async function approveFollowupPlan(
+  planId: number,
+  steps?: FollowupStep[],
+): Promise<FollowupPlanActionResponse> {
+  const { data } = await axios.post<FollowupPlanActionResponse>(
+    `/api/action/followups/${planId}/approve/`,
+    { steps },
+  );
+  return data;
+}
+
+export async function abortFollowupPlan(planId: number): Promise<FollowupPlanActionResponse> {
+  const { data } = await axios.post<FollowupPlanActionResponse>(
+    `/api/action/followups/${planId}/abort/`,
+    {},
+  );
+  return data;
+}
+
+/** Retries only `stepIds` when given, otherwise every step that has not succeeded. */
+export async function retryFollowupPlan(
+  planId: number,
+  stepIds?: string[],
+): Promise<FollowupPlanActionResponse> {
+  const { data } = await axios.post<FollowupPlanActionResponse>(
+    `/api/action/followups/${planId}/retry/`,
+    { step_ids: stepIds },
+  );
+  return data;
+}
+
+export async function updateFollowupPlan(
+  planId: number,
+  steps: FollowupStep[],
+): Promise<FollowupPlanActionResponse> {
+  const { data } = await axios.post<FollowupPlanActionResponse>(
+    `/api/action/followups/${planId}/update/`,
+    { steps },
+  );
+  return data;
+}

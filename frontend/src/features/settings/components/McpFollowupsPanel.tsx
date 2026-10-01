@@ -11,37 +11,19 @@ import {
 } from '@mui/material';
 import { ListChecks } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { useParams } from '@tanstack/react-router';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getFieldSx } from '../../../theme/semanticColors';
 import { TacticalPanel } from '../../../components/TacticalPanel';
-
-type FollowupStep = {
-  id: string;
-  kind: string;
-  status?: string;
-  tool?: string;
-  rationale?: string;
-  error?: string;
-};
-
-type FollowupPlan = {
-  id: number;
-  project_slug: string;
-  scan_id?: number | null;
-  status: string;
-  rationale: string;
-  steps: FollowupStep[];
-  retry_count: number;
-};
-
-async function fetchPlans(projectSlug: string, status?: string) {
-  const { data } = await axios.get('/api/action/followups/', {
-    params: { project_slug: projectSlug, status: status || undefined, limit: 30 },
-  });
-  return (data.results || []) as FollowupPlan[];
-}
+import {
+  abortFollowupPlan,
+  approveFollowupPlan,
+  fetchFollowupPlans,
+  retryFollowupPlan,
+  updateFollowupPlan,
+  type FollowupPlan,
+  type FollowupStep,
+} from '../api/mcp';
 
 export const McpFollowupsPanel: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as { projectSlug?: string };
@@ -55,39 +37,29 @@ export const McpFollowupsPanel: React.FC = () => {
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['followup-plans', projectSlug, statusFilter],
-    queryFn: () => fetchPlans(projectSlug, statusFilter),
+    queryFn: () => fetchFollowupPlans(projectSlug, statusFilter),
     enabled: Boolean(projectSlug),
   });
 
   const approve = useMutation({
     mutationFn: async (plan: FollowupPlan) => {
-      let steps;
+      let steps: FollowupStep[] | undefined;
       if (editJson.trim() && selected?.id === plan.id) {
         steps = JSON.parse(editJson);
       }
-      const { data } = await axios.post(`/api/action/followups/${plan.id}/approve/`, {
-        steps,
-      });
-      return data;
+      return approveFollowupPlan(plan.id, steps);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['followup-plans'] }),
   });
 
   const abort = useMutation({
-    mutationFn: async (id: number) => {
-      const { data } = await axios.post(`/api/action/followups/${id}/abort/`, {});
-      return data;
-    },
+    mutationFn: (id: number) => abortFollowupPlan(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['followup-plans'] }),
   });
 
   const retry = useMutation({
-    mutationFn: async (plan: FollowupPlan) => {
-      const { data } = await axios.post(`/api/action/followups/${plan.id}/retry/`, {
-        step_ids: retryIds.length ? retryIds : undefined,
-      });
-      return data;
-    },
+    mutationFn: (plan: FollowupPlan) =>
+      retryFollowupPlan(plan.id, retryIds.length ? retryIds : undefined),
     onSuccess: () => {
       setRetryIds([]);
       qc.invalidateQueries({ queryKey: ['followup-plans'] });
@@ -96,9 +68,8 @@ export const McpFollowupsPanel: React.FC = () => {
 
   const update = useMutation({
     mutationFn: async (plan: FollowupPlan) => {
-      const steps = JSON.parse(editJson);
-      const { data } = await axios.post(`/api/action/followups/${plan.id}/update/`, { steps });
-      return data;
+      const steps: FollowupStep[] = JSON.parse(editJson);
+      return updateFollowupPlan(plan.id, steps);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['followup-plans'] }),
   });
