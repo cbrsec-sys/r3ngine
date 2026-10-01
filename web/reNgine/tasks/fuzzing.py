@@ -44,6 +44,7 @@ from reNgine.settings import (
 	DEFAULT_THREADS
 )
 from reNgine.utils.opsec import OpSecManager, get_opsec_manager
+from reNgine.utils.redis_lock import renewed_lock
 from reNgine.common_func import get_http_urls, get_subdomain_from_url, extract_path_from_url, get_random_proxy, sanitize_url
 from reNgine.utils.task import (
 	run_command,
@@ -748,7 +749,9 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 					proxy = 'http://' + proxy
 
 			lock_key = f"fuzz_execution_lock_{self.scan_id}_{hashlib.md5(target_url.encode(), usedforsecurity=False).hexdigest()}"
-			with redis_client.lock(lock_key, timeout=1800):
+			# One worker per target: a retry waits for a still-running attempt, and a
+			# dead attempt's lock frees itself within a few minutes.
+			with renewed_lock(redis_client, lock_key):
 				ffuf_results_local = []
 				ffuf_exc = [None]
 				ds_exc = [None]
