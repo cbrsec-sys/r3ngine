@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank">
-    <img src="https://img.shields.io/badge/version-v3.7.7-informational?&logo=none" alt="r3ngine Latest Version" />
+    <img src="https://img.shields.io/badge/version-v3.7.8-informational?&logo=none" alt="r3ngine Latest Version" />
   </a>
   &nbsp;
   <a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank">
@@ -30,9 +30,9 @@
   </a>
 </p>
 
-<h3 align="center">r3ngine 3.7.7: Plugin-Gated MCP</h3>
+<h3 align="center">r3ngine 3.7.8: Hardening, CI, and Infrastructure</h3>
 <p>
-  r3ngine v3.7.7 extends official <b>MCP Access</b> with <b>plugin-gated tools</b> — agents discover enabled plugins via <code>r3ngine_list_plugins</code> and only then receive AD / BloodHound ingest, credential intelligence, compliance, and Burp Suite tools (sidecar <b>v1.4.0</b>). Dedicated <code>/api/mcp/</code> wrappers never open raw <code>/api/plugins/</code> routes; secrets stay redacted; Metasploit and active exploitation remain out of MCP. Building on v3.7.6 MCP foundations (hashed keys, sessions, audit chain, singular tools, SAFE validation, portable cyber skills, Reacher mailbox verification) and the broader Phoenix stack — <b>Target Report Generation</b>, <b>APME</b>, <b>Distributed Workers</b>, <b>Certificate &amp; Identity Intelligence</b>, <b>Exposure Correlation</b>, and Temporal-backed orchestration — this release focuses on agent-ready plugin surfaces while keeping defense-in-depth. Building off the original reNgine and further inspired by rengine-ng (Check out <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">rengine-ng v3</a> if you haven't!). Infrastructure remains <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b>.
+  r3ngine v3.7.8 extends official <b>MCP Access</b> with <b>plugin-gated tools</b> — agents discover enabled plugins via <code>r3ngine_list_plugins</code> and only then receive AD / BloodHound ingest, credential intelligence, compliance, and Burp Suite tools (sidecar <b>v1.4.0</b>). Dedicated <code>/api/mcp/</code> wrappers never open raw <code>/api/plugins/</code> routes; secrets stay redacted; Metasploit and active exploitation remain out of MCP. Building on v3.7.6 MCP foundations (hashed keys, sessions, audit chain, singular tools, SAFE validation, portable cyber skills, Reacher mailbox verification) and the broader Phoenix stack — <b>Target Report Generation</b>, <b>APME</b>, <b>Distributed Workers</b>, <b>Certificate &amp; Identity Intelligence</b>, <b>Exposure Correlation</b>, and Temporal-backed orchestration — this release focuses on agent-ready plugin surfaces while keeping defense-in-depth. Building off the original reNgine and further inspired by rengine-ng (Check out <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">rengine-ng v3</a> if you haven't!). Infrastructure remains <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b>.
 </p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
@@ -85,7 +85,7 @@ The plugin system supports dynamic installation, signed `.r3n` packages with Ed2
   </a>
   &nbsp;
   <a href="https://github.com/whiterabb17/r3ngine-mcp/releases" target="_blank">
-    <img src="https://img.shields.io/badge/compatible_with-r3ngine_v3.7.7+-warning.svg?logo=none" alt="Compatible with r3ngine v3.7.7+" />
+    <img src="https://img.shields.io/badge/compatible_with-r3ngine_v3.7.8+-warning.svg?logo=none" alt="Compatible with r3ngine v3.7.8+" />
   </a>
   &nbsp;
   <a href="https://modelcontextprotocol.io" target="_blank">
