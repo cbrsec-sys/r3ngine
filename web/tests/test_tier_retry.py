@@ -350,7 +350,7 @@ class TestTierRetryPermissions(TierRetryTestCase):
 
 
 WORKFLOWS_FILE = os.path.join(
-    os.path.dirname(__file__), '..', 'reNgine', 'temporal', 'workflows', '__init__.py'
+    os.path.dirname(__file__), '..', 'reNgine', 'temporal', 'workflows', 'jobs.py'
 )
 
 

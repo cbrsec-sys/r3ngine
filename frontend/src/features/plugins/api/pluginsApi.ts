@@ -3,6 +3,70 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_URL = '/api/plugins/';
 
+/** Entry of a manifest's `ui.components` or `ui.overrides` list. */
+export interface PluginManifestComponent {
+  /** Core component (override) or slot entry name matched by `PluginComponent`. */
+  name?: string;
+  /** Module under `/media/plugins/<slug>/ui/`. */
+  file: string;
+  /** Slot name matched by `PluginSlot`. */
+  type?: string;
+  [key: string]: unknown;
+}
+
+/** Entry of a manifest's `ui.tabs` list, rendered as an extra scan-detail tab. */
+export interface PluginManifestTab {
+  label: string;
+  file: string;
+}
+
+/** `ui` section of a manifest; also served as-is by `/api/plugins/registry/`. */
+export interface PluginManifestUi {
+  menu_item?: string;
+  menu_path?: string;
+  entry_export?: string;
+  components?: PluginManifestComponent[];
+  overrides?: PluginManifestComponent[];
+  tabs?: PluginManifestTab[];
+  [key: string]: unknown;
+}
+
+/**
+ * Parsed `manifest.yaml` (`PluginManager.validate_manifest` in `web/plugins/utils.py`).
+ * `name`, `version` and `runtime` are required on upload, but the model defaults to `{}`.
+ */
+export interface PluginManifest {
+  name?: string;
+  version?: string;
+  description?: string;
+  author?: string;
+  icon?: string;
+  /** Holds `run after` or `run before`: the anchor scan task, or `standalone`. */
+  runtime?: Record<string, unknown>;
+  /** Dotted paths registered on the orchestrator (`web/plugins/temporal_registry.py`). */
+  temporal?: {
+    workflows?: string[];
+    activities?: string[];
+  };
+  ui?: PluginManifestUi;
+  [key: string]: unknown;
+}
+
+/** One entry of `tools.yaml`'s `tools` list. */
+export interface PluginToolEntry {
+  name?: string;
+  version?: string;
+  source?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+/** Parsed `tools.yaml`; free-form apart from the `tools` list. */
+export interface PluginToolsConfig {
+  tools?: PluginToolEntry[];
+  [key: string]: unknown;
+}
+
 export interface Plugin {
   name: string;
   slug: string;
@@ -12,8 +76,8 @@ export interface Plugin {
   anchor_step: string;
   runtime_position: 'BEFORE' | 'AFTER';
   order_weight: number;
-  manifest: Record<string, any>;
-  tools_config: Record<string, any>;
+  manifest: PluginManifest;
+  tools_config: PluginToolsConfig;
   installed_at: string;
   needs_restart: boolean;
   author: string;
@@ -97,6 +161,20 @@ export const fetchPlugins = async (): Promise<Plugin[]> => {
   return Array.isArray(data) ? data : data.results || [];
 };
 
+/** UI section of an enabled plugin's manifest, as served by `/api/plugins/registry/`. */
+export type PluginRegistryComponents = PluginManifestUi;
+
+export interface PluginRegistryEntry {
+  slug: string;
+  name: string;
+  components: PluginRegistryComponents;
+}
+
+export const fetchPluginRegistry = async (): Promise<PluginRegistryEntry[]> => {
+  const res = await axios.get<PluginRegistryEntry[]>(`${API_URL}registry/`);
+  return res.data;
+};
+
 export const uploadPlugin = async (file: File): Promise<{ install_id: string }> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -144,6 +222,10 @@ export const deletePlugin = async (slug: string) => {
 // --- CORE HOOKS ---
 export const usePlugins = () => {
   return useQuery({ queryKey: ['plugins'], queryFn: fetchPlugins });
+};
+
+export const usePluginRegistry = () => {
+  return useQuery({ queryKey: ['pluginsRegistry'], queryFn: fetchPluginRegistry });
 };
 
 export const useUploadPlugin = () => {
@@ -311,7 +393,17 @@ export const updateBurpConfig = async (config: Partial<BurpConfig>): Promise<Bur
   return data;
 };
 
-export const fetchBurpHealth = async (): Promise<any> => {
+/**
+ * `GET /api/plugins/burpsuite_integration/health/`, served by the external plugin; only
+ * `status` (`'ok'` when Burp is reachable) and `message` are read.
+ */
+export interface BurpHealth {
+  status: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
+export const fetchBurpHealth = async (): Promise<BurpHealth> => {
   const { data } = await axios.get('/api/plugins/burpsuite_integration/health/');
   return data;
 };

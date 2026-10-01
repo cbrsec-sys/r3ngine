@@ -12,6 +12,12 @@ from django.conf import settings
 from scanEngine.models import OpSec, Proxy
 from reNgine.definitions import BRUTUS_EXEC_PATH, PROXYCHAINS_EXEC_PATH
 
+logger = logging.getLogger(__name__)
+
+# File types OpSecManager.strip_metadata knows how to clean.
+_STRIPPABLE_EXTENSIONS = frozenset({'.pdf', '.jpg', '.jpeg', '.png'})
+
+
 class OpSecManager:
     """
     Manages Operational Security (OpSec) settings and provides utility functions
@@ -75,7 +81,7 @@ class OpSecManager:
         try:
             parsed = urlparse(proxy_str)
             return parsed.hostname
-        except Exception:
+        except ValueError:
             return None
 
     def apply_stealth(self, tool_name, command, proxy=None):
@@ -232,7 +238,7 @@ class OpSecManager:
                 with pikepdf.open(file_path, allow_overwriting_input=True) as pdf:
                     del pdf.Root.Metadata
                     pdf.save(file_path)
-            elif ext in [".jpg", ".jpeg", ".png"]:
+            elif ext in _STRIPPABLE_EXTENSIONS:
                 from PIL import Image
                 img = Image.open(file_path)
                 data = list(img.getdata())
@@ -240,7 +246,8 @@ class OpSecManager:
                 img_without_exif.putdata(data)
                 img_without_exif.save(file_path)
         except Exception:
-            pass
+            # Metadata stripping is an OpSec control: a file that keeps its metadata must be visible.
+            logger.warning("Could not strip metadata from %s", file_path, exc_info=True)
 
     def strip_directory(self, directory):
         """
@@ -248,7 +255,19 @@ class OpSecManager:
         """
         if not self.is_enabled() or not self.settings.enable_metadata_stripping:
             return
-        
+        if not directory or not os.path.isdir(directory):
+            return
+
+        for root, _dirs, files in os.walk(directory):
+            for name in files:
+                path = os.path.join(root, name)
+                # A link inside a results dir could point anywhere; rewriting
+                # its target would modify files outside the scan's results.
+                if os.path.islink(path):
+                    continue
+                if os.path.splitext(name)[1].lower() in _STRIPPABLE_EXTENSIONS:
+                    self.strip_metadata(path)
+
 
 class ProxychainsWrapper:
     """

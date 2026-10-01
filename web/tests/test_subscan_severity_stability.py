@@ -1,8 +1,10 @@
 import os
+import signal
+import threading
 import django
 import json
 import yaml
-from django.test import TestCase
+from django.test import TestCase, tag
 from unittest.mock import patch, MagicMock
 
 # Setup Django environment
@@ -159,6 +161,73 @@ class TestSubscanSeverityStability(TestCase):
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
+    @patch('reNgine.utils.task.Command')
+    @patch('reNgine.utils.task.SOCConfiguration')
+    def test_stream_command_watchdog_kills_hung_process(self, mock_soc_config, mock_command_model):
+        """The watchdog kills a process that outlives the timeout (fake process and clock).
+
+        The real-subprocess version below is tagged integration: it waits out
+        the watchdog's 2 s poll interval in wall time.
+        """
+        from reNgine.utils.task import stream_command
+
+        mock_soc_config.objects.get_or_create.return_value = (
+            MagicMock(enable_live_log_streaming=False), False,
+        )
+        mock_cmd_obj = MagicMock()
+        mock_command_model.objects.create.return_value = mock_cmd_obj
+
+        killed = threading.Event()
+
+        class _HungStdout:
+            def readline(self):
+                # Blocks like a pipe from a silent process until the kill;
+                # the bound only keeps a broken watchdog from hanging the suite.
+                was_killed = killed.wait(timeout=10)
+                return '' if was_killed else 'still running'
+
+            def close(self):
+                pass
+
+        class _HungProcess:
+            pid = 4242
+            returncode = None
+            stdout = _HungStdout()
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+        process = _HungProcess()
+
+        def fake_killpg(pgid, sig):
+            process.returncode = -sig
+            killed.set()
+
+        clock = [1000.0]
+
+        def fake_sleep(seconds):
+            clock[0] += seconds
+
+        with patch('reNgine.utils.task.subprocess.Popen', return_value=process), \
+                patch('reNgine.utils.task.os.getpgid', side_effect=lambda pid: pid), \
+                patch('reNgine.utils.task.os.killpg', side_effect=fake_killpg) as mock_killpg, \
+                patch('time.monotonic', side_effect=lambda: clock[0]), \
+                patch('time.sleep', side_effect=fake_sleep) as mock_sleep:
+            lines = list(stream_command(
+                'sleep 10', timeout=1, shell=False, route_to_executor=False,
+            ))
+
+        self.assertEqual(lines, [])
+        self.assertTrue(killed.is_set())
+        mock_killpg.assert_called_once_with(4242, signal.SIGKILL)
+        mock_sleep.assert_called_with(2)
+        self.assertEqual(process.returncode, -signal.SIGKILL)
+        mock_cmd_obj.save.assert_called()
+
+    @tag('integration')
     @patch('reNgine.utils.task.Command')
     @patch('reNgine.utils.task.SOCConfiguration')
     def test_stream_command_watchdog_timeout(self, mock_soc_config, mock_command_model):

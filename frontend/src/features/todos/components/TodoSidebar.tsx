@@ -1,10 +1,12 @@
 import React from 'react';
 import { Box, Typography, Button, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Badge } from '@mui/material';
-import { List as ListIcon, CheckCircle, AlertOctagon, Plus } from 'lucide-react';
+import { List as ListIcon, CheckCircle, AlertOctagon, Plus, type LucideIcon } from 'lucide-react';
+
+type TodoFilter = 'all' | 'done' | 'important';
 
 interface TodoSidebarProps {
-  activeFilter: 'all' | 'done' | 'important';
-  setActiveFilter: (filter: 'all' | 'done' | 'important') => void;
+  activeFilter: TodoFilter;
+  setActiveFilter: (filter: TodoFilter) => void;
   counts: {
     all: number;
     done: number;
@@ -14,7 +16,7 @@ interface TodoSidebarProps {
 }
 
 export const TodoSidebar: React.FC<TodoSidebarProps> = ({ activeFilter, setActiveFilter, counts, onNewTodo }) => {
-  const menuItems = [
+  const menuItems: { id: TodoFilter; label: string; icon: LucideIcon; count: number; color: string }[] = [
     { id: 'all', label: 'Todo', icon: ListIcon, count: counts.all, color: '#00f3ff' },
     { id: 'done', label: 'Done', icon: CheckCircle, count: counts.done, color: '#00ff62' },
     { id: 'important', label: 'Important', icon: AlertOctagon, count: counts.important, color: '#ff003c' },
@@ -30,7 +32,7 @@ export const TodoSidebar: React.FC<TodoSidebarProps> = ({ activeFilter, setActiv
             sx={{ mb: 1 }}
           >
             <ListItemButton
-              onClick={() => setActiveFilter(item.id as any)}
+              onClick={() => setActiveFilter(item.id)}
               sx={{ 
                 borderRadius: '12px',
                 bgcolor: activeFilter === item.id ? 'rgba(0, 243, 255, 0.1)' : 'transparent',

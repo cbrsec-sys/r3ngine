@@ -97,7 +97,8 @@
           - xnldorker
       dir_file_fuzz:
         auto_calibration: true
-        run_dirsearch: true
+        run_ffuf: true
+        run_dirsearch: false
         run_feroxbuster: false
         enable_http_crawl: true
         rate_limit: 150
@@ -118,7 +119,6 @@
           - asp
           - aspx
           - txt
-          - conf
           - sql
           - json
           - yml
@@ -250,7 +250,7 @@
           skip_spidering: false
         cpanel_scanner:
           run_cpanel2shell: true
-          cpanel_user_wordlist: /usr/src/app/wordlist/cpanel_users.txt
+          cpanel_user_wordlist: /usr/src/wordlist/cpanel_users.txt
           proxy_type: rotating
       vigolium_discovery:
         run_vigolium_discovery: true

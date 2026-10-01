@@ -14,13 +14,14 @@ from startScan.models import (
     VulnerabilityTags, IpAddress, Port, Technology, 
     MonitoringDiscovery, CountryISO, CveId, CweId,
     Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak,
-    Dork, MetaFinderDocument, S3Bucket, OsintStaging
+    Dork, MetaFinderDocument, OsintStaging
 )
 from reNgine.utilities import get_screenshot_path
 from reNgine.definitions import RUNNING_TASK, INITIATED_TASK, FAILED_TASK, ABORTED_TASK
 from reNgine.failure_reasons import classify_failure
 from reNgine.exporters.ai_bundle import AiExportOptions, FORMAT_VERSION, build_ai_export_zip
 from api.scan_task_counts import get_task_counts
+from api.summary_domain_info import build_domain_info_summary, domain_info_select_related
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer
 from api.serializers import (
@@ -28,6 +29,9 @@ from api.serializers import (
     SecretLeakSerializer, EmailSerializer, EmployeeSerializer, 
     DorkSerializer, MetafinderDocumentSerializer, S3BucketSerializer, OsintStagingSerializer
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ScanSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -56,7 +60,9 @@ class ScanSummaryAPIView(APIView):
                 .annotate(command_count=Count('command'))
                 .order_by('tier', 'time_started', 'time')
             )
-            scan = ScanHistory.objects.prefetch_related(
+            scan = ScanHistory.objects.select_related(
+                *domain_info_select_related('domain__domain_info')
+            ).prefetch_related(
                 Prefetch('scanactivity_set', queryset=activity_qs)
             ).get(id=id, domain__project=project)
             target = scan.domain
@@ -171,27 +177,11 @@ class ScanSummaryAPIView(APIView):
         subdomain_techs = Technology.objects.filter(technologies__target_domain=target)
         discovered_technologies = (endpoint_techs | subdomain_techs).distinct().values('name').annotate(count=Count('name')).order_by('-count')[:20]
 
-        # Domain Information
-        domain_info_data = None
-        if hasattr(target, 'domain_info') and target.domain_info:
-            di = target.domain_info
-            domain_info_data = {
-                'dnssec': di.dnssec,
-                'geolocation_iso': di.geolocation_iso,
-                'created': di.created,
-                'updated': di.updated,
-                'expires': di.expires,
-                'whois_server': di.whois_server,
-                'registrar': {
-                    'name': di.registrar.name if di.registrar else None,
-                    'phone': di.registrar.phone if di.registrar else None,
-                    'email': di.registrar.email if di.registrar else None,
-                },
-                'dns_records': list(di.dns_records.all().values('type', 'name'))[:20],
-                'name_servers': list(di.name_servers.all().values('name'))[:10],
-                'nameservers': [ns.name for ns in di.name_servers.all()][:10],
-                'historical_ips': list(di.historical_ips.all().values('ip', 'location', 'owner', 'last_seen'))[:10],
-            }
+        domain_info_data = build_domain_info_summary(target.domain_info)
+
+        # S3Scanner links each bucket to the scan that found it (`vuln.s3scanner`),
+        # so the BUCKETS tab, its gate and the scan report all read the same rows.
+        buckets = list(scan.buckets.order_by('name', 'id'))
 
         # Related
         related_domains = []
@@ -330,7 +320,7 @@ class ScanSummaryAPIView(APIView):
             'employees': EmployeeSerializer(Employee.objects.filter(employees__domain=target).distinct(), many=True).data,
             'dorks': DorkSerializer(Dork.objects.filter(dorks__domain=target).distinct(), many=True).data,
             'documents': MetafinderDocumentSerializer(MetaFinderDocument.objects.filter(target_domain=target), many=True).data,
-            'buckets': S3BucketSerializer(S3Bucket.objects.filter(buckets__domain=target).distinct(), many=True).data,
+            'buckets': S3BucketSerializer(buckets, many=True).data,
             'monitoring_discoveries_list': MonitoringDiscoverySerializer(monitoring_discoveries, many=True).data,
             'subscans': SubScanSerializer(subscans, many=True).data,
             'recent_scans': recent_scans_data,
@@ -383,6 +373,7 @@ class ScanSummaryAPIView(APIView):
                 'id': scan.id,
                 'scan_status': scan.scan_status,
                 'engine_name': scan.scan_type.engine_name if scan.scan_type else "Standard",
+                'hardware_profile_id': scan.hardware_profile_id,
                 'start_scan_date': scan.start_scan_date,
                 'stop_scan_date': scan.stop_scan_date,
                 'duration': int((scan.stop_scan_date - scan.start_scan_date).total_seconds()) if scan.stop_scan_date and scan.start_scan_date else int((timezone.now() - scan.start_scan_date).total_seconds()) if scan.start_scan_date else 0,
@@ -402,7 +393,7 @@ class ScanSummaryAPIView(APIView):
             'secret_leaks_count': secret_leaks_count,
             'exploitable_count': exploitable_count,
             'matched_gf_count': matched_gf_count,
-            'buckets_count': scan.buckets.count(),
+            'buckets_count': len(buckets),
             'timeline': timeline_data
         }
 
@@ -435,8 +426,9 @@ class ScanAiExportAPIView(APIView):
 
         try:
             zip_buffer, filename = build_ai_export_zip(scan=scan, options=options)
-        except Exception as exc:
-            return Response({"error": f"Failed to build AI export: {exc}"}, status=500)
+        except Exception:
+            logger.exception("Failed to build AI export for scan %s", scan.id)
+            return Response({"error": "Failed to build AI export; see server logs."}, status=500)
 
         return FileResponse(
             zip_buffer,

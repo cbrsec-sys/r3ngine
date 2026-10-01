@@ -5,8 +5,8 @@ from django.db import models
 from dashboard.models import Project
 
 
-def normalize_manual_subdomains(value):
-	"""Normalize manual subdomains into a de-duplicated lowercase list."""
+def split_manual_subdomains(value):
+	"""Split manual subdomain input into lowercase names, keeping repeats."""
 	if not value:
 		return []
 
@@ -15,15 +15,13 @@ def normalize_manual_subdomains(value):
 	else:
 		candidates = value
 
-	normalized = []
-	seen = set()
-	for item in candidates:
-		name = str(item or '').strip().lower()
-		if not name or name in seen:
-			continue
-		seen.add(name)
-		normalized.append(name)
-	return normalized
+	names = (str(item or '').strip().lower() for item in candidates)
+	return [name for name in names if name]
+
+
+def normalize_manual_subdomains(value):
+	"""Normalize manual subdomains into a de-duplicated lowercase list."""
+	return list(dict.fromkeys(split_manual_subdomains(value)))
 
 
 class HistoricalIP(models.Model):

@@ -13,7 +13,7 @@ this app becomes an auto-generated migration on the next developer boot.
 No fixtures are created — these are schema-level assertions.
 """
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from startScan.models import CweId, ScanActivity, Vulnerability, VulnerabilityTags
 
@@ -66,7 +66,7 @@ class TestVulnerabilityIndexes(TestCase):
         )
 
     def test_subdomain_severity_index(self):
-        """api/serializers.py buckets a per-subdomain queryset by severity."""
+        """api/serializers/hosts.py buckets a per-subdomain queryset by severity."""
         self.assertEqual(
             self.indexes.get('vuln_subdomain_sev_idx'),
             ('subdomain', 'severity'),
@@ -82,7 +82,7 @@ class TestVulnerabilityIndexes(TestCase):
 
 
 class TestVulnWritePathLookupIndexes(TestCase):
-    """``get_or_create`` lookup columns in reNgine/common_func.py."""
+    """``get_or_create`` lookup columns in reNgine/common_func/vuln_helpers.py."""
 
     def test_vulnerability_tag_name_indexed(self):
         self.assertTrue(VulnerabilityTags._meta.get_field('name').db_index)
@@ -94,6 +94,9 @@ class TestVulnWritePathLookupIndexes(TestCase):
 class TestMigrationStateMatchesModels(TestCase):
     """The hand-written migration must leave no drift against the models."""
 
+    # settings_test_local disables migrations to speed up DB setup, which would
+    # make every model look like a pending change; read the real ones here.
+    @override_settings(MIGRATION_MODULES={})
     def test_no_pending_startscan_migrations(self):
         """``makemigrations --check`` exits non-zero when changes are missing.
 

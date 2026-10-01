@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { operations } from '@/types/api';
-import type { Vulnerability, VulnerabilityResponse } from '../types';
+import type {
+  GptVulnerabilityReport,
+  Vulnerability,
+  VulnerabilityCompactResponse,
+  VulnerabilityResponse,
+} from '../types';
 
 
 export interface VulnerabilityFilters {
@@ -14,51 +18,76 @@ export interface VulnerabilityFilters {
   has_exploit?: boolean;
 }
 
+export interface VulnerabilityListParams {
+  projectSlug: string;
+  page?: number;
+  pageSize?: number;
+  searchQuery?: string;
+  scanId?: number;
+  targetId?: number;
+  filters?: VulnerabilityFilters;
+}
+
+/**
+ * One page of vulnerability list rows. Requests the compact row format (`compact=1`):
+ * list views only read the row's own fields and a few keys of each relation; the
+ * detail modal loads the full record through `useVulnerability`.
+ */
+export const fetchVulnerabilities = async ({
+  projectSlug,
+  page = 1,
+  pageSize = 10,
+  searchQuery = '',
+  scanId,
+  targetId,
+  filters,
+}: VulnerabilityListParams): Promise<VulnerabilityCompactResponse> => {
+  const url = new URL(`${window.location.origin}/api/listVulnerability/`);
+  url.searchParams.append('project', projectSlug);
+  url.searchParams.append('page', page.toString());
+  url.searchParams.append('length', pageSize.toString());
+
+  if (searchQuery) {
+    url.searchParams.append('search[value]', searchQuery);
+  }
+
+  if (scanId) {
+    url.searchParams.append('scan_history', scanId.toString());
+  }
+
+  if (targetId) {
+    url.searchParams.append('target_id', targetId.toString());
+  }
+
+  if (filters) {
+    if (filters.severity) url.searchParams.append('severity', filters.severity);
+    if (filters.exclude_severity) url.searchParams.append('exclude_severity', filters.exclude_severity);
+    if (filters.validation_status) url.searchParams.append('validation_status', filters.validation_status);
+    if (filters.open_status) url.searchParams.append('open_status', filters.open_status);
+    if (filters.source) url.searchParams.append('source', filters.source);
+    if (filters.exclude_source) url.searchParams.append('exclude_source', filters.exclude_source);
+    if (filters.has_exploit !== undefined) {
+      url.searchParams.append('has_exploit', filters.has_exploit ? 'true' : 'false');
+    }
+  }
+
+  url.searchParams.append('compact', '1');
+  url.searchParams.append('format', 'json');
+
+  const response = await fetch(url.toString(), {
+    credentials: 'include'
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+  return await response.json() as VulnerabilityCompactResponse;
+};
+
 export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, targetId?: number, filters?: VulnerabilityFilters, pageSize = 10) => {
-  return useQuery<VulnerabilityResponse>({
+  return useQuery<VulnerabilityCompactResponse>({
     queryKey: ['vulnerabilities', projectSlug, page, searchQuery, scanId, targetId, filters, pageSize],
-    queryFn: async () => {
-      const url = new URL(`${window.location.origin}/api/listVulnerability/`);
-      url.searchParams.append('project', projectSlug);
-      url.searchParams.append('page', page.toString());
-      url.searchParams.append('length', pageSize.toString());
-      
-      if (searchQuery) {
-        url.searchParams.append('search[value]', searchQuery);
-      }
-      
-      if (scanId) {
-        url.searchParams.append('scan_history', scanId.toString());
-      }
-
-      if (targetId) {
-        url.searchParams.append('target_id', targetId.toString());
-      }
-      
-      if (filters) {
-        if (filters.severity) url.searchParams.append('severity', filters.severity);
-        if (filters.exclude_severity) url.searchParams.append('exclude_severity', filters.exclude_severity);
-        if (filters.validation_status) url.searchParams.append('validation_status', filters.validation_status);
-        if (filters.open_status) url.searchParams.append('open_status', filters.open_status);
-        if (filters.source) url.searchParams.append('source', filters.source);
-        if (filters.exclude_source) url.searchParams.append('exclude_source', filters.exclude_source);
-        if (filters.has_exploit !== undefined) {
-          url.searchParams.append('has_exploit', filters.has_exploit ? 'true' : 'false');
-        }
-      }
-      
-      url.searchParams.append('format', 'json');
-
-      const response = await fetch(url.toString(), {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return await response.json() as operations["api_listVulnerability_list"]["responses"]["200"]["content"]["application/json"];
-    },
-
+    queryFn: () => fetchVulnerabilities({ projectSlug, page, pageSize, searchQuery, scanId, targetId, filters }),
     enabled: !!projectSlug,
   });
 };
@@ -113,7 +142,7 @@ export const useDeleteVulnerability = () => {
 
 export const useGptVulnerabilityDetails = () => {
   return useMutation({
-    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+    mutationFn: async ({ id, name }: { id: number; name: string }): Promise<GptVulnerabilityReport> => {
       const response = await fetch(`/api/tools/gpt_vulnerability_report/?id=${id}`, {
         credentials: 'include'
       });

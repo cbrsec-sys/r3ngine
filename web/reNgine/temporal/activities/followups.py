@@ -5,6 +5,7 @@ import logging
 from typing import Any, Optional
 
 from temporalio import activity
+from reNgine.temporal.heartbeat import keep_alive
 
 logger = logging.getLogger(__name__)
 
@@ -291,6 +292,7 @@ def followup_dispatch_step_activity(plan_id: int, step: dict) -> dict:
 
 
 @activity.defn(name="FollowupWaitWorkflowActivity")
+@keep_alive
 def followup_wait_workflow_activity(workflow_id: str, timeout_hours: int = 24) -> dict:
     """Block until a Temporal workflow completes (used for sequential plan steps)."""
     import asyncio

@@ -1132,4 +1132,4 @@ def generate_target_report_task(target_report_id: int) -> None:
             try:
                 report_obj.save()
             except Exception:
-                pass
+                logger.exception("Could not mark target report %s as failed", target_report_id)

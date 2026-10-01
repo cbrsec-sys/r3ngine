@@ -272,7 +272,7 @@ class TestURLParserScan(TestCase):
 
 class TestSourcemapperFiltering(TestCase):
     @patch('reNgine.tasks.auth_discovery.extract_auth_candidates')
-    @patch('reNgine.tasks.crawl.run_command')
+    @patch('reNgine.tasks.crawl.api_discovery.run_command')
     @patch('requests.get')
     def test_sourcemapper_filters_non_js_urls(self, mock_get, mock_run_cmd, mock_extract_auth):
         from reNgine.tasks.crawl import web_api_discovery
@@ -291,7 +291,7 @@ class TestSourcemapperFiltering(TestCase):
             'https://example.com/index.html',
             'https://example.com/sitemap.xml',
         ]
-        with patch('reNgine.tasks.crawl.Subdomain.objects.filter') as mock_filter:
+        with patch('reNgine.tasks.crawl.api_discovery.Subdomain.objects.filter') as mock_filter:
             mock_filter.return_value.first.return_value = MagicMock(name='example.com')
             web_api_discovery(proxy, urls=urls, ctx={'api_discovery_tools': ['sourcemapper']})
 
@@ -303,7 +303,7 @@ class TestSourcemapperFiltering(TestCase):
             self.assertNotIn('sourcemapper ', cmd)
 
     @patch('reNgine.tasks.auth_discovery.extract_auth_candidates')
-    @patch('reNgine.tasks.crawl.run_command')
+    @patch('reNgine.tasks.crawl.api_discovery.run_command')
     @patch('requests.get')
     def test_sourcemapper_runs_on_valid_sourcemap_candidate(self, mock_get, mock_run_cmd, mock_extract_auth):
         from reNgine.tasks.crawl import web_api_discovery
@@ -318,7 +318,7 @@ class TestSourcemapperFiltering(TestCase):
 
         # Given a direct .map URL
         urls = ['https://example.com/app.js.map']
-        with patch('reNgine.tasks.crawl.Subdomain.objects.filter') as mock_filter:
+        with patch('reNgine.tasks.crawl.api_discovery.Subdomain.objects.filter') as mock_filter:
             mock_filter.return_value.first.return_value = MagicMock(name='example.com')
             web_api_discovery(proxy, urls=urls, ctx={'api_discovery_tools': ['sourcemapper']})
 
@@ -333,9 +333,9 @@ class TestSourcemapperFiltering(TestCase):
 
 
 class TestGrpcurlCircuitBreaker(TestCase):
-    @patch('reNgine.tasks.crawl.save_vulnerability')
+    @patch('reNgine.tasks.crawl.api_discovery.save_vulnerability')
     @patch('reNgine.tasks.auth_discovery.extract_auth_candidates')
-    @patch('reNgine.tasks.crawl.run_command')
+    @patch('reNgine.tasks.crawl.api_discovery.run_command')
     def test_grpcurl_deduplicates_target_hosts(self, mock_run_cmd, mock_extract_auth, mock_save_vuln):
         from reNgine.tasks.crawl import web_api_discovery
         proxy = _make_proxy({'uses_tools': ['grpcurl']})
@@ -357,7 +357,7 @@ class TestGrpcurlCircuitBreaker(TestCase):
             'https://example.com/api/v1',
             'https://example.com/login',
         ]
-        with patch('reNgine.tasks.crawl.Subdomain.objects.filter') as mock_filter:
+        with patch('reNgine.tasks.crawl.api_discovery.Subdomain.objects.filter') as mock_filter:
             mock_filter.return_value.first.return_value = MagicMock(name='example.com')
             web_api_discovery(proxy, urls=urls, ctx={'api_discovery_tools': ['grpcurl']})
 
@@ -369,9 +369,9 @@ class TestGrpcurlCircuitBreaker(TestCase):
         self.assertIn('example.com:443', grpcurl_calls[0])
         mock_save_vuln.assert_called_once()
 
-    @patch('reNgine.tasks.crawl.save_vulnerability')
+    @patch('reNgine.tasks.crawl.api_discovery.save_vulnerability')
     @patch('reNgine.tasks.auth_discovery.extract_auth_candidates')
-    @patch('reNgine.tasks.crawl.run_command')
+    @patch('reNgine.tasks.crawl.api_discovery.run_command')
     def test_grpcurl_circuit_breaker_on_dial_failure(self, mock_run_cmd, mock_extract_auth, mock_save_vuln):
         from reNgine.tasks.crawl import web_api_discovery
         proxy = _make_proxy({'uses_tools': ['grpcurl']})
@@ -386,7 +386,7 @@ class TestGrpcurlCircuitBreaker(TestCase):
         mock_run_cmd.return_value = (1, 'Failed to dial target host "unreachable.com:443": context deadline exceeded')
 
         urls = ['https://unreachable.com/path1', 'https://unreachable.com/path2']
-        with patch('reNgine.tasks.crawl.Subdomain.objects.filter') as mock_filter:
+        with patch('reNgine.tasks.crawl.api_discovery.Subdomain.objects.filter') as mock_filter:
             mock_filter.return_value.first.return_value = MagicMock(name='unreachable.com')
             web_api_discovery(proxy, urls=urls, ctx={'api_discovery_tools': ['grpcurl']})
 

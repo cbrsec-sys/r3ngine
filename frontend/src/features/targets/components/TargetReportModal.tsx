@@ -21,6 +21,7 @@ import { X, FileText, Download, Shield, Clock } from 'lucide-react';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { getDialogPaperSx } from '../../../theme/semanticColors';
 import { useTargetScans, useCreateTargetReport, fetchTargetReportStatus } from '../api';
+import { getSafeUrl } from '../../../utils/securityUtils';
 
 const OPTIONAL_SECTIONS: { key: string; label: string }[] = [
   { key: 'subdomain_changes', label: 'Subdomain Changes' },
@@ -88,9 +89,10 @@ export const TargetReportModal: React.FC<TargetReportModalProps> = ({
         if (data.status === 2) {
           setIsGenerating(false);
           setStatusMessage('Report generated successfully!');
-          setReportUrl(data.report_url);
-          if (data.report_url) {
-            const win = window.open(data.report_url, '_blank');
+          const safeReportUrl = getSafeUrl(data.report_url) ?? null;
+          setReportUrl(safeReportUrl);
+          if (safeReportUrl) {
+            const win = window.open(safeReportUrl, '_blank');
             if (!win) setStatusMessage('Report ready — click Download below (popup was blocked).');
           }
         } else if (data.status === 0) {

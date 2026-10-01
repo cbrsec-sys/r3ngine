@@ -70,7 +70,7 @@ class LLMNarrator:
                 return self._fallback_narration(path, node_index)
             return narrative
         except Exception as e:
-            logger.error(f"APME Narration Error: {str(e)}")
+            logger.error("APME Narration Error: %s", str(e))
             return self._fallback_narration(path, node_index)
 
     def _fallback_narration(self, path: AttackPath, node_index: Dict[str, Any]) -> str:
