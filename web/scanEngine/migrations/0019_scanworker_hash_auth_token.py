@@ -9,9 +9,19 @@ from django.db import migrations, models
 
 
 def hash_existing_tokens(apps, schema_editor):
+    import secrets
+
     ScanWorker = apps.get_model('scanEngine', 'ScanWorker')
     for worker in ScanWorker.objects.all():
-        worker.auth_token_hash = hashlib.sha256(worker.auth_token.encode('utf-8')).hexdigest()
+        token = worker.auth_token
+        if not token:
+            # Unusable unique placeholder: empty plaintext cannot authenticate
+            # after the column is dropped, and unique=True forbids shared hashes.
+            worker.auth_token_hash = hashlib.sha256(
+                f'empty:{worker.pk}:{secrets.token_hex(16)}'.encode('utf-8')
+            ).hexdigest()
+        else:
+            worker.auth_token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
         worker.save(update_fields=['auth_token_hash'])
 
 

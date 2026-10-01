@@ -170,3 +170,32 @@ class HashExistingTokensMigrationTests(SimpleTestCase):
 
         self.assertEqual(worker.auth_token_hash, hash_token('legacy-token'))
         self.assertEqual(saved, [['auth_token_hash']])
+
+    def test_null_or_empty_tokens_get_unique_placeholder_hashes(self):
+        migration = importlib.import_module('scanEngine.migrations.0019_scanworker_hash_auth_token')
+        saved = []
+
+        class FakeWorker:
+            def __init__(self, pk, token):
+                self.pk = pk
+                self.auth_token = token
+                self.auth_token_hash = None
+
+            def save(self, update_fields):
+                saved.append((self.pk, update_fields, self.auth_token_hash))
+
+        empty = FakeWorker(1, '')
+        missing = FakeWorker(2, None)
+        fake_apps = SimpleNamespace(
+            get_model=lambda *_: SimpleNamespace(
+                objects=SimpleNamespace(all=lambda: [empty, missing]),
+            ),
+        )
+
+        migration.hash_existing_tokens(fake_apps, None)
+
+        self.assertEqual(len(empty.auth_token_hash), 64)
+        self.assertEqual(len(missing.auth_token_hash), 64)
+        self.assertNotEqual(empty.auth_token_hash, missing.auth_token_hash)
+        self.assertNotEqual(empty.auth_token_hash, hash_token(''))
+        self.assertEqual([s[0] for s in saved], [1, 2])
