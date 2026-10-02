@@ -347,3 +347,49 @@ class TierStalenessTests(TestCase):
 
         old_row.refresh_from_db()
         self.assertEqual(old_row.tier, 3)
+
+
+class RetryTaskDispatchNameTests(TestCase):
+    """Rows named after their activity are retried as the step that runs them."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        self.client.force_login(User.objects.create_superuser("dispatch", "d@test.example", "password"))
+
+    def _retry(self, name):
+        scan = _make_scan(status=SUCCESS_TASK)
+        act = _make_activity(scan, name=name, status=FAILED_TASK)
+        temporal = MagicMock()
+        temporal.start_workflow = AsyncMock()
+        with patch("reNgine.temporal_client.TemporalClientProvider.get_client", new=AsyncMock(return_value=temporal)):
+            resp = self.client.post(reverse("api:retry_task", kwargs={"pk": act.pk}), content_type="application/json")
+        return resp, temporal.start_workflow, scan, act
+
+    def test_a_nuclei_row_is_retried_through_the_vulnerability_scan_step(self):
+        resp, start, _scan, _act = self._retry("nuclei_scan")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(start.call_args.kwargs["args"][1], "vulnerability_scan")
+        self.assertTrue(start.call_args.kwargs["id"].startswith("retry-vulnerability_scan-"))
+
+    def test_the_acunetix_row_is_retried_through_run_acunetix(self):
+        resp, start, _scan, _act = self._retry("acunetix_scan")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(start.call_args.kwargs["args"][1], "run_acunetix")
+
+    def test_a_row_the_workflow_cannot_retry_is_refused_without_changes(self):
+        resp, start, scan, act = self._retry("crlfuzz_scan")
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()["status"])
+        start.assert_not_called()
+        act.refresh_from_db()
+        scan.refresh_from_db()
+        self.assertEqual(act.status, FAILED_TASK)
+        self.assertEqual(scan.scan_status, SUCCESS_TASK)
+
+    def test_dispatch_names_always_name_a_step_the_workflow_handles(self):
+        from api.views.scan import RETRY_TASK_ALIASES, RETRYABLE_TASK_NAMES, retry_dispatch_name
+        for row, step in RETRY_TASK_ALIASES.items():
+            self.assertIn(step, RETRYABLE_TASK_NAMES)
+            self.assertEqual(retry_dispatch_name(row), step)
+            self.assertEqual(retry_dispatch_name(f"single_tool_{row}"), step)
+        self.assertIsNone(retry_dispatch_name("crlfuzz_scan"))

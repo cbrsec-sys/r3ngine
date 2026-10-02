@@ -709,6 +709,15 @@ class ScanActivityRetryAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Refuse before touching anything: the workflow would raise "Unrecognised
+        # task_name" at once, and the row would just turn red again.
+        task_name = retry_dispatch_name(activity_obj.name)
+        if task_name is None:
+            return Response(
+                {"status": False, "message": f"{activity_obj.title or activity_obj.name} cannot be retried on its own."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         original_scan_status = scan.scan_status
 
         with transaction.atomic():
@@ -747,7 +756,9 @@ class ScanActivityRetryAPIView(APIView):
         from reNgine.task_plan import is_singular_activity_name, pipeline_task_name
         from urllib.parse import urlparse
 
-        task_name = pipeline_task_name(activity_obj.name)
+        # The overlay a singular run stored is keyed by the tool's own name (see
+        # api/tool_run.py); the workflow is dispatched on task_name.
+        tool_name = pipeline_task_name(activity_obj.name)
         singular = is_singular_activity_name(activity_obj.name)
 
         ctx = {
@@ -802,7 +813,7 @@ class ScanActivityRetryAPIView(APIView):
                     if overlay:
                         ctx['yaml_configuration'] = merge_yaml_overlay(
                             ctx.get('yaml_configuration') or {},
-                            task_name,
+                            tool_name,
                             overlay,
                         )
                     ctx['singular_tool_args'] = meta.get('sanitized') or {}
@@ -897,6 +908,22 @@ RETRYABLE_TASK_NAMES = frozenset({
     'mailbox_verification',
 })
 
+#: Timeline rows named after the activity that wrote them rather than the step
+#: ``SingleTaskRetryWorkflow`` dispatches on: Nuclei rows come from the
+#: vulnerability_scan step, the Acunetix row from run_acunetix.
+RETRY_TASK_ALIASES = {
+    'nuclei_scan': 'vulnerability_scan',
+    'acunetix_scan': 'run_acunetix',
+}
+
+
+def retry_dispatch_name(activity_name: str) -> str | None:
+    """The task name to retry a timeline row with, or None when it cannot be retried on its own."""
+    from reNgine.task_plan import pipeline_task_name
+    name = pipeline_task_name(activity_name or '')
+    name = RETRY_TASK_ALIASES.get(name, name)
+    return name if name in RETRYABLE_TASK_NAMES else None
+
 #: Highest tier the timeline uses (Tier 7 holds finalisation/post-processing).
 MAX_SCAN_TIER = 7
 
@@ -980,7 +1007,7 @@ class ScanTierRetryAPIView(APIView):
                     activity, 'singular_tool',
                     'Singular tool runs are not included in tier retry',
                 ))
-            elif activity.name not in RETRYABLE_TASK_NAMES:
+            elif retry_dispatch_name(activity.name) is None:
                 skipped.append(self._skip(
                     activity, 'unsupported_task',
                     f"Task '{activity.name}' cannot be retried on its own",
@@ -1048,21 +1075,25 @@ class ScanTierRetryAPIView(APIView):
             client = await TemporalClientProvider.get_client()
             outcomes = []
             for activity in retryable:
+                task_name = retry_dispatch_name(activity.name)
                 ctx = {
                     "scan_history_id": scan.id,
                     "engine_id": scan.scan_type.id,
                     "domain_id": scan.domain.id,
                     "results_dir": scan.results_dir,
                     "yaml_configuration": yaml_config,
-                    "tasks": [activity.name],
+                    "tasks": [task_name],
                     "original_scan_status": original_scan_status,
                     "retry_batch_names": batch_names,
+                    # Lets the finaliser close this exact row when the retry fails;
+                    # by name it would look for task_name, which differs for aliases.
+                    "activity_id": activity.id,
                 }
                 workflow_id = tier_retry_workflow_id(scan.id, tier, activity.id)
                 try:
                     await client.start_workflow(
                         "SingleTaskRetryWorkflow",
-                        args=[ctx, activity.name],
+                        args=[ctx, task_name],
                         id=workflow_id,
                         task_queue="python-orchestrator-queue",
                     )
