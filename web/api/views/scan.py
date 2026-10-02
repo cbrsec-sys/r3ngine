@@ -227,6 +227,18 @@ class InitiateSubTask(APIView):
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
 
+		from reNgine.temporal.workflows.subscan import is_subscan_task
+		scan_types = [scan_types] if isinstance(scan_types, str) else list(scan_types or [])
+		unsupported = [t for t in scan_types if not is_subscan_task(t)]
+		if unsupported or not scan_types:
+			return Response({
+				'status': False,
+				'message': (
+					f"Not runnable as a subscan: {', '.join(unsupported)}" if unsupported
+					else 'Select at least one task'
+				),
+			}, status=status.HTTP_400_BAD_REQUEST)
+
 		def _run_single_subscan(sub_id):
 			"""Run a single subscan launch inside a worker thread, ensuring DB connection cleanup."""
 			try:
