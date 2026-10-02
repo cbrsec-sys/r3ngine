@@ -72,8 +72,7 @@ import {
   CVELookupModal,
   WAFDetectorModal
 } from '../../features/tools/components/ToolboxModals';
-import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import { usePluginRegistry } from '../../features/plugins/api/pluginsApi';
 import { NotificationsDropdown } from '../../features/notifications/components/NotificationsDropdown';
 import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
@@ -111,7 +110,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const isMobileHeader = useMediaQuery(theme.breakpoints.down('lg'));
 
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const { data: torStatus } = useTorStatus();
   const torActive = torStatus?.running ?? false;
   const { data: torExitIP } = useTorExitIP(torActive);
@@ -122,20 +121,13 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [proxyWarningOpen, setProxyWarningOpen] = useState(false);
   const [hasWarnedForLowProxyStock, setHasWarnedForLowProxyStock] = useState(false);
 
-  const { data: pluginsRegistry } = useQuery({
-    queryKey: ['pluginsRegistry'],
-    queryFn: async () => {
-      const res = await axios.get('/api/plugins/registry/');
-      return res.data;
-    }
-  });
+  const { data: pluginsRegistry } = usePluginRegistry();
 
-  const pluginMenuChildren = (pluginsRegistry || [])
-    .filter((p: any) => p.components?.menu_item)
-    .map((p: any) => ({
-      title: p.components.menu_item,
-      path: `/${projectSlug}${p.components.menu_path}`
-    }));
+  const pluginMenuChildren = (pluginsRegistry || []).flatMap((p) =>
+    p.components?.menu_item
+      ? [{ title: p.components.menu_item, path: `/${projectSlug}${p.components.menu_path}` }]
+      : []
+  );
 
   const navItems: NavItem[] = [
     { title: 'Dashboard', icon: <Home size={20} />, path: `/${projectSlug}/dashboard`, color: theme.palette.primary.main },

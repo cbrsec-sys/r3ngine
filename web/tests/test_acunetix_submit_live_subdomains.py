@@ -217,6 +217,28 @@ class AcunetixSubmissionIsolationTests(_SubmissionTestBase):
         self.assertIn('a.sub.example', failed.first().command)
         self.assertIn('ReadTimeout', failed.first().output)
 
+    @patch('reNgine.tasks.acunetix._start_acunetix_scan_direct')
+    @patch('reNgine.tasks.acunetix._create_or_reuse_acunetix_target', return_value='tgt-1')
+    @patch('reNgine.tasks.acunetix.AcunetixAPIKey')
+    def test_a_scan_that_does_not_start_is_failed_not_submitted(
+            self, mock_keys, mock_create, mock_start) -> None:
+        mock_keys.objects.first.return_value = _creds()
+        mock_start.side_effect = [None, {'scan_id': 'scan-2'}]
+
+        task = self._task()
+        self.assertTrue(self._run(task, self._ctx(start_scan_on_submit=True)))
+
+        # Not recorded, so the next scan retries it instead of skipping it as recent.
+        self.assertEqual(
+            [r.host for r in AcunetixTargetSubmission.objects.all()],
+            ['b.sub.example'],
+        )
+        failed = Command.objects.get(activity=self.activity, output__startswith='FAILED')
+        self.assertIn('a.sub.example', failed.command)
+        self.assertIn('scan did not start', failed.output)
+        self.assertEqual(
+            Command.objects.filter(activity=self.activity, output__startswith='SUBMITTED').count(), 1)
+
     @patch('reNgine.tasks.acunetix._create_or_reuse_acunetix_target', return_value='tgt-1')
     @patch('reNgine.tasks.acunetix.AcunetixAPIKey')
     def test_a_colliding_submission_row_does_not_skip_the_remaining_hosts(

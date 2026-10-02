@@ -88,8 +88,8 @@ def check_dkim(domain: str) -> dict:
                 txt = str(rdata).strip('"')
                 if 'v=DKIM1' in txt or 'p=' in txt:
                     return {"found": True, "selector": selector, "record": txt}
-        except (Exception,):
-            continue
+        except dns.exception.DNSException:
+            continue  # NXDOMAIN / no TXT / timeout: try the next selector
     return {"found": False, "selector": None, "record": None}
 
 

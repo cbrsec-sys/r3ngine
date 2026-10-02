@@ -95,7 +95,7 @@ class TestHasGraphqlEndpointDbEvidence(TestCase):
             http_url=url,
         )
 
-    @patch('reNgine.common_func.requests.head')
+    @patch('reNgine.common_func.probe_gates.requests.head')
     def test_dependency_file_does_not_count_as_evidence(self, mock_head):
         """Without the fix this returned True from the database, never probing."""
         import requests as _requests
@@ -113,7 +113,7 @@ class TestHasGraphqlEndpointDbEvidence(TestCase):
             has_graphql_endpoint(self.scan.id, 'https://host.example.test/')
         )
 
-    @patch('reNgine.common_func.requests.head')
+    @patch('reNgine.common_func.probe_gates.requests.head')
     def test_real_endpoint_counts_as_evidence_without_probing(self, mock_head):
         self._endpoint('https://host.example.test/api/graphql')
 

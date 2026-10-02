@@ -44,14 +44,14 @@ def _run_discovery(tools, urls, graphql_gate=True, jwt_gate=True):
         p = stack.enter_context
         # Patched where the names are looked up: crawl.py imports these via
         # `from reNgine.common_func import *`.
-        p(patch('reNgine.tasks.crawl.get_http_urls', return_value=[]))
-        p(patch('reNgine.tasks.crawl.get_random_proxy', return_value=None))
-        p(patch('reNgine.tasks.crawl.has_graphql_endpoint', return_value=graphql_gate))
-        p(patch('reNgine.tasks.crawl.has_jwt_tokens', return_value=jwt_gate))
-        p(patch('reNgine.tasks.crawl.Neo4jManager'))
-        subdomain_filter = p(patch('reNgine.tasks.crawl.Subdomain.objects.filter'))
+        p(patch('reNgine.tasks.crawl.api_discovery.get_http_urls', return_value=[]))
+        p(patch('reNgine.tasks.crawl.api_discovery.get_random_proxy', return_value=None))
+        p(patch('reNgine.tasks.crawl.api_discovery.has_graphql_endpoint', return_value=graphql_gate))
+        p(patch('reNgine.tasks.crawl.api_discovery.has_jwt_tokens', return_value=jwt_gate))
+        p(patch('reNgine.tasks.crawl.api_discovery.Neo4jManager'))
+        subdomain_filter = p(patch('reNgine.tasks.crawl.api_discovery.Subdomain.objects.filter'))
         subdomain_filter.return_value.first.return_value = MagicMock()
-        run_command = p(patch('reNgine.tasks.crawl.run_command', return_value=(0, '')))
+        run_command = p(patch('reNgine.tasks.crawl.api_discovery.run_command', return_value=(0, '')))
         # jwt_tool and graphql-cop are imported inside the loop body from
         # reNgine.tasks.api, so that module is where the name is looked up.
         run_jwt_scan = p(patch('reNgine.tasks.api.run_jwt_scan'))

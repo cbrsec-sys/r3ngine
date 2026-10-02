@@ -1,7 +1,9 @@
-"""Reconcile InstalledExternalTool rows against binaries on this host.
+"""Reconcile InstalledExternalTool rows against the binaries on the tool host.
 
 Only probes a curated allowlist derived from fixture/catalog names — never
-auto-registers arbitrary PATH binaries.
+auto-registers arbitrary PATH binaries. Where the probes run is decided by
+``reNgine.tool_workers``: locally on the Python orchestrator, otherwise on it
+through a Temporal workflow.
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ import shutil
 import subprocess
 from typing import Any, Optional
 
+from django.db import DatabaseError
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -138,12 +141,12 @@ def _default_github_clone(tool_name: str) -> Optional[str]:
 def resolve_binary_path(tool_name: str, github_clone_path: Optional[str] = None) -> Optional[str]:
     """Return location of the primary binary.
 
-    Prefers Temporal worker containers (go-executor / python-orchestrator) where
-    entrypoint-installed tools live. Returns an encoded worker path
-    (`go:/usr/local/bin/kr` or `python:/…`) when found remotely.
+    Asks the tool host (the Python orchestrator, locally when this process is
+    it) where entrypoint-installed tools live, and returns an encoded worker
+    path (`python:/usr/local/bin/kr`) when found there.
 
-    Falls back to a local absolute path only when Docker workers are unreachable
-    (dev/tests without the socket). Never returns a directory.
+    Falls back to a local absolute path only when the orchestrator cannot be
+    reached (dev/tests without Temporal). Never returns a directory.
     """
     from reNgine.tool_workers import (
         encode_worker_path,
@@ -267,7 +270,7 @@ def _extract_version(text: str, version_match_regex: Optional[str]) -> Optional[
 def ensure_db_connection() -> None:
     """Reconnect only when the DB handle is dead.
 
-    Long docker.exec probes can outlive Postgres idle timeouts. Calling
+    Long tool probes can outlive Postgres idle timeouts. Calling
     ``close_old_connections()`` unconditionally breaks Django ``TestCase``
     (it closes the transactional connection). Ping first; recover only on failure.
     """
@@ -285,14 +288,32 @@ def ensure_db_connection() -> None:
 def sync_installed_tools(*, probe_versions: bool = True) -> dict[str, Any]:
     """Upsert presence/version on all InstalledExternalTool rows.
 
-    Presence is determined primarily on go-executor / python-orchestrator workers
-    (entrypoint-installed tools). Does not create tools from arbitrary PATH entries.
+    Presence is determined on the tool host: this process when it is the
+    Python orchestrator, otherwise the orchestrator runs the whole sync as a
+    ``ToolProbeActivity`` and this call returns its summary. Only when the
+    orchestrator cannot be reached does the sync probe this host's own
+    filesystem. Does not create tools from arbitrary PATH entries.
 
-    Resolve/probe happens in a DB-free phase so docker exec cannot strand an open
-    queryset cursor; writes happen afterward with a safe reconnect.
+    Resolve/probe happens in a DB-free phase so a slow probe cannot strand an
+    open queryset cursor; writes happen afterward with a safe reconnect.
     """
     from scanEngine.models import InstalledExternalTool
-    from reNgine.tool_workers import decode_worker_path, worker_probe_summary
+    from reNgine.tool_workers import (
+        ToolProbeError,
+        decode_worker_path,
+        dispatch_probe,
+        probe_is_local,
+        worker_probe_summary,
+    )
+
+    if not probe_is_local():
+        try:
+            remote = dispatch_probe('sync', {'probe_versions': probe_versions})
+        except ToolProbeError:
+            logger.warning('orchestrator unreachable; syncing installed tools against this host instead')
+        else:
+            remote['workers'] = {**(remote.get('workers') or {}), 'mode': 'remote'}
+            return remote
 
     now = timezone.now()
     present = 0
@@ -300,7 +321,7 @@ def sync_installed_tools(*, probe_versions: bool = True) -> dict[str, Any]:
     errors = 0
     workers = worker_probe_summary()
 
-    # Phase 1 — snapshot rows (short DB window). Keepalive before long docker.
+    # Phase 1 — snapshot rows (short DB window). Keepalive before the probes.
     ensure_db_connection()
     snapshots = list(
         InstalledExternalTool.objects.order_by('id').values(
@@ -313,25 +334,20 @@ def sync_installed_tools(*, probe_versions: bool = True) -> dict[str, Any]:
         )
     )
 
-    # Phase 2 — resolve + optional version probe (docker; no DB).
+    # Phase 2 — resolve + optional version probe (subprocesses; no DB).
     updates: list[dict[str, Any]] = []
     for idx, row in enumerate(snapshots):
         tool_id = row['id']
-        # Heartbeat so idle-in-transaction / idle timeouts do not kill the session
-        # while we docker-exec across dozens of tools.
+        # Keep the session alive: idle-in-transaction / idle timeouts must not
+        # kill it while dozens of version probes run.
         if idx and idx % 8 == 0:
             try:
                 ensure_db_connection()
-            except Exception:
-                pass
+            except DatabaseError:
+                # Phase 3 reconnects before writing; note the outage meanwhile.
+                logger.warning('DB keepalive failed during tool sync', exc_info=True)
         try:
-            # Reuse a still-encoded worker path from a prior sync when possible.
-            prior = row.get('resolved_path') or ''
-            role_prior, remote_prior = decode_worker_path(prior)
-            if role_prior and remote_prior:
-                path = prior
-            else:
-                path = resolve_binary_path(row['name'], row['github_clone_path'])
+            path = resolve_binary_path(row['name'], row['github_clone_path'])
             version = None
             sync_err = None
             if path:
@@ -401,7 +417,7 @@ def sync_installed_tools(*, probe_versions: bool = True) -> dict[str, Any]:
                 tool.last_sync_error = str(exc)[:500]
                 tool.save(update_fields=['last_sync_error'])
             except Exception:
-                pass
+                logger.warning('Could not record sync error on tool id=%s', tool_id, exc_info=True)
             errors += 1
 
     return {

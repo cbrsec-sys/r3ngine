@@ -207,37 +207,29 @@ if [ ! -f '/usr/local/bin/kr' ]; then
   cd /usr/src/app
 fi
 
-if [ ! -d '/usr/src/wordlist/kr' ]; then
-  mkdir -p /usr/src/wordlist/kr
-  cd /usr/src/wordlist/kr
-  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-large.kite.tar.gz -O routes-large.kite.tar.gz
-  tar -xvf routes-large.kite.tar.gz
-  rm -rf routes-large.kite.tar.gz
-  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-small.kite.tar.gz -O routes-small.kite.tar.gz
-  tar -xvf routes-small.kite.tar.gz
-  rm -rf routes-small.kite.tar.gz
-  cp routes-large.kite routes-large.kr
-  cp routes-small.kite routes-small.kr
-  cd /usr/src/app
-fi
+# Each wordlist is fetched on its own and only moved into place once fully
+# extracted, so a failed or partial download is retried on the next start.
+mkdir -p /usr/src/wordlist/kr
+for kite in routes-small routes-large; do
+  if [ ! -s "/usr/src/wordlist/kr/${kite}.kite" ]; then
+    kr_tmp=$(mktemp -d)
+    if wget -q "https://wordlists-cdn.assetnote.io/data/kiterunner/${kite}.kite.tar.gz" -O "${kr_tmp}/${kite}.tar.gz" \
+      && tar -xzf "${kr_tmp}/${kite}.tar.gz" -C "${kr_tmp}" \
+      && [ -s "${kr_tmp}/${kite}.kite" ]; then
+      cp "${kr_tmp}/${kite}.kite" "/usr/src/wordlist/kr/${kite}.kr"
+      mv "${kr_tmp}/${kite}.kite" "/usr/src/wordlist/kr/${kite}.kite"
+    else
+      echo "WARNING: could not fetch the kiterunner ${kite} wordlist; kiterunner skips it until the next start"
+    fi
+    rm -rf "${kr_tmp}"
+  fi
+done
 
 if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
   echo "Fetching cPanel2Shell wordlist"
   mkdir -p /usr/src/wordlist
   wget -qO- https://raw.githubusercontent.com/danielmiessler/SecLists/master/Usernames/top-usernames-shortlist.txt >> /usr/src/wordlist/cpanel_users.txt
   sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
-fi
-
-# Clone Exploit-DB for Searchsploit if not already present
-if [ ! -d "/usr/src/exploitdb/.git" ]; then
-  echo "Cloning Exploit-DB for searchsploit..."
-  rm -rf /usr/src/exploitdb/* /usr/src/exploitdb/.* 2>/dev/null || true
-  git clone --depth 1 https://gitlab.com/exploit-database/exploitdb /usr/src/exploitdb
-fi
-
-# Ensure searchsploit RC file is copied to root home directory
-if [ -f "/usr/src/exploitdb/.searchsploit_rc" ]; then
-  cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc
 fi
 
 cd /usr/src/app

@@ -26,6 +26,7 @@ from reNgine.common_func import (
     sanitize_url,
 )
 from reNgine.utilities import SubdomainScopeChecker, replace_nulls
+from reNgine.utils.task_queues import go_executor_queue, python_orchestrator_queue
 from reNgine.settings import RENGINE_RESULTS
 
 logger = logging.getLogger(__name__)
@@ -74,11 +75,18 @@ def _execute_go_workflow(cmd, scan_id, command_obj_id, tool):
     async def _start():
         from reNgine.temporal_client import TemporalClientProvider
         client = await TemporalClientProvider.get_client()
+        # Both queues belong to this host: the executor that runs the tool must
+        # share this process's scan_results volume.
         await client.start_workflow(
             "GoExecutorTaskWorkflow",
-            {"command": [cmd], "scan_id": scan_id or 0, "command_id": command_obj_id or 0},
+            {
+                "command": [cmd],
+                "scan_id": scan_id or 0,
+                "command_id": command_obj_id or 0,
+                "executor_task_queue": go_executor_queue(),
+            },
             id=wf_id,
-            task_queue="python-orchestrator-queue",
+            task_queue=python_orchestrator_queue(),
         )
 
     async def _fetch_result():
@@ -110,13 +118,13 @@ def _execute_go_workflow(cmd, scan_id, command_obj_id, tool):
                 from reNgine.definitions import ABORTED_TASK
                 status = ScanHistory.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
                 if status == ABORTED_TASK:
-                    logger.warning(f"[_execute_go_workflow] Scan {scan_id} aborted — cancelling {wf_id}")
+                    logger.warning("[_execute_go_workflow] Scan %s aborted — cancelling %s", scan_id, wf_id)
                     from reNgine.temporal_client import TemporalClientProvider
                     TemporalClientProvider.cancel_workflow(wf_id)
                     cancelled = True
                     break
             except Exception as poll_err:
-                logger.debug(f"[_execute_go_workflow] Abort poll error: {poll_err}")
+                logger.debug("[_execute_go_workflow] Abort poll error: %s", poll_err)
 
     # Allow the result thread time to react to the cancellation before returning.
     done.wait(timeout=15.0)
@@ -146,14 +154,14 @@ def _subprocess_abort_watchdog(proc, scan_id):
             from reNgine.definitions import ABORTED_TASK
             status = ScanHistory.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
             if status == ABORTED_TASK:
-                logger.warning(f"[_subprocess_abort_watchdog] Scan {scan_id} aborted — killing subprocess")
+                logger.warning("[_subprocess_abort_watchdog] Scan %s aborted — killing subprocess", scan_id)
                 try:
                     os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                 except (ProcessLookupError, OSError):
                     pass
                 return
         except Exception as e:
-            logger.debug(f"[_subprocess_abort_watchdog] Poll error: {e}")
+            logger.debug("[_subprocess_abort_watchdog] Poll error: %s", e)
 
 
 def get_tool_color(cmd):
@@ -215,7 +223,7 @@ def _publish_to_redis_log(redis_client, soc_config, scan_id, command_id, line):
         redis_client.xadd(stream_key, log_payload)
         redis_client.xtrim(stream_key, maxlen=soc_config.log_retention_count, approximate=True)
     except Exception as e:
-        logger.error(f"Failed to publish log to Redis: {e}")
+        logger.error("Failed to publish log to Redis: %s", e)
 
 
 def _init_redis_logging(scan_id):
@@ -240,7 +248,7 @@ def _init_redis_logging(scan_id):
             )
             return r, soc_config
     except Exception as e:
-        logger.error(f"Failed to initialize Redis logging configuration: {e}")
+        logger.error("Failed to initialize Redis logging configuration: %s", e)
     return None, None
 
 
@@ -270,7 +278,7 @@ def run_command(
         tuple: Tuple with return_code, output.
     """
     color = get_tool_color(cmd)
-    logger.debug(f"{color}{redact_proxy_credentials(cmd)}{COLOR_RESET}")
+    logger.debug("%s%s%s", color, redact_proxy_credentials(cmd), COLOR_RESET)
 
     conf_path = None
     if proxy:
@@ -287,7 +295,7 @@ def run_command(
             scan_history_id=scan_id,
             activity_id=activity_id)
     except IntegrityError as e:
-        logger.warning(f"Could not create Command object in DB (scan or activity may have been deleted/rolled back): {e}")
+        logger.warning("Could not create Command object in DB (scan or activity may have been deleted/rolled back): %s", e)
         command_obj = None
 
     redis_client, soc_config = _init_redis_logging(scan_id)
@@ -307,7 +315,7 @@ def run_command(
 
     if should_route:
         # Route execution transparently to the temporal-go-executor worker
-        logger.info(f"Routing {tool} command execution to Go executor: {cmd}")
+        logger.info("Routing %s command execution to Go executor: %s", tool, cmd)
         import asyncio
         import time
         from temporalio.client import Client
@@ -326,8 +334,9 @@ def run_command(
             from reNgine.temporal_client import TemporalClientProvider
             # Connect to the Temporal cluster
             client = await TemporalClientProvider.get_client()
-            # Execute GoExecutorTaskWorkflow on the python-orchestrator task queue which routes
-            # the subprocess activity to the go-executor-queue
+            # GoExecutorTaskWorkflow runs on this host's Python queue and hands the
+            # subprocess to this host's Go executor queue, so the tool output
+            # lands in the scan_results volume this process reads.
             result = await client.execute_workflow(
                 "GoExecutorTaskWorkflow",
                 {
@@ -336,9 +345,10 @@ def run_command(
                     "command_id": command_rec_id or 0,
                     "working_dir": cwd or "",
                     "timeout_seconds": timeout,
+                    "executor_task_queue": go_executor_queue(),
                 },
                 id=f"go-exec-{tool}-{command_rec_id or int(time.time())}",
-                task_queue="python-orchestrator-queue"
+                task_queue=python_orchestrator_queue()
             )
             return result
 
@@ -368,7 +378,7 @@ def run_command(
                 for line in stderr.splitlines():
                     _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, line)
         except Exception as e:
-            logger.error(f"Error executing remote command: {e}")
+            logger.error("Error executing remote command: %s", e)
             output = f"Error executing remote command: {e}"
             return_code = 127
     else:
@@ -395,7 +405,7 @@ def run_command(
             for stdout_line in iter(popen.stdout.readline, ""):
                 item = stdout_line.strip()
                 output += '\n' + item
-                logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
+                logger.info("%s%s%s", COLOR_WHITE, item, COLOR_RESET)
                 if redis_client and soc_config:
                     _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, item)
                 _run_cmd_line_count += 1
@@ -448,11 +458,11 @@ def run_command(
                 else:
                     return_code = popen.returncode
         except Exception as e:
-            logger.error(f"Error executing command {cmd}: {str(e)}")
+            logger.error("Error executing command %s: %s", cmd, str(e))
             output = f"Error executing command: {str(e)}"
             return_code = 127 # Command not found / error
         except BaseException as e:
-            logger.error(f"BaseException raised during command execution: {str(e)}")
+            logger.error("BaseException raised during command execution: %s", str(e))
             if popen:
                 try:
                     os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
@@ -464,8 +474,8 @@ def run_command(
                 try:
                     if popen.stdout:
                         popen.stdout.close()
-                except Exception:
-                    pass
+                except OSError:
+                    pass  # stream already broken; the process is reaped below
                 try:
                     if popen.poll() is None:
                         try:
@@ -482,19 +492,19 @@ def run_command(
                     else:
                         popen.wait()
                 except Exception as ex:
-                    logger.error(f"Error reaping process in run_command: {ex}")
+                    logger.error("Error reaping process in run_command: %s", ex)
             if conf_path and os.path.exists(conf_path):
                 os.remove(conf_path)
 
     if command_obj:
-        logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
+        logger.warning("Command %s finished with return code %s", command_obj.id, return_code)
         # run_command has no output cap: unlike stream_command it returns the
         # output to the caller and has never truncated what it stores.
         persist_command_output(
             command_obj, output, max_output_chars=None, return_code=return_code
         )
     else:
-        logger.warning(f"Command finished with return code {return_code} (no database record saved)")
+        logger.warning("Command finished with return code %s (no database record saved)", return_code)
 
     if history_file:
         mode = 'a'
@@ -526,12 +536,12 @@ def run_command_with_retry(cmd, results_file, max_retries=3, **kwargs):
         if results_file and os.path.exists(results_file) and os.path.getsize(results_file) > 0:
             break
         logger.warning(
-            f'{tool_name}: results file "{results_file}" is empty after attempt {attempt - 1}/{max_retries}. Retrying...'
+            '%s: results file "%s" is empty after attempt %s/%s. Retrying...', tool_name, results_file, attempt - 1, max_retries
         )
         return_code, output = run_command(cmd, **kwargs)
 
     if not results_file or not os.path.exists(results_file) or os.path.getsize(results_file) == 0:
-        logger.warning(f'{tool_name}: results file "{results_file}" still empty after {max_retries} attempts. Moving on.')
+        logger.warning('%s: results file "%s" still empty after %s attempts. Moving on.', tool_name, results_file, max_retries)
 
     return return_code, output
 
@@ -596,17 +606,17 @@ def save_subdomain(subdomain_name, ctx={}):
         validators.ipv6(subdomain_name)
     )
     if not valid_domain:
-        logger.error(f'{subdomain_name} is not a valid domain. Skipping.')
+        logger.error("%s is not a valid domain. Skipping.", subdomain_name)
         return None, False
 
     if subdomain_checker.is_out_of_scope(subdomain_name):
-        logger.error(f'{subdomain_name} is out-of-scope. Skipping.')
+        logger.error("%s is out-of-scope. Skipping.", subdomain_name)
         return None, False
 
     if ctx.get('domain_id'):
         domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
         if domain and domain.name not in subdomain_name:
-            logger.error(f"{subdomain_name} is not a subdomain of domain {domain.name}. Skipping.")
+            logger.error("%s is not a subdomain of domain %s. Skipping.", subdomain_name, domain.name)
             return None, False
 
     scan = ScanHistory.objects.filter(pk=scan_id).first()
@@ -666,7 +676,11 @@ def save_endpoint(
         **endpoint_data):
     """Get or create EndPoint object."""
     endpoint_data = replace_nulls(endpoint_data)
-    scheme = urlparse(http_url).scheme
+    try:
+        scheme = urlparse(http_url).scheme
+    except ValueError:
+        logger.warning("%s is not a valid URL. Skipping.", http_url)
+        return None, False
     endpoint = None
     created = False
     
@@ -676,9 +690,12 @@ def save_endpoint(
         if domain is None or isinstance(domain, int):
             domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
             ctx['_domain_obj'] = domain
-        if domain and domain.name not in http_url:
-            logger.error(f"{http_url} is not a URL of domain {domain.name}. Skipping.")
-            return None, False
+        if domain:
+            host = _url_host(http_url)
+            domain_name = domain.name.lower().rstrip('.')
+            if host != domain_name and not host.endswith('.' + domain_name):
+                logger.error("%s is not a URL of domain %s. Skipping.", http_url, domain.name)
+                return None, False
 
     if crawl:
         # Avoid circular import by importing here
@@ -758,7 +775,7 @@ def save_endpoint(
                     tech_hint=f"Discovered URL: {http_url}"
                 )
             except Exception as e:
-                logger.error(f"Error registering AuthCandidate from endpoint {http_url}: {e}")
+                logger.error("Error registering AuthCandidate from endpoint %s: %s", http_url, e)
 
         subscan_id = ctx.get('subscan_id')
         if subscan_id:
@@ -993,7 +1010,7 @@ def stream_command(
 		str/dict: Output line.
 	"""
 	color = get_tool_color(cmd)
-	logger.debug(f"{color}{redact_proxy_credentials(cmd)}{COLOR_RESET}")
+	logger.debug("%s%s%s", color, redact_proxy_credentials(cmd), COLOR_RESET)
 
 	conf_path = None
 	if proxy:
@@ -1024,10 +1041,15 @@ def stream_command(
 			should_route = True
 
 	if route_to_executor and should_route:
-		logger.info(f"Routing {tool} command execution to Go executor: {cmd}")
+		logger.info("Routing %s command execution to Go executor: %s", tool, cmd)
 		import asyncio
 		import time
 		from temporalio.client import Client
+		from reNgine.temporal.activities.core import _task_cancel_local
+
+		# Read in this thread: _run_task sets it thread-locally, and the polling
+		# coroutine below may run on a pool thread where it would be missing.
+		cancel_event = getattr(_task_cancel_local, 'cancel_event', None)
 
 		async def _execute_remote_command(command_str, scan_history_id, command_rec_id):
 			"""Start GoExecutorTaskWorkflow and wait for result, cancelling it if the scan is aborted.
@@ -1042,6 +1064,8 @@ def stream_command(
 			client = await TemporalClientProvider.get_client()
 			workflow_id = f"go-exec-{tool}-{command_rec_id or int(time.time())}"
 
+			# Same host for both queues: the executor that runs the tool must
+			# share this process's scan_results volume.
 			handle = await client.start_workflow(
 				"GoExecutorTaskWorkflow",
 				{
@@ -1050,9 +1074,10 @@ def stream_command(
 					"command_id": command_rec_id or 0,
 					"working_dir": cwd or "",
 					"timeout_seconds": timeout,
+					"executor_task_queue": go_executor_queue(),
 				},
 				id=workflow_id,
-				task_queue="python-orchestrator-queue"
+				task_queue=python_orchestrator_queue()
 			)
 			# Create a single task to await the workflow result.
 			# This avoids creating multiple handle.result() coroutines on every iteration,
@@ -1063,21 +1088,16 @@ def stream_command(
 				# Poll until result_task is complete.
 				while not result_task.done():
 					# 1) Check the cancel_event set by _run_task's heartbeat thread.
-					try:
-						from reNgine.temporal_activities import _task_cancel_local
-						ce = getattr(_task_cancel_local, 'cancel_event', None)
-						if ce and ce.is_set():
-							logger.warning(
-								f"[stream_command] cancel_event set — cancelling GoExecutorTaskWorkflow {workflow_id}"
-							)
-							try:
-								await handle.cancel()
-							except Exception as cancel_err:
-								logger.error(f"[stream_command] Failed to cancel workflow {workflow_id}: {cancel_err}")
-							result_task.cancel()
-							return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
-					except Exception as e:
-						logger.debug(f"[stream_command] Local cancel_event check failed: {e}")
+					if cancel_event is not None and cancel_event.is_set():
+						logger.warning(
+							"[stream_command] cancel_event set — cancelling GoExecutorTaskWorkflow %s", workflow_id
+						)
+						try:
+							await handle.cancel()
+						except Exception as cancel_err:
+							logger.error("[stream_command] Failed to cancel workflow %s: %s", workflow_id, cancel_err)
+						result_task.cancel()
+						return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
 
 					# 2) Fallback: direct DB check.
 					if scan_history_id:
@@ -1093,16 +1113,16 @@ def stream_command(
 							)
 							if status == ABORTED_TASK:
 								logger.warning(
-									f"[stream_command] DB ABORTED_TASK — cancelling GoExecutorTaskWorkflow {workflow_id}"
+									"[stream_command] DB ABORTED_TASK — cancelling GoExecutorTaskWorkflow %s", workflow_id
 								)
 								try:
 									await handle.cancel()
 								except Exception as cancel_err:
-									logger.error(f"[stream_command] Failed to cancel workflow {workflow_id}: {cancel_err}")
+									logger.error("[stream_command] Failed to cancel workflow %s: %s", workflow_id, cancel_err)
 								result_task.cancel()
 								return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
 						except Exception as e:
-							logger.debug(f"[stream_command] DB abort status check failed: {e}")
+							logger.debug("[stream_command] DB abort status check failed: %s", e)
 
 					# Wait for up to 10 seconds or until the workflow finishes.
 					# This yields control to the event loop, letting result_task run,
@@ -1112,7 +1132,7 @@ def stream_command(
 				# Once result_task is done, return its result.
 				return await result_task
 			except Exception as e:
-				logger.error(f"[stream_command] Error waiting for GoExecutorTaskWorkflow: {e}")
+				logger.error("[stream_command] Error waiting for GoExecutorTaskWorkflow: %s", e)
 				raise
 			finally:
 				# Ensure result_task is cancelled if we exit early (e.g. on abort or error).
@@ -1145,7 +1165,7 @@ def stream_command(
 				for line in stderr.splitlines():
 					_publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, line)
 		except Exception as e:
-			logger.error(f"Error executing remote command: {e}")
+			logger.error("Error executing remote command: %s", e)
 			output = f"Error executing remote command: {e}"
 			return_code = 127
 			stdout = ""
@@ -1208,20 +1228,20 @@ def stream_command(
 			
 		# If we reach here, it timed out
 		if proc.poll() is None:
-			logger.error(f"Watchdog: Command timed out after {limit_sec} seconds. Killing process: {cmd}")
+			logger.error("Watchdog: Command timed out after %s seconds. Killing process: %s", limit_sec, cmd)
 			try:
 				os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
 			except (ProcessLookupError, OSError):
 				pass
 			except Exception as ex:
-				logger.error(f"Watchdog: Failed to kill process: {ex}")
+				logger.error("Watchdog: Failed to kill process: %s", ex)
 			
 			# Force close stdout to break the blocked readline() in the main thread
 			if proc.stdout:
 				try:
 					proc.stdout.close()
-				except Exception:
-					pass
+				except OSError:
+					pass  # stream already broken; the process was killed above
 
 	watchdog_thread = threading.Thread(
 		target=watchdog,
@@ -1259,9 +1279,9 @@ def stream_command(
 
 			# Log to console for visibility
 			if isinstance(item, str):
-				logger.debug(f"{COLOR_WHITE}{item}{COLOR_RESET}")
+				logger.debug("%s%s%s", COLOR_WHITE, item, COLOR_RESET)
 			else:
-				logger.debug(f"{COLOR_WHITE}{json.dumps(item)}{COLOR_RESET}")
+				logger.debug("%s%s%s", COLOR_WHITE, json.dumps(item), COLOR_RESET)
 
 			# Yield the line
 			yield item
@@ -1300,7 +1320,7 @@ def stream_command(
 
 	except BaseException as e:
 		if not isinstance(e, GeneratorExit):
-			logger.error(f"Error in stream_command: {str(e)}")
+			logger.error("Error in stream_command: %s", str(e))
 		if process:
 			try:
 				os.killpg(os.getpgid(process.pid), signal.SIGKILL)
@@ -1316,8 +1336,8 @@ def stream_command(
 			if process.stdout:
 				try:
 					process.stdout.close()
-				except Exception:
-					pass
+				except OSError:
+					pass  # stream already broken; the process is reaped below
 			try:
 				if process.poll() is None:
 					try:
@@ -1334,7 +1354,7 @@ def stream_command(
 				else:
 					process.wait()
 			except Exception as ex:
-				logger.error(f"Error reaping process in stream_command: {ex}")
+				logger.error("Error reaping process in stream_command: %s", ex)
 		if conf_path and os.path.exists(conf_path):
 			os.remove(conf_path)
 
@@ -1344,8 +1364,8 @@ def activity_heartbeat_safe(message: str) -> None:
 	try:
 		from temporalio import activity
 		activity.heartbeat(message)
-	except Exception:
-		pass
+	except RuntimeError:
+		pass  # not running inside a Temporal activity
 
 
 def _link_endpoints_subscan(http_urls, scan, subscan_id):
@@ -1628,20 +1648,20 @@ def ensure_endpoints_crawled_and_execute(task_proxy, task_function, ctx, descrip
 	from copy import deepcopy
 	from reNgine.common_func import get_http_urls
 
-	logger.info(f'Ensuring endpoints are crawled for {task_function.__name__}')
+	logger.info("Ensuring endpoints are crawled for %s", task_function.__name__)
 
 	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
-		logger.info(f'Found {len(alive_endpoints)} alive endpoints, executing {task_function.__name__}')
+		logger.info("Found %s alive endpoints, executing %s", len(alive_endpoints), task_function.__name__)
 		return task_function(ctx=ctx, description=description)
 
 	# No alive endpoints found, check if we have uncrawled endpoints
 	uncrawled_endpoints = get_http_urls(is_uncrawled=True, ctx=ctx)
 
 	if not uncrawled_endpoints:
-		logger.warning(f'No endpoints found for {task_function.__name__}, skipping task')
+		logger.warning("No endpoints found for %s, skipping task", task_function.__name__)
 		return None
 
-	logger.info(f'Found {len(uncrawled_endpoints)} uncrawled endpoints, launching HTTP crawl first')
+	logger.info("Found %s uncrawled endpoints, launching HTTP crawl first", len(uncrawled_endpoints))
 
 	from reNgine.tasks import http_crawl
 	custom_ctx = deepcopy(ctx)
@@ -1652,10 +1672,10 @@ def ensure_endpoints_crawled_and_execute(task_proxy, task_function, ctx, descrip
 	http_crawl(task_proxy, urls=uncrawled_endpoints[:precrawl_limit], ctx=custom_ctx)
 
 	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
-		logger.info(f'Found {len(alive_endpoints)} alive endpoints after crawl, executing {task_function.__name__}')
+		logger.info("Found %s alive endpoints after crawl, executing %s", len(alive_endpoints), task_function.__name__)
 		return task_function(ctx=ctx, description=description)
 	else:
-		logger.warning(f'No alive endpoints found after crawl, skipping {task_function.__name__}')
+		logger.warning("No alive endpoints found after crawl, skipping %s", task_function.__name__)
 		return None
 
 
@@ -1740,7 +1760,7 @@ def save_subdomain_metadata(subdomain, endpoint, extra_datas=None):
 	if extra_datas is None:
 		extra_datas = {}
 	if endpoint and endpoint.is_alive:
-		logger.info(f'Saving HTTP metadatas from {endpoint.http_url}')
+		logger.info("Saving HTTP metadatas from %s", endpoint.http_url)
 		subdomain.http_url = endpoint.http_url
 		subdomain.http_status = endpoint.http_status
 		subdomain.response_time = endpoint.response_time
@@ -1774,6 +1794,13 @@ def save_subdomain_metadata(subdomain, endpoint, extra_datas=None):
 		subdomain.http_url = http_url
 		subdomain.save()
 	else:
-		logger.debug(f'No HTTP URL found for {subdomain.name} yet. Skipping metadata extraction.')
+		logger.debug("No HTTP URL found for %s yet. Skipping metadata extraction.", subdomain.name)
 
 
+def _url_host(http_url: str) -> str:
+    """Lower-case host of a URL, or of a bare 'host[:port][/path]' as callers pass for a subdomain."""
+    target = http_url if '://' in http_url else f'//{http_url}'
+    try:
+        return (urlparse(target).hostname or '').rstrip('.')
+    except ValueError:
+        return ''

@@ -387,10 +387,6 @@ urlpatterns = [
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
     path(
-        'action/subdomain/<int:pk>/searchsploit/',
-        RunSearchsploitAction.as_view(),
-        name='run_searchsploit'),
-    path(
         'action/vulnerability/delete/',
         DeleteVulnerability.as_view(),
         name='delete_vulnerability'),
@@ -506,6 +502,10 @@ urlpatterns = [
         'action/unpause/scan/',
         UnpauseScan.as_view(),
         name='unpause_scan'),
+    path(
+        'action/scan/<int:scan_id>/hardware-profile/',
+        SetScanHardwareProfile.as_view(),
+        name='set_scan_hardware_profile'),
     path(
         'fetch/results/subscan/',
         FetchSubscanResults.as_view(),
@@ -787,4 +787,4 @@ if _os.path.exists(_plugins_data_dir):
         except Exception as _e:
             import logging as _logging
             _logging.getLogger(__name__).warning(
-                f"Failed to load plugin URLs for {_plugin_slug}: {_e}")
+                "Failed to load plugin URLs for %s: %s", _plugin_slug, _e)

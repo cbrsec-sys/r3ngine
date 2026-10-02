@@ -63,7 +63,7 @@ class TestTheQueueGateUsesTheSafeWrapper(unittest.TestCase):
     """The activity that actually failed, pinned by name."""
 
     def test_check_scan_queue_status_imports_database_sync_to_async(self):
-        with open(os.path.join(ACTIVITIES_DIR, '__init__.py'), encoding='utf-8') as handle:
+        with open(os.path.join(ACTIVITIES_DIR, 'scan_lifecycle.py'), encoding='utf-8') as handle:
             source = handle.read()
         start = source.index('def check_scan_queue_status_activity')
         body = source[start:start + 6000]

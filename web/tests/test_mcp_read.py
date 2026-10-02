@@ -1,4 +1,7 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.db import DatabaseError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -77,6 +80,15 @@ class McpReadTests(TestCase):
         bare.credentials(HTTP_AUTHORIZATION=f'Bearer {secret}')
         res = bare.get('/api/mcp/health/')
         self.assertEqual(res.status_code, 401)
+
+    def test_failed_audit_write_is_logged_not_swallowed(self):
+        with patch('mcp.views.audit.write_audit_event', side_effect=DatabaseError('audit table locked')), \
+                self.assertLogs('mcp.views.audit', level='ERROR') as logs:
+            res = self.client.get('/api/mcp/targets/?project_slug=read-project')
+        # The tool call itself still answers; the lost audit row is on record.
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('MCP audit write failed for GET /api/mcp/targets/', logs.output[0])
+        self.assertNotIn('audit table locked', res.content.decode())
 
     def test_list_targets_and_audit_tool_name(self):
         res = self.client.get('/api/mcp/targets/?project_slug=read-project')

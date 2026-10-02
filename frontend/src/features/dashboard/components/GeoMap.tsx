@@ -20,7 +20,7 @@ import { Globe, Plus } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip as LeafletTooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { scaleLinear } from 'd3-scale';
+import { scaleLinear } from 'd3';
 import { countryCentroids } from '../types/countryCentroids';
 
 // Pulsing Dot is now handled via global CSS .map-marker-pulse in index.css
@@ -31,16 +31,14 @@ interface CountryData {
     count: number;
 }
 
-interface GeoJSONFeature {
-    type: 'Feature';
-    properties: Record<string, any>;
-    geometry: any;
+/** Properties of a country in the world GeoJSON; only `name` is read. */
+interface CountryProperties {
+    name?: string;
+    [key: string]: unknown;
 }
 
-interface GeoJSONFeatureCollection {
-    type: 'FeatureCollection';
-    features: GeoJSONFeature[];
-}
+type GeoJSONFeature = GeoJSON.Feature<GeoJSON.Geometry, CountryProperties>;
+type GeoJSONFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Geometry, CountryProperties>;
 
 export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = ({ data, disableCard = false }) => {
     const { theme, isLight, tokens } = useThemeTokens();
@@ -52,8 +50,8 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
         .domain([0, maxCount])
         .range(["rgba(0, 243, 255, 0.05)", "rgba(0, 243, 255, 0.4)"]);
 
-    const findCountry = (properties: any) => {
-        const geoName = (properties.name || "").toUpperCase();
+    const findCountry = (properties: CountryProperties | null) => {
+        const geoName = (properties?.name || "").toUpperCase();
         return data.find(d =>
             d.iso.toUpperCase() === geoName ||
             d.name.toUpperCase() === geoName ||

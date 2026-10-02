@@ -62,6 +62,7 @@ import {
   usePauseScan,
   useUnpauseScan
 } from '../api';
+import { isResumableScanStatus } from '../utils/scanStatus';
 import { useParams, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
@@ -125,7 +126,7 @@ const HistoryProgressBar: React.FC<{
 
 export const ScanHistoryPage: React.FC = () => {
   const { tokens, isLight, theme } = useThemeTokens();
-  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { projectSlug = 'default' } = useParams({ strict: false });
   const navigate = useNavigate();
   const { data: scans, isLoading } = useScansHistory(projectSlug);
   const stopScanMutation = useStopScan(projectSlug);
@@ -460,7 +461,7 @@ export const ScanHistoryPage: React.FC = () => {
                       sx={{ borderBottom: 1, borderColor: 'divider', cursor: 'pointer' }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate({ to: `/${projectSlug}/scan/detail/${scan.id}` as any });
+                        navigate({ to: '/$projectSlug/scan/detail/$scanId', params: { projectSlug, scanId: String(scan.id) } });
                       }}
                     >
                       <Typography
@@ -708,7 +709,7 @@ export const ScanHistoryPage: React.FC = () => {
         }}>
           <StopCircle size={14} /> STOP SCAN
         </MenuItem>
-        {activeScanId && (scans?.find((s) => s.id === activeScanId)?.scan_status === 0 || scans?.find((s) => s.id === activeScanId)?.scan_status === 3) && (
+        {activeScanId && isResumableScanStatus(scans?.find((s) => s.id === activeScanId)?.scan_status) && (
           <MenuItem onClick={() => {
             if (activeScanId) {
               resumeScanMutation.mutate(activeScanId);

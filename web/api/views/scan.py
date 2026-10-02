@@ -39,7 +39,7 @@ from recon_note.models import *
 from reNgine.common_func import *
 from reNgine.utils.database import *
 from reNgine.definitions import (
-    ABORTED_TASK, RUNNING_TASK, SUCCESS_TASK,
+    ABORTED_TASK, FAILED_TASK, PARTIALLY_COMPLETE_TASK, RUNNING_TASK, SUCCESS_TASK,
     PERM_MODIFY_TARGETS, PERM_MODIFY_SCAN_CONFIGURATIONS,
     PERM_MODIFY_WORDLISTS, PERM_INITATE_SCANS_SUBSCANS,
     PERM_MODIFY_SCAN_REPORT, PERM_MODIFY_SCAN_RESULTS,
@@ -57,6 +57,7 @@ from api.serializers import *
 from reNgine.utils.graph import Neo4jManager
 from reNgine.temporal_client import TemporalClientProvider, run_and_close
 from api.views.tools import _WORKFLOW_REGISTRY
+from reNgine.definitions import INTERNAL_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -159,9 +160,9 @@ class InitiateScan(APIView):
 						raise Exception(res.get('error', 'Failed to initiate scan'))
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
-				except Exception as e:
+				except Exception:
 					logger.error("Error initiating scan for domain %s", domain_id, exc_info=True)
-					errors.append({'domain_id': domain_id, 'error': str(e)})
+					errors.append({'domain_id': domain_id, 'error': INTERNAL_ERROR_MESSAGE})
 
 			if not results:
 				return Response({
@@ -176,12 +177,12 @@ class InitiateScan(APIView):
 				'results': results,
 				'errors': errors if errors else None
 			})
-		except Exception as e:
-			logger.error(e)
+		except Exception:
+			logger.exception('Failed to initiate scans')
 			return Response({
 				'status': False,
-				'message': str(e)
-			}, status=status.HTTP_400_BAD_REQUEST)
+				'message': INTERNAL_ERROR_MESSAGE
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class InitiateSubTask(APIView):
@@ -238,9 +239,9 @@ class InitiateSubTask(APIView):
 					'task_queue': task_queue or worker_name,
 				}
 				return sub_id, initiate_subscan_temporal(**ctx)
-			except Exception as ex:
-				logger.exception('Error starting concurrent subscan for subdomain %s', sub_id, exc_info=True)
-				return sub_id, {'success': False, 'error': str(ex)}
+			except Exception:
+				logger.exception('Error starting concurrent subscan for subdomain %s', sub_id)
+				return sub_id, {'success': False, 'error': INTERNAL_ERROR_MESSAGE}
 			finally:
 				# Close all connections created or cached for this thread to prevent leaks
 				connections.close_all()
@@ -290,9 +291,9 @@ class StopScan(APIView):
 				if scan.scan_status == SUCCESS_TASK or scan.scan_status == ABORTED_TASK:
 					continue
 				response = abort_scan_history(scan, aborted_by=request.user)
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
+			except Exception:
+				logger.exception('Failed to abort scan %s', scan_id)
+				response = {'status': False, 'message': INTERNAL_ERROR_MESSAGE}
 
 		for subscan_id in subscan_ids:
 			try:
@@ -300,11 +301,14 @@ class StopScan(APIView):
 				if subscan.status == SUCCESS_TASK or subscan.status == ABORTED_TASK:
 					continue
 				response = abort_subscan(subscan)
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
+			except Exception:
+				logger.exception('Failed to abort subscan %s', subscan_id)
+				response = {'status': False, 'message': INTERNAL_ERROR_MESSAGE}
 
 		return Response(response)
+
+
+RESUMABLE_SCAN_STATUSES = (FAILED_TASK, ABORTED_TASK, PARTIALLY_COMPLETE_TASK)
 
 
 class ResumeScan(APIView):
@@ -323,19 +327,22 @@ class ResumeScan(APIView):
 			scan = ScanHistory.objects.get(id=scan_id)
 			if scan.scan_status == SUCCESS_TASK:
 				return Response({'status': False, 'message': 'Scan is already completed.'})
-			if scan.recovery_count >= 3:
-				return Response({'status': False, 'message': 'Max recovery limit (3) exceeded. Use the manual Resume button to override.'})
+			# A running, pending or paused scan still has a workflow; resuming it would
+			# start a second one over the same scan. recovery_count only caps automatic
+			# recovery: a manual resume is the override and resets it.
+			if scan.scan_status not in RESUMABLE_SCAN_STATUSES:
+				return Response({'status': False, 'message': 'Only a failed, aborted or partially complete scan can be resumed.'})
 
 			from reNgine.tasks import resume_scan_temporal
 			resume_scan_temporal(scan.id)
-			
+
 			response['status'] = True
 			response['message'] = 'Scan resumption initiated successfully.'
 		except ScanHistory.DoesNotExist:
 			response['message'] = 'Scan not found'
-		except Exception as e:
+		except Exception:
 			logger.error('Error resuming scan %s', scan_id, exc_info=True)
-			response['message'] = str(e)
+			response['message'] = INTERNAL_ERROR_MESSAGE
 		
 		return Response(response)
 
@@ -446,6 +453,54 @@ class UnpauseScan(APIView):
 				logger.error("Failed to resume/unpause scan %s", scan.id, exc_info=True)
 
 		return Response({'status': True, 'resumed_count': resumed_count, 'message': f'Resumed {resumed_count} scans.'})
+
+
+class SetScanHardwareProfile(APIView):
+	"""Switch the hardware profile of a scan, including a pending or running one.
+
+	Every activity re-reads the profile when it starts (TemporalTaskProxy), so the
+	change applies to the steps that start afterwards; tools already running keep
+	the settings they were launched with.
+	"""
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request, scan_id: int) -> Response:
+		try:
+			profile_id = int(request.data.get('hardware_profile_id'))
+		except (TypeError, ValueError):
+			return Response(
+				{'status': False, 'message': 'A valid hardware_profile_id is required.'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		scan = ScanHistory.objects.filter(pk=scan_id).first()
+		if scan is None:
+			return Response({'status': False, 'message': 'Scan not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+		profile = HardwareProfile.objects.filter(pk=profile_id, is_active=True).first()
+		if profile is None:
+			return Response(
+				{'status': False, 'message': 'Hardware profile not found or inactive.'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		try:
+			scan.hardware_profile = profile
+			scan.save(update_fields=['hardware_profile'])
+		except Exception:
+			logger.exception('Failed to set hardware profile %s on scan %s', profile_id, scan_id)
+			return Response(
+				{'status': False, 'message': INTERNAL_ERROR_MESSAGE},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
+
+		logger.info('Scan %s switched to hardware profile %s by user %s', scan_id, profile.id, request.user.pk)
+		return Response({
+			'status': True,
+			'message': 'Hardware profile updated; it applies to scan steps that start from now on.',
+			'hardware_profile': {'id': profile.id, 'name': profile.name},
+		})
 
 
 class FetchSubscanResults(APIView):
@@ -801,7 +856,7 @@ class ScanActivityRetryAPIView(APIView):
 #: makes the workflow raise a non-retryable ``ApplicationError``, so the tier
 #: retry endpoint filters those rows out and reports them instead of queueing a
 #: workflow that is guaranteed to fail. Kept in sync with the dispatch chain in
-#: ``reNgine/temporal/workflows/__init__.py`` (see test_tier_retry.py).
+#: ``reNgine/temporal/workflows/jobs.py`` (see test_tier_retry.py).
 RETRYABLE_TASK_NAMES = frozenset({
     'subdomain_discovery',
     'amass_intel_discovery',
@@ -1293,10 +1348,9 @@ class ExtractAuthLogsView(APIView):
                         logs.append(fields['data'])
 
             return Response({'status': True, 'logs': logs}, status=status.HTTP_200_OK)
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to fetch auth logs for {workflow_id}: {exc}")
-            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Failed to fetch auth logs for %s", workflow_id)
+            return Response({'error': INTERNAL_ERROR_MESSAGE}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # ---------------------------------------------------------------------------
 # Phase 4 — ScanProfile CRUD API

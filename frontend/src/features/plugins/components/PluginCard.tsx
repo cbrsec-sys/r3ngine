@@ -40,7 +40,7 @@ import {
   VisibilityOff as EyeOffIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
-import type { Plugin, MarketplacePlugin } from '../api/pluginsApi';
+import type { Plugin, MarketplacePlugin, PluginManifest, PluginToolsConfig } from '../api/pluginsApi';
 import {
   useTogglePlugin,
   useDeletePlugin,
@@ -55,6 +55,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import type { ResolvedThemeTokens } from '../../../theme/tokens';
 
 // ── Mermaid diagram renderer (lazy — keeps mermaid out of the critical path) ─
 
@@ -156,7 +157,7 @@ const TrustBadge: React.FC<{ trustLevel: Plugin['trust_level'] }> = ({ trustLeve
 };
 
 // ── Helper to resolve trust config dynamically ────────────────────────────────
-function getTrustLevelConfig(trustLevel: Plugin['trust_level'], tokens: any) {
+function getTrustLevelConfig(trustLevel: Plugin['trust_level'], tokens: ResolvedThemeTokens) {
   switch (trustLevel) {
     case 'official':
       return {
@@ -302,8 +303,8 @@ const PluginAvatar: React.FC<{
 const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin, iconSrcs }) => {
   const { tokens } = useThemeTokens();
   const trustCfg = getTrustLevelConfig(plugin.trust_level, tokens);
-  const tools: Record<string, any> = plugin.tools_config ?? {};
-  const manifest: Record<string, any> = plugin.manifest ?? {};
+  const tools: PluginToolsConfig = plugin.tools_config ?? {};
+  const manifest: PluginManifest = plugin.manifest ?? {};
   const runtime = manifest.runtime ?? {};
 
   return (
@@ -385,7 +386,7 @@ const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin
             <Divider sx={{ my: 2, borderColor: tokens.border.subtle }} />
             <SectionLabel>Tools</SectionLabel>
             {Array.isArray(tools.tools) ? (
-              tools.tools.map((t: any, i: number) => (
+              tools.tools.map((t, i) => (
                 <Box key={i} sx={{ mb: 1, p: 1, bgcolor: alpha(tokens.accent.primary, 0.04), border: `1px solid ${alpha(tokens.accent.primary, 0.08)}`, borderRadius: 1 }}>
                   <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700, color: tokens.accent.primary }}>
                     {t.name ?? `Tool ${i + 1}`}

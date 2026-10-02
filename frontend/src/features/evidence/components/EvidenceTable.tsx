@@ -16,6 +16,7 @@ import { useEvidenceCollections, useCollectionItems, useVerifyEvidence,
 import type { Evidence, EvidenceCollection } from '../types';
 import { EvidenceDetailDialog } from './EvidenceDetailDialog';
 import { EvidenceUploadDialog } from './EvidenceUploadDialog';
+import { openSafeUrl } from '../../../utils/securityUtils';
 
 // -------------------------------------------------------------------------
 // Constants
@@ -196,7 +197,7 @@ function EvidenceRow({
               <Tooltip title="Download evidence">
                 <IconButton
                   size="small"
-                  onClick={() => window.open(item.download_url, '_blank')}
+                  onClick={() => openSafeUrl(item.download_url)}
                   sx={{ color: 'text.secondary' }}
                 >
                   <Download size={14} />

@@ -19,10 +19,10 @@ from reNgine.failure_reasons import CATEGORY_HINTS, classify_failure
 
 # (label, error_message, traceback, expected category).
 # Messages are quoted as stored: ``_run_task`` writes ``repr(exc)`` into
-# ``error_message`` (reNgine/temporal/activities/__init__.py:535).
+# ``error_message`` (reNgine/temporal/activities/core.py:517).
 SAMPLES: list[tuple[str, str, str, str]] = [
     (
-        # acunetix.py:309 reason, wrapped by activities/__init__.py:523.
+        # acunetix.py:309 reason, wrapped by activities/core.py:505.
         'acunetix missing vault keys',
         'Exception(\'Task acunetix_scan failed: Acunetix API keys not fully '
         'configured in vault.\')',
@@ -38,7 +38,7 @@ SAMPLES: list[tuple[str, str, str, str]] = [
         'missing_configuration',
     ),
     (
-        # activities/__init__.py:524 — the generic "gave up" shape. vigolium's
+        # activities/core.py:506 — the generic "gave up" shape. vigolium's
         # phases take this path: their proxy retry only reaches the log
         # (tasks/vigolium.py:299-302), never self.error.
         'task returned False',
@@ -64,7 +64,8 @@ SAMPLES: list[tuple[str, str, str, str]] = [
         'network_error',
     ),
     (
-        # activities/__init__.py:403-406, copied onto the row by :3174-3177.
+        # activities/core.py:385-389, copied onto the row by
+        # activities/scan_lifecycle.py:430-432.
         'user aborted the scan',
         "ApplicationError('[port_scan] Scan 42 was aborted by the user. "
         "Workflow cancelled.')",
@@ -72,7 +73,7 @@ SAMPLES: list[tuple[str, str, str, str]] = [
         'temporal_cancelled',
     ),
     (
-        # activities/__init__.py:397-400.
+        # activities/core.py:378-383.
         'scan deleted mid-run',
         "ApplicationError('[subdomain_discovery] ScanHistory 42 no longer "
         "exists — scan was deleted. Workflow cancelled.')",
@@ -80,8 +81,8 @@ SAMPLES: list[tuple[str, str, str, str]] = [
         'temporal_cancelled',
     ),
     (
-        # activities/__init__.py:3162, fanned out to every RUNNING/INITIATED
-        # row at :3177 — what an operator sees after the box rebooted.
+        # activities/scan_lifecycle.py:417, fanned out to every RUNNING/INITIATED
+        # row at :432 — what an operator sees after the box rebooted.
         'workflow crashed with the container',
         'Scan workflow crashed.',
         '',
@@ -97,9 +98,9 @@ SAMPLES: list[tuple[str, str, str, str]] = [
     ),
     (
         # Temporal's own text when the heartbeat thread in
-        # activities/__init__.py:430-490 stops reaching the server
+        # activities/core.py:410-469 stops reaching the server
         # (heartbeat_timeout is set on every activity call in
-        # temporal/workflows/__init__.py, e.g. :248).
+        # temporal/workflows/master_scan.py, e.g. :145).
         'heartbeat timeout',
         'ActivityError: activity Heartbeat timeout',
         '',
@@ -146,7 +147,7 @@ SAMPLES: list[tuple[str, str, str, str]] = [
         'network_error',
     ),
     (
-        # temporal/workflows/__init__.py:952 — the fallback the workflow uses
+        # temporal/workflows/master_scan.py:860 — the fallback the workflow uses
         # when it captured no reason. It names no cause, so neither do we.
         'workflow failed with no captured reason',
         'Workflow failed during execution',
@@ -172,13 +173,13 @@ SAMPLES: list[tuple[str, str, str, str]] = [
     ),
     (
         # Regression: every _run_task traceback contains TemporalTaskProxy
-        # frames (activities/__init__.py:120, :533). That word must not drag an
+        # frames (activities/core.py:65, :515). That word must not drag an
         # unrelated failure into proxy_failure.
         'proxy frames in the traceback are not a proxy failure',
         "Exception('kaboom')",
         'Traceback (most recent call last):\n'
-        '  File "/usr/src/app/reNgine/temporal/activities/__init__.py", line '
-        '533, in _run_task\n'
+        '  File "/usr/src/app/reNgine/temporal/activities/core.py", line '
+        '515, in _run_task\n'
         '    proxy.update_scan_activity(FAILED_TASK)\n'
         "AttributeError: 'TemporalTaskProxy' object has no attribute 'foo'\n",
         'unknown',

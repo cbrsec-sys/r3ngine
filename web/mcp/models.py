@@ -193,6 +193,80 @@ class FollowupPlan(models.Model):
         return f'FollowupPlan {self.id} ({self.status})'
 
 
+class AttackPathProposal(models.Model):
+    """Agent/operator attack-path mutation (propose → edit → approve → apply)."""
+
+    STATUS_PROPOSED = 'proposed'
+    STATUS_APPROVED = 'approved'
+    STATUS_APPLIED = 'applied'
+    STATUS_ABORTED = 'aborted'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = (
+        (STATUS_PROPOSED, 'Proposed'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_APPLIED, 'Applied'),
+        (STATUS_ABORTED, 'Aborted'),
+        (STATUS_REJECTED, 'Rejected'),
+    )
+
+    OP_ENRICH = 'enrich'
+    OP_CREATE = 'create'
+    OP_UPDATE = 'update'
+    OP_DISMISS = 'dismiss'
+    OP_TRIGGER_APME = 'trigger_apme'
+    OP_RECALCULATE_APME = 'recalculate_apme'
+    OPERATION_CHOICES = (
+        (OP_ENRICH, 'Enrich'),
+        (OP_CREATE, 'Create'),
+        (OP_UPDATE, 'Update'),
+        (OP_DISMISS, 'Dismiss'),
+        (OP_TRIGGER_APME, 'Trigger APME'),
+        (OP_RECALCULATE_APME, 'Recalculate APME'),
+    )
+
+    project_slug = models.CharField(max_length=255, db_index=True)
+    scan_id = models.IntegerField(null=True, blank=True, db_index=True)
+    target_path_id = models.CharField(max_length=128, blank=True, default='', db_index=True)
+    impact_assessment_id = models.IntegerField(null=True, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_PROPOSED, db_index=True
+    )
+    operation = models.CharField(max_length=32, choices=OPERATION_CHOICES)
+    payload = models.JSONField(default=dict)
+    rationale = models.TextField(blank=True, default='')
+    agent_id = models.CharField(max_length=128, blank=True, default='')
+    result = models.JSONField(null=True, blank=True)
+    operator_edited = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='attack_path_proposals_created',
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='attack_path_proposals_updated',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['project_slug', 'status', '-created_at']),
+            models.Index(fields=['scan_id', 'status']),
+            models.Index(fields=['target_path_id', 'status']),
+        ]
+
+    def __str__(self):
+        return f'AttackPathProposal {self.id} ({self.operation}/{self.status})'
+
+
 class McpAuditEvent(models.Model):
     session = models.ForeignKey(
         McpSession, null=True, blank=True, on_delete=models.SET_NULL, related_name='events'

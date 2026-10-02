@@ -32,6 +32,16 @@ if "%1" == "update-mcp" node scripts\install-mcp.mjs --update %2 %3 %4 %5 %6 %7 
 if "%1" == "up" set DEBUG=0 && %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% up -d --build %SERVICES%
 :: Build and start all services in development mode.
 if "%1" == "devup" set DEBUG=1 && %DOCKER_COMPOSE% %COMPOSE_DEV_FILES% up -d --build %SERVICES%
+:: Optional services (compose profiles). This script does not read COMPOSE_PROFILES
+:: from .env, so start them by name.
+:: Build and start the optional Tor service.
+if "%1" == "up-tor" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% up -d --build tor
+:: Stop the optional Tor service.
+if "%1" == "stop-tor" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% stop tor
+:: Build and start the optional Ollama service.
+if "%1" == "up-ollama" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% up -d --build ollama
+:: Stop the optional Ollama service.
+if "%1" == "stop-ollama" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% stop ollama
 :: Build and start the remote worker.
 if "%1" == "up-worker" set DEBUG=0 && %DOCKER_COMPOSE% --env-file .env -f docker/docker-compose.worker.yml up -d --build
 :: Stop the remote worker.
@@ -56,7 +66,7 @@ if "%1" == "makemigrations" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% exec web python
 :: Apply migrations
 if "%1" == "migrate" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% exec web python3 manage.py migrate
 :: Pull Docker images.
-if "%1" == "pull" %DOCKER_COMPOSE% docker.pkg.github.com & docker-compose %COMPOSE_ALL_FILES% pull
+if "%1" == "pull" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% pull --ignore-buildable
 :: Down all services.
 if "%1" == "down" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% down
 :: Stop all services.

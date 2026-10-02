@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Card, CardContent, Typography, useTheme } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, type Theme } from '@mui/material/styles';
+import type { SystemStyleObject } from '@mui/system';
 import clsx from 'clsx';
 import { useThemeTokens } from '../theme/useThemeTokens';
 import { getElevatedSurfaceSx } from '../theme/semanticColors';
@@ -11,7 +12,8 @@ interface TacticalPanelProps {
   children: React.ReactNode;
   className?: string;
   borderColor?: string;
-  sx?: any;
+  /** Style object merged into the card's own `sx`; the `&::before` glow always stays on top. */
+  sx?: SystemStyleObject<Theme>;
   headerAction?: React.ReactNode;
 }
 

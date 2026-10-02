@@ -65,7 +65,7 @@ def send_scan_notif(
 		'fields': fields,
 		'severity': severity
 	}
-	logger.info(f'Sending notification "{title}" (severity: {severity})')
+	logger.info('Sending notification "%s" (severity: %s)', title, severity)
 
 	# inapp notification has to be sent eitherways
 	generate_inapp_notification(scan, subscan, status, engine, fields)
@@ -324,5 +324,5 @@ def send_hackerone_report(vulnerability_id):
 		vulnerability.open_status = False
 		vulnerability.save()
 		return {"status_code": r.status_code, "message": "Report sent successfully"}
-	logger.error(f"Error sending report to HackerOne")
+	logger.error("Error sending report to HackerOne")
 	return {"status_code": r.status_code, "message": response}

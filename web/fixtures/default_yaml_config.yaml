@@ -84,11 +84,12 @@ osint: {
 }
 dir_file_fuzz: {
   'auto_calibration': true,
-  'run_dirsearch': true,
+  'run_ffuf': true,
+  'run_dirsearch': false,
   'run_feroxbuster': false,
   'enable_http_crawl': true,
   'rate_limit': 150,
-  'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','conf','sql','json','yml','pdf'],
+  'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','sql','json','yml','pdf'],
   'follow_redirect': false,
   'max_time': 300,
   'match_http_status': [200, 204],
@@ -143,7 +144,7 @@ vulnerability_scan: {
   },
   'cpanel_scanner': {
     'run_cpanel2shell': true,
-    'cpanel_user_wordlist': '/usr/src/app/wordlist/cpanel_users.txt',
+    'cpanel_user_wordlist': '/usr/src/wordlist/cpanel_users.txt',
     'proxy_type': 'rotating'
   },
   'run_vigolium': true,
@@ -153,10 +154,10 @@ vulnerability_scan: {
     'rate_limit': 100,
     'timeout': '15s',
     'spider_max_time': '20m',
-    'run_phase_a': true,            # Phase A: spidering + discovery
+    'run_phase_a': true,            # Phase A: spidering (discovery runs in earlier tiers)
     'run_phase_b': true,            # Phase B: known-issue-scan + dynamic-assessment
     'scope_origin': 'balanced',     # all=follow any host, relaxed=same apex, balanced=same host+common subdomains, strict=exact host only
-    'skip_spidering': false,        # Skip browser-based spidering within Phase A (uses --skip spidering)
+    'skip_spidering': false,        # Skip browser-based spidering within Phase A
     # 'modules': [],                # Restrict to specific Vigolium modules (empty = all)
     # 'severity_filter': []         # known-issue-scan severities to include (empty = all)
   }

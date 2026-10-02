@@ -345,83 +345,15 @@ class McpEnrichAttackPathView(McpDataView):
     permission_classes = [IsPenetrationTester]
 
     def patch(self, request, path_id):
-        forbidden = _reject_forbidden_keys(request.data)
-        if forbidden:
-            return Response({'error': forbidden}, status=400)
-
-        path_key = str(path_id).strip()
-        if not path_key:
-            return Response({'error': 'path_id is required'}, status=400)
-
-        assessment = None
-        candidates = (
-            ImpactAssessment.objects
-            .exclude(potential_attack_chain__isnull=True)
-            .exclude(potential_attack_chain={})
-            .order_by('-id')
+        from mcp.attack_path_proposals import PROPOSE_APPROVE_MSG
+        return Response(
+            {
+                'error': PROPOSE_APPROVE_MSG,
+                'hint': {
+                    'tool': 'r3ngine_propose_attack_path',
+                    'operation': 'enrich',
+                    'path_id': path_id,
+                },
+            },
+            status=410,
         )
-        # Prefer exact apme_path_id match; also allow ImpactAssessment pk.
-        if path_key.isdigit():
-            assessment = ImpactAssessment.objects.filter(pk=int(path_key)).first()
-        if assessment is None:
-            for row in candidates.iterator(chunk_size=200):
-                chain = row.potential_attack_chain or {}
-                if str(chain.get('apme_path_id') or '') == path_key:
-                    assessment = row
-                    break
-        if assessment is None:
-            return Response({'error': 'Attack path not found'}, status=404)
-
-        data = request.data or {}
-        chain = dict(assessment.potential_attack_chain or {})
-        review = dict(chain.get('agent_path_review') or {})
-
-        feasibility = data.get('feasibility')
-        if feasibility is not None:
-            feasibility = str(feasibility).strip().lower()
-            if feasibility not in PATH_FEASIBILITY:
-                return Response({
-                    'error': f'feasibility must be one of {sorted(PATH_FEASIBILITY)}',
-                }, status=400)
-            review['feasibility'] = feasibility
-
-        confidence = _clamp_confidence(data.get('confidence'))
-        if data.get('confidence') is not None and confidence is None:
-            return Response({'error': 'confidence must be a number'}, status=400)
-        if confidence is not None:
-            review['confidence'] = confidence
-
-        if 'blocked_reasons' in data:
-            reasons = data.get('blocked_reasons') or []
-            if not isinstance(reasons, list):
-                return Response({'error': 'blocked_reasons must be a list'}, status=400)
-            review['blocked_reasons'] = [str(r)[:500] for r in reasons[:40]]
-
-        if 'missing_prereqs' in data:
-            prereqs = data.get('missing_prereqs') or []
-            if not isinstance(prereqs, list):
-                return Response({'error': 'missing_prereqs must be a list'}, status=400)
-            review['missing_prereqs'] = [str(r)[:500] for r in prereqs[:40]]
-
-        classes = _normalize_impact_classes(data.get('impact_classes'))
-        if data.get('impact_classes') is not None and classes is None:
-            return Response({'error': 'impact_classes must be a list of known class names'}, status=400)
-        if classes is not None:
-            review['impact_classes'] = classes
-
-        if 'rationale' in data:
-            review['rationale'] = str(data.get('rationale') or '')[:4000]
-
-        review['enriched_at'] = _utc_now_iso()
-        if data.get('agent_id'):
-            review['agent_id'] = str(data.get('agent_id'))[:128]
-
-        chain['agent_path_review'] = review
-        assessment.potential_attack_chain = chain
-        update_fields = ['potential_attack_chain', 'updated_at']
-        if 'potential_impact' in data and data.get('potential_impact') is not None:
-            assessment.potential_impact = str(data.get('potential_impact'))[:8000]
-            update_fields.append('potential_impact')
-        assessment.save(update_fields=update_fields)
-
-        return Response(serialize_path_summary(assessment))

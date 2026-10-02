@@ -33,6 +33,15 @@ from mcp.views.validation import (
     McpEnrichVulnerabilityView,
     McpValidateVulnerabilityView,
 )
+from mcp.views.attack_path_proposals import (
+    McpAbortAttackPathProposalView,
+    McpApproveAttackPathProposalView,
+    McpGetAttackPathProposalView,
+    McpGetAttackPathView,
+    McpListAttackPathProposalsView,
+    McpProposeAttackPathView,
+    McpUpdateAttackPathProposalView,
+)
 from mcp.views.notes import McpNoteDetailView, McpNotesListCreateView
 from mcp.views.osint_verify import McpVerifyOsintStagingView
 from mcp.views.read import (
@@ -77,6 +86,40 @@ from mcp.views.capabilities import (
     McpGetToolArgsView,
     McpUpdateFollowupsView,
 )
+from mcp.views.plugins import McpGetPluginView, McpListPluginsView
+from mcp.views.ad_plugin import (
+    McpAdAttackPathsView,
+    McpAdFindingsView,
+    McpAdGetAssessmentView,
+    McpAdIngestView,
+    McpAdListAssessmentsView,
+    McpAdReportView,
+    McpAdStartAssessmentView,
+)
+from mcp.views.credential_plugin import (
+    McpCredGetCrackingView,
+    McpCredGetTaskView,
+    McpCredListCrackingView,
+    McpCredListCredentialsView,
+    McpCredListTasksView,
+    McpCredStartCrackingView,
+    McpCredStartTaskView,
+)
+from mcp.views.compliance_plugin import (
+    McpComplianceEnrichControlView,
+    McpComplianceGetAssessmentView,
+    McpComplianceGetReportView,
+    McpComplianceListAssessmentsView,
+    McpComplianceListControlsView,
+)
+from mcp.views.burp_plugin import (
+    McpBurpGetIssueView,
+    McpBurpHealthView,
+    McpBurpListIssuesView,
+    McpBurpListSyncLogsView,
+    McpBurpMetricsView,
+    McpBurpSyncImportView,
+)
 from mcp.views.settings import McpSettingsView
 
 urlpatterns = [
@@ -120,10 +163,44 @@ urlpatterns = [
     path('search/', McpSearchView.as_view()),
     path('dashboard/', McpDashboardView.as_view()),
     path('attack-paths/<str:path_id>/enrich/', McpEnrichAttackPathView.as_view()),
+    path('attack-paths/<str:path_id>/', McpGetAttackPathView.as_view()),
     path('attack-paths/', McpAttackPathsView.as_view()),
+    path('attack-path-proposals/propose/', McpProposeAttackPathView.as_view()),
+    path('attack-path-proposals/<int:pk>/update/', McpUpdateAttackPathProposalView.as_view()),
+    path('attack-path-proposals/<int:pk>/approve/', McpApproveAttackPathProposalView.as_view()),
+    path('attack-path-proposals/<int:pk>/abort/', McpAbortAttackPathProposalView.as_view()),
+    path('attack-path-proposals/<int:pk>/', McpGetAttackPathProposalView.as_view()),
+    path('attack-path-proposals/', McpListAttackPathProposalsView.as_view()),
     path('engines/<int:pk>/', McpGetEngineDetailView.as_view()),
     path('engines/', McpListEnginesView.as_view()),
     path('capabilities/', McpListCapabilitiesView.as_view()),
+    path('plugins/<slug:slug>/', McpGetPluginView.as_view()),
+    path('plugins/', McpListPluginsView.as_view()),
+    path('ad/assessments/start/', McpAdStartAssessmentView.as_view()),
+    path('ad/assessments/<int:pk>/ingest/', McpAdIngestView.as_view()),
+    path('ad/assessments/<int:pk>/findings/', McpAdFindingsView.as_view()),
+    path('ad/assessments/<int:pk>/attack-paths/', McpAdAttackPathsView.as_view()),
+    path('ad/assessments/<int:pk>/report/', McpAdReportView.as_view()),
+    path('ad/assessments/<int:pk>/', McpAdGetAssessmentView.as_view()),
+    path('ad/assessments/', McpAdListAssessmentsView.as_view()),
+    path('credentials/tasks/start/', McpCredStartTaskView.as_view()),
+    path('credentials/tasks/<int:pk>/', McpCredGetTaskView.as_view()),
+    path('credentials/tasks/', McpCredListTasksView.as_view()),
+    path('credentials/discovered/', McpCredListCredentialsView.as_view()),
+    path('credentials/cracking/start/', McpCredStartCrackingView.as_view()),
+    path('credentials/cracking/<int:pk>/', McpCredGetCrackingView.as_view()),
+    path('credentials/cracking/', McpCredListCrackingView.as_view()),
+    path('compliance/assessments/<int:pk>/report/', McpComplianceGetReportView.as_view()),
+    path('compliance/assessments/<int:pk>/', McpComplianceGetAssessmentView.as_view()),
+    path('compliance/assessments/', McpComplianceListAssessmentsView.as_view()),
+    path('compliance/controls/<int:pk>/enrich/', McpComplianceEnrichControlView.as_view()),
+    path('compliance/controls/', McpComplianceListControlsView.as_view()),
+    path('burp/issues/metrics/', McpBurpMetricsView.as_view()),
+    path('burp/issues/<int:pk>/', McpBurpGetIssueView.as_view()),
+    path('burp/issues/', McpBurpListIssuesView.as_view()),
+    path('burp/sync-logs/', McpBurpListSyncLogsView.as_view()),
+    path('burp/health/', McpBurpHealthView.as_view()),
+    path('burp/sync/import/', McpBurpSyncImportView.as_view()),
     path('health/', McpHealthView.as_view()),
     path('notes/', McpNotesListCreateView.as_view()),
     path('notes/<int:pk>/', McpNoteDetailView.as_view()),

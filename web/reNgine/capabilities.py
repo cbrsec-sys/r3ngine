@@ -172,10 +172,20 @@ def list_workflow_tools() -> list[dict[str, Any]]:
     return out
 
 
+def list_plugin_capabilities() -> list[dict[str, Any]]:
+    """Enabled plugins and their declared MCP tool names (from manifest.mcp.tools)."""
+    try:
+        from mcp.plugins_gate import list_enabled_plugins
+        return list_enabled_plugins()
+    except Exception:
+        return []
+
+
 def list_capabilities() -> dict[str, Any]:
     return {
         'pipeline_tasks': list_pipeline_tools(),
         'workflows': list_workflow_tools(),
+        'plugins': list_plugin_capabilities(),
         'asset_kinds': [ASSET_SUBDOMAIN, ASSET_ENDPOINT, ASSET_URL, ASSET_HOST],
         'risk_classes': [RISK_RECON, RISK_ACTIVE, RISK_VULN],
         'max_followup_steps': 5,

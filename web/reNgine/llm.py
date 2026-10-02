@@ -1,8 +1,6 @@
-import openai
 import os
 import re
 import logging
-import requests
 
 _logger = logging.getLogger(__name__)
 
@@ -52,10 +50,11 @@ from reNgine.definitions import (
     VULNERABILITY_DESCRIPTION_SYSTEM_MESSAGE, 
     ATTACK_SUGGESTION_GPT_SYSTEM_PROMPT, 
     OLLAMA_INSTANCE,
-    OLLAMA, OPENAI, ANTHROPIC, GEMINI
+    OLLAMA, OPENAI, OPENAI_COMPATIBLE, ANTHROPIC, GEMINI
 )
 from langchain_community.llms import Ollama
 from dashboard.models import LLMConfig
+from reNgine import llm_client
 from reNgine.privacy import PIIGate
 
 NO_QUESTIONS_SYSTEM_SUFFIX = (
@@ -76,10 +75,12 @@ class LLMBaseGenerator:
             self.model_name = None
             self.provider = None
             self.api_key = None
+            self.base_url = None
         else:
             self.model_name = self.config.selected_model
             self.provider = self.config.provider
             self.api_key = self.config.api_key
+            self.base_url = self.config.base_url
         settings_on = llm_enabled()
         self.enabled = settings_on and self.config is not None
         if not self.enabled:
@@ -112,10 +113,12 @@ class LLMBaseGenerator:
             response = self._call_ollama(masked_system, masked_user)
         elif self.provider == OPENAI:
             response = self._call_openai(masked_system, masked_user, max_tokens=max_tokens)
+        elif self.provider == OPENAI_COMPATIBLE:
+            response = self._call_openai_compatible(masked_system, masked_user, max_tokens=max_tokens)
         elif self.provider == ANTHROPIC:
-            response = self._call_anthropic(masked_system, masked_user)
+            response = self._call_anthropic(masked_system, masked_user, max_tokens=max_tokens)
         elif self.provider == GEMINI:
-            response = self._call_gemini(masked_system, masked_user)
+            response = self._call_gemini(masked_system, masked_user, max_tokens=max_tokens)
         else:
             return "Error: Unsupported LLM Provider"
             
@@ -129,118 +132,39 @@ class LLMBaseGenerator:
             llm = Ollama(base_url=OLLAMA_INSTANCE, model=self.model_name, timeout=120)
             return llm.invoke(prompt)
         except Exception as e:
-            self.logger.error(f"Ollama Error: {str(e)}")
+            self.logger.error("Ollama Error: %s", str(e))
             return f"Error: {str(e)}"
 
     def _call_openai(self, system_message, user_message, max_tokens=None):
-        """Execute chat completion request to OpenAI API.
+        return self._call_cloud(OPENAI, 'OpenAI', system_message, user_message, max_tokens)
 
-        Handles model parameter compatibility by automatically falling back from
-        'max_tokens' to 'max_completion_tokens' if the target model returns HTTP 400
-        indicating 'max_tokens' is unsupported.
+    def _call_openai_compatible(self, system_message, user_message, max_tokens=None):
+        if not self.base_url:
+            return "Error: OpenAI-compatible base URL not set"
+        return self._call_cloud(OPENAI_COMPATIBLE, 'OpenAI-compatible', system_message, user_message, max_tokens)
 
-        Args:
-            system_message (str): System prompt for instruction context.
-            user_message (str): Input prompt for LLM response generation.
-            max_tokens (int, optional): Maximum token generation limit.
+    def _call_anthropic(self, system_message, user_message, max_tokens=None):
+        return self._call_cloud(ANTHROPIC, 'Anthropic', system_message, user_message, max_tokens)
 
-        Returns:
-            str: Generated text response or error string.
-        """
+    def _call_gemini(self, system_message, user_message, max_tokens=None):
+        return self._call_cloud(GEMINI, 'Gemini', system_message, user_message, max_tokens)
+
+    def _call_cloud(self, provider, label, system_message, user_message, max_tokens=None):
+        """One request through reNgine.llm_client; failures come back as an "Error: ..." string."""
         if not self.api_key:
-            return "Error: OpenAI API Key not set"
+            return f"Error: {label} API Key not set"
         try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            data = {
-                "model": self.model_name,
-                "messages": [
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message}
-                ]
-            }
-            if max_tokens is not None:
-                data["max_tokens"] = max_tokens
-
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=60
+            return llm_client.complete(
+                provider,
+                api_key=self.api_key,
+                model=self.model_name,
+                system=system_message,
+                user=user_message,
+                max_tokens=max_tokens,
+                base_url=self.base_url,
             )
-
-            # Fallback to max_completion_tokens if OpenAI model rejects max_tokens parameter
-            if response.status_code == 400 and ("max_tokens" in response.text and "max_completion_tokens" in response.text):
-                self.logger.warning(
-                    f"OpenAI model '{self.model_name}' rejected 'max_tokens'. Retrying with 'max_completion_tokens'."
-                )
-                if "max_tokens" in data:
-                    token_val = data.pop("max_tokens")
-                    data["max_completion_tokens"] = token_val
-                response = requests.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers=headers,
-                    json=data,
-                    timeout=60
-                )
-
-            response.raise_for_status()
-            return response.json()['choices'][0]['message']['content']
         except Exception as e:
-            self.logger.error(f"OpenAI Error: {str(e)}")
-            return f"Error: {str(e)}"
-
-    def _call_anthropic(self, system_message, user_message):
-        if not self.api_key:
-            return "Error: Anthropic API Key not set"
-        try:
-            headers = {
-                "x-api-key": self.api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            }
-            data = {
-                "model": self.model_name,
-                "max_tokens": 1024,
-                "system": system_message,
-                "messages": [{"role": "user", "content": user_message}]
-            }
-            response = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=data,
-                timeout=60
-            )
-            response.raise_for_status()
-            block = response.json()['content'][0]
-            if block.get('type') != 'text':
-                raise ValueError(f"Unexpected Anthropic response content type: {block.get('type')}")
-            return block['text']
-        except Exception as e:
-            self.logger.error(f"Anthropic Error: {str(e)}")
-            return f"Error: {str(e)}"
-
-    def _call_gemini(self, system_message, user_message):
-        if not self.api_key:
-            return "Error: Gemini API Key not set"
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
-            headers = {
-                "x-goog-api-key": self.api_key,
-                "Content-Type": "application/json"
-            }
-            data = {
-                "contents": [{
-                    "parts": [{"text": f"{system_message}\n\n{user_message}"}]
-                }]
-            }
-            response = requests.post(url, headers=headers, json=data, timeout=60)
-            response.raise_for_status()
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        except Exception as e:
-            self.logger.error(f"Gemini Error: {str(e)}")
+            self.logger.error("%s Error: %s", label, str(e))
             return f"Error: {str(e)}"
 
 class LLMVulnerabilityReportGenerator(LLMBaseGenerator):
@@ -389,7 +313,7 @@ class LLMSeverityValidator(LLMBaseGenerator):
                 'raw_response': raw_response,
             }
         except Exception as e:
-            self.logger.warning(f"Failed to parse LLM severity validation JSON: {str(e)}. Fallback raw string returned.")
+            self.logger.warning("Failed to parse LLM severity validation JSON: %s. Fallback raw string returned.", str(e))
             return {
                 'status': True,
                 'suggested_severity': 'info',

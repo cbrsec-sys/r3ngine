@@ -32,6 +32,9 @@ from startScan.models import (
     Vulnerability,
 )
 from targetApp.models import Domain
+import logging
+
+logger = logging.getLogger(__name__)
 
 RELATED_LIST_CAP = 20
 ACTIVITY_BUCKET_CAP = 100
@@ -404,8 +407,9 @@ class McpExportScanForAiView(McpDataView):
         include_files = _query_bool(request.query_params, 'include_files', False)
         try:
             payload = build_ai_export_payload(scan=row, options=options)
-        except Exception as exc:
-            return Response({'error': f'Failed to build AI export: {exc}'}, status=500)
+        except Exception:
+            logger.exception('Failed to build AI export for scan %s', row.id)
+            return Response({'error': 'Failed to build AI export; see server logs.'}, status=500)
 
         # Omit raw file blobs by default — agents use markdown + bundle.
         if not include_files:
