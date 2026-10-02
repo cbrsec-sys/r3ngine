@@ -375,7 +375,7 @@ class TestRetryableTaskNamesStayInSync(unittest.TestCase):
     branch is added or removed there, this test points at the drift."""
 
     def test_allowlist_matches_workflow_dispatch_branches(self):
-        from api.views.scan import RETRYABLE_TASK_NAMES
+        from reNgine.task_plan import RETRYABLE_TASK_NAMES
 
         with open(WORKFLOWS_FILE, encoding='utf-8-sig') as handle:
             source = handle.read()
