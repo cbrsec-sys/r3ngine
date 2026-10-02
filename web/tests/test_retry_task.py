@@ -306,6 +306,19 @@ class GetScanFinalStatusTests(TestCase):
         )
         self.assertEqual(result, RUNNING_TASK)
 
+    def test_a_planned_row_that_never_started_does_not_hold_the_scan_running(self):
+        import uuid
+        scan = _make_scan()
+        _make_activity(scan, name="generate_impact_assessment", status=SUCCESS_TASK)
+        ScanActivity.objects.create(
+            scan_of=scan, task_uid=uuid.uuid4(), name="sync_graph", title="Graph Sync",
+            tier=7, status=INITIATED_TASK, time="2026-06-21T10:00:00Z", time_started=None,
+        )
+        result = get_scan_final_status_activity(
+            scan.id, True, ["generate_impact_assessment", "sync_graph"]
+        )
+        self.assertEqual(result, SUCCESS_TASK)
+
     def test_failed_retry_marks_visible_initiated_row_failed(self):
         scan = _make_scan()
         act = _make_activity(scan, name="generate_impact_assessment", status=INITIATED_TASK)
