@@ -5,6 +5,10 @@ import validators
 from urllib.parse import urlparse
 
 from django.conf import settings
+from datetime import timezone as dt_timezone
+
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from reNgine.common_func import *
 from reNgine.definitions import *
@@ -216,6 +220,43 @@ def _start_acunetix_scan_direct(base_url: str, headers: dict, verify, timeout: i
 	return scan_resp.json()
 
 
+def _existing_acunetix_scan(base_url: str, headers: dict, verify, timeout: int, target_id: str, since):
+	"""The target's latest AWVS scan started at or after ``since``, unless it failed.
+
+	A Temporal retry (the previous attempt was killed, e.g. by its time limit) or a
+	manual retry of the step would otherwise start another multi-hour scan of the
+	same target. A scan still running is waited for; one that completed or was
+	aborted by the operator already holds the findings to import. A failed scan is
+	not reused, so retrying after an AWVS-side failure scans again.
+
+	Returns ``{'scan_id': ..., 'status': ...}`` or None.
+	"""
+	if since is None:
+		return None
+	resp = requests.get(
+		f"{base_url}/api/v1/scans?q=target_id:{target_id}",
+		headers=headers, verify=verify, timeout=timeout,
+	)
+	if resp.status_code != 200:
+		logger.warning("Could not list Acunetix scans for target_id=%s (status %s)", target_id, resp.status_code)
+		return None
+	candidates = []
+	for scan in resp.json().get('scans', []):
+		session = scan.get('current_session') or {}
+		started = parse_datetime(session.get('start_date') or '')
+		if started is not None and timezone.is_naive(started):
+			started = timezone.make_aware(started, dt_timezone.utc)
+		if not scan.get('scan_id') or started is None or started < since:
+			continue
+		candidates.append((started, scan['scan_id'], session.get('status')))
+	if not candidates:
+		return None
+	_started, scan_id, status = max(candidates)
+	if status == 'failed':
+		return None
+	return {'scan_id': scan_id, 'status': status}
+
+
 def _fetch_acunetix_vulnerabilities(vulns_url: str, headers: dict, verify, timeout: int):
 	collected_vulnerabilities = []
 	next_url = vulns_url
@@ -327,17 +368,29 @@ def acunetix_scan(
 		if not target_id:
 			return _fail(self, f"Could not create or locate Acunetix target for {target_name}")
 
-		scan_info = _start_acunetix_scan_direct(
+		existing = _existing_acunetix_scan(
 			base_url=base_url,
 			headers=headers,
 			verify=_acunetix_verify,
 			timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
 			target_id=target_id,
-		) or {}
-		scan_id = scan_info.get('scan_id')
-
-		if not target_id:
-			return _fail(self, f"Target {target_name} not found in Acunetix after start_scan.")
+			since=scan_history.start_scan_date if scan_history else None,
+		)
+		if existing:
+			scan_id = existing['scan_id']
+			logger.info(
+				"Reusing Acunetix scan %s for %s (status %s), started during this scan",
+				scan_id, target_name, existing['status'],
+			)
+		else:
+			scan_info = _start_acunetix_scan_direct(
+				base_url=base_url,
+				headers=headers,
+				verify=_acunetix_verify,
+				timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+				target_id=target_id,
+			) or {}
+			scan_id = scan_info.get('scan_id')
 
 		# If scan_id wasn't in scan_info, try to find it from scans query by target_id
 		if not scan_id:
@@ -355,6 +408,7 @@ def acunetix_scan(
 		max_retries = settings.ACUNETIX_MAX_RETRIES
 		poll_interval = settings.ACUNETIX_POLL_INTERVAL
 		retries = 0
+		current_status = None
 		while retries < max_retries:
 			scan_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 			if scan_resp.status_code == 200:
@@ -363,11 +417,10 @@ def acunetix_scan(
 				current_status = current_session.get('status')
 				logger.info("Acunetix scan %s status: %s (retry %s/%s)", scan_id, current_status, retries, max_retries)
 
-				if current_status == 'completed':
-					logger.info("Acunetix scan for %s completed.", target_name)
+				if current_status in ('completed', 'failed', 'aborted'):
+					# A stopped or failed scan still holds what it found until then.
+					logger.info("Acunetix scan for %s ended with status %s.", target_name, current_status)
 					break
-				elif current_status in ['failed', 'aborted']:
-					return _fail(self, f"Acunetix scan for {target_name} ended with status: {current_status}.")
 			else:
 				logger.warning("Failed to fetch scan status for %s, status code: %s", scan_id, scan_resp.status_code)
 
@@ -426,6 +479,7 @@ def acunetix_scan(
 				failed_resp.status_code, len(v_list),
 			)
 
+		imported = 0
 		if v_list:
 			logger.info("Found %s vulnerabilities in Acunetix scan report.", len(v_list))
 			for vuln in v_list:
@@ -479,7 +533,23 @@ def acunetix_scan(
 						save_v_data['subscan'] = subscan
 
 					save_vulnerability(**save_v_data)
+					imported += 1
 
+		if current_status == 'failed':
+			# Retrying is worthwhile here: the failed scan is not reused, so the next
+			# attempt scans again, and saving the same finding again is a no-op.
+			return _fail(
+				self,
+				f"Acunetix scan for {target_name} ended with status: failed; "
+				f"imported {imported} finding(s) it reported before failing.",
+			)
+		if current_status == 'aborted':
+			# Stopped by the operator: keep what it found and do not retry, which
+			# would start another scan of the same target.
+			logger.warning(
+				"Acunetix scan for %s was aborted; imported %d finding(s) found before it stopped.",
+				target_name, imported,
+			)
 		return True
 
 	except Exception as e:
