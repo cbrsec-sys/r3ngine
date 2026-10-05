@@ -1131,7 +1131,13 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void, onR
             The scan stopped before this task started{activity.error_message ? ` (scan error: ${activity.error_message})` : ''}.
           </Typography>
         )}
-        {activity.error_message && !notRun && (
+        {activity.error_message && activity.status === 'SUCCESS' && (
+          // A completed task's note, e.g. that it stopped at its time limit.
+          <Typography sx={{ fontSize: '0.65rem', color: tokens.accent.warning, mt: 1 }}>
+            {activity.error_message}
+          </Typography>
+        )}
+        {activity.error_message && !notRun && activity.status !== 'SUCCESS' && (
           <Typography sx={{ fontSize: '0.65rem', color: isLight ? tokens.accent.error : '#ff003c', bgcolor: isLight ? `${tokens.accent.error}15` : 'rgba(255,0,60,0.1)', p: 1, borderRadius: 0.5, border: `1px solid ${isLight ? `${tokens.accent.error}33` : 'rgba(255,0,60,0.2)'}`, mt: 1 }}>
             ERROR: {activity.error_message}
           </Typography>
