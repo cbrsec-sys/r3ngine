@@ -399,6 +399,16 @@ _TIME_LIMIT_MARGIN_MIN = timedelta(minutes=1)
 _TIME_LIMIT_MARGIN_MAX = timedelta(minutes=10)
 
 
+def task_is_stopping() -> bool:
+    """True once the running task was told to stop (scan abort or time limit).
+
+    Loops over many targets check this so they neither start the next target nor
+    mark the one that was cut short as done.
+    """
+    event = getattr(_task_cancel_local, 'cancel_event', None)
+    return event is not None and event.is_set()
+
+
 def _attempt_stop_time(info) -> Optional[datetime]:
     """When this attempt should stop its tool, or None when it has no time limit.
 
