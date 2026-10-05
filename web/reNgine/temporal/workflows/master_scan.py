@@ -35,7 +35,9 @@ from reNgine.temporal.workflows._common import (
     _RETRY_SCANNER,
     _dispatch_tier_plugins,
     _fan_out_search_vulns,
+    _batching_enabled,
     _isolated_tool,
+    _run_chunked,
 )
 
 # All imports that touch Django or any non-deterministic module must be wrapped
@@ -504,14 +506,20 @@ class MasterScanWorkflow:
             # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
             # ------------------------------------------------------------------
             if "dir_file_fuzz" in tasks:
-                await _isolated_tool("RunDirFileFuzzActivity", workflow.execute_activity(
-                    "RunDirFileFuzzActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(hours=8),
-                    heartbeat_timeout=timedelta(minutes=15),
-                    retry_policy=_RETRY_LONG_SCAN,
-                    task_queue="python-orchestrator-queue"
-                ))
+                # Batches of hosts, each with its own time limit, instead of one
+                # activity over every host. Workflows that reached Tier 4 before this
+                # patch replay the single activity.
+                if workflow.patched("chunked-dir-file-fuzz") and _batching_enabled(yaml_config, "dir_file_fuzz"):
+                    await _isolated_tool("dir_file_fuzz batches", _run_chunked(ctx, "dir_file_fuzz"))
+                else:
+                    await _isolated_tool("RunDirFileFuzzActivity", workflow.execute_activity(
+                        "RunDirFileFuzzActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=8),
+                        heartbeat_timeout=timedelta(minutes=15),
+                        retry_policy=_RETRY_LONG_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    ))
                 await workflow.execute_activity(
                     "ParseFuzzResultsActivity",
                     ctx,

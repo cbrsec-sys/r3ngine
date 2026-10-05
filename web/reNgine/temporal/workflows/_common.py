@@ -79,6 +79,88 @@ async def _isolated_tool(name: str, call):
         return None
 
 
+#: Runs of one batch, the first included, while its tool keeps stopping at the
+#: batch time limit with targets left; the fuzzer resumes where it stopped.
+_BATCH_PASSES = 3
+
+
+def _batching_enabled(yaml_config: dict, section: str) -> bool:
+    """Whether the engine runs `section` in batches (on unless `batching.enabled: false`)."""
+    batching = (yaml_config.get(section) or {}).get('batching')
+    return not isinstance(batching, dict) or batching.get('enabled', True) is not False
+
+
+async def _run_chunked(ctx: dict, task: str) -> list:
+    """Run a per-host tool as batches of hosts, a few at a time, under one timeline row.
+
+    The plan activity splits the targets and returns the settings; the host lists
+    and ctx stay in files, so each batch only carries its index. A batch stopped
+    at its time limit runs again while the overall budget lasts; batches not
+    started before the budget runs out are left for a Retry. The budget is checked
+    before each run, so the step can end up to one batch time limit later.
+
+    Returns:
+        One outcome dict per batch, in batch order.
+    """
+    queue = "python-orchestrator-queue"
+    plan = await workflow.execute_activity(
+        "PlanChunkedTaskActivity",
+        args=[ctx, task],
+        start_to_close_timeout=timedelta(hours=1),
+        heartbeat_timeout=timedelta(minutes=5),
+        retry_policy=_RETRY_INTERNAL,
+        task_queue=queue,
+    )
+    results_dir, activity_id = plan["results_dir"], plan["activity_id"]
+    batch_timeout = timedelta(minutes=plan["batch_timeout_minutes"])
+    deadline = workflow.now() + timedelta(hours=plan["max_total_hours"])
+    slots = asyncio.Semaphore(plan["max_parallel"])
+
+    async def _batch(index: int) -> dict:
+        result = {"index": index, "status": "skipped"}
+        async with slots:
+            for _ in range(_BATCH_PASSES):
+                if workflow.now() >= deadline:
+                    break
+                try:
+                    result = await workflow.execute_activity(
+                        "RunChunkedTaskBatchActivity",
+                        args=[results_dir, task, index, activity_id],
+                        start_to_close_timeout=batch_timeout,
+                        heartbeat_timeout=timedelta(minutes=15),
+                        retry_policy=_RETRY_LONG_SCAN,
+                        task_queue=queue,
+                    )
+                except ActivityError as exc:
+                    workflow.logger.error("%s batch %d failed: %s", task, index + 1, exc)
+                    return {"index": index, "status": "failed"}
+                if result.get("status") != "partial":
+                    return result
+        # Cut short by the overall budget rather than by its own failure.
+        if result.get("status") == "partial" and workflow.now() >= deadline:
+            result = {**result, "status": "skipped"}
+        return result
+
+    results = list(await asyncio.gather(*(_batch(index) for index in range(plan["batches"]))))
+
+    await workflow.execute_activity(
+        "FinalizeChunkedTaskActivity",
+        args=[results_dir, task, activity_id, results],
+        start_to_close_timeout=timedelta(minutes=5),
+        retry_policy=_RETRY_INTERNAL,
+        task_queue=queue,
+    )
+    await _isolated_tool("RunChunkedTaskFollowUpActivity", workflow.execute_activity(
+        "RunChunkedTaskFollowUpActivity",
+        args=[results_dir, task, activity_id],
+        start_to_close_timeout=timedelta(hours=3),
+        heartbeat_timeout=timedelta(minutes=10),
+        retry_policy=_RETRY_LONG_SCAN,
+        task_queue=queue,
+    ))
+    return results
+
+
 async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> None:
     """Dispatch selected plugins anchored to `tier` as child workflows.
 

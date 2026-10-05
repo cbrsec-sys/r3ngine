@@ -35,7 +35,7 @@ class BatchingConfig:
 
 _BOUNDS = {
     'batch_size': (1, 500),
-    'max_batches': (1, 1000),
+    'max_batches': (1, 300),
     'max_parallel': (1, 5),
     'batch_timeout_minutes': (10, 720),
     'max_total_hours': (1, 72),
