@@ -2,6 +2,23 @@
 
 Status: plan for items 4 and 5; nothing of them is implemented. Line references are from 2026-10-05, taken before fixes (a) and (b) below landed, so line numbers in `master_scan.py`, `activities/core.py` and `utils/task.py` have moved.
 
+## 0. Implementation status
+
+Step 1 and step 2 (dir_file_fuzz) are implemented. Where the code differs from sections 3.1-3.6:
+
+- **No child workflow.** `_run_chunked` in `workflows/_common.py` runs inline in `MasterScanWorkflow` Tier 4 and in `SingleTaskRetryWorkflow`, both behind `workflow.patched("chunked-dir-file-fuzz")`. Each batch carries only `(results_dir, task, index, activity_id)`. The plan (`plan.json`, versioned and scoped to the whole scan, one subdomain or a subscan) and a fresh `ctx.json` are kept in `{results_dir}/batches/<task>/`. `max_batches` is capped at 300. Because the master history stays small, `_isolated_tool` does not need to catch `ChildWorkflowError`.
+- **Passes.** A batch stopped at its time limit with targets left runs again, up to three passes in total, while the budget lasts.
+- **Step outcome.**
+  - A batch that still has unfinished targets after its passes, or that failed, makes the step FAILED. Retry and recovery then pick it up, and the fuzz markers make them skip finished targets.
+  - Batches never started because the budget ran out leave the step SUCCESS, with a note.
+- **Follow-up crawl.** The fuzzer's trailing crawl runs once as `RunChunkedTaskFollowUpActivity`, through `_run_task`, so it gets the time-limit stop. It runs after `FinalizeChunkedTaskActivity` has set the row status, and it does not overwrite an ABORTED row.
+- **Item 5, phase 1 (step 3) is implemented as well.**
+  - `reNgine/host_dedup.py` holds the rules. `RunTargetDedupActivity` runs after Tier 2 (`workflow.patched("target-dedup")`) and appears as the "Target Deduplication" row. Its migration is `startScan/0070`.
+  - The redirect rule counts only when a host's root redirects to the root of another live host of the scan, so apps behind one shared SSO host are not collapsed.
+  - The batched fuzzer and the Acunetix submission skip the marked hosts.
+  - The step is not run a second time after the crawl bridge.
+- **Defaults.** `max_total_hours` defaults to 12, not 8. The budget is checked before each batch run, so the step can end up to one batch time limit later.
+
 ## 1. Summary
 
 **Incident.** On a target with many live subdomains, Tier 4 `RunDirFileFuzzActivity` hit its 8h `start_to_close` on both attempts allowed by `_RETRY_LONG_SCAN`. That is about 16h of fuzzing thrown away. `MasterScanWorkflow` then failed, and Tiers 5-7 never ran: no WAF/secrets, no nuclei, no correlation, no APME.

@@ -929,13 +929,20 @@ def acunetix_submit_live_subdomains(
 	import os as _os
 	verify = _os.environ.get('ACUNETIX_CA_BUNDLE', False)
 
+	from reNgine.host_dedup import duplicate_hosts, www_twin
+
 	live_hosts = set(hosts)
+	# Hosts serving the same site as another one (Target Deduplication), plus the
+	# www rule for engines that run without that step: scanning both doubles the
+	# Acunetix work for the same findings.
+	duplicates = duplicate_hosts(scan_history_id)
 	pending = []
 	for subdomain in subdomains:
 		host = subdomain.name
-		# www.<host> serves the same site as <host> in practice; scanning both
-		# doubles the Acunetix work for the same findings.
-		same_site_as = host[4:] if host.startswith('www.') and host[4:] in live_hosts else None
+		same_site_as = www_twin(host, live_hosts)
+		if same_site_as is None and host.lower() in duplicates:
+			target, reason = duplicates[host.lower()]
+			same_site_as = f"{target} ({reason})"
 		if same_site_as:
 			_record_submission(
 				self,
