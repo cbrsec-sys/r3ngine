@@ -121,6 +121,7 @@ from reNgine.temporal.activities.enumeration import (  # noqa: E402
     parse_enumeration_results_activity,
     run_dir_file_fuzz_activity,
     parse_fuzz_results_activity,
+    run_target_dedup_activity,
     run_web_api_discovery_activity,
     run_waf_detection_activity,
     run_secret_scanning_activity,

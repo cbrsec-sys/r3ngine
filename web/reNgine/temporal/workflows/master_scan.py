@@ -38,6 +38,7 @@ from reNgine.temporal.workflows._common import (
     _batching_enabled,
     _isolated_tool,
     _run_chunked,
+    _target_dedup_enabled,
 )
 
 # All imports that touch Django or any non-deterministic module must be wrapped
@@ -374,6 +375,18 @@ class MasterScanWorkflow:
                     task_queue="python-orchestrator-queue",
                 )
                 await _fan_out_search_vulns(ctx, services or [])
+
+            # Mark hosts that serve the same site as another (www twins, redirects to
+            # another host's root) so the heavy tools below run once per site.
+            if "http_crawl" in tasks and workflow.patched("target-dedup") and _target_dedup_enabled(yaml_config):
+                await _isolated_tool("RunTargetDedupActivity", workflow.execute_activity(
+                    "RunTargetDedupActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_INTERNAL,
+                    task_queue="python-orchestrator-queue",
+                ))
 
             # Push every live subdomain to Acunetix as soon as liveness is known,
             # rather than waiting for Tier 6. Hosts already submitted inside the

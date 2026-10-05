@@ -12,6 +12,11 @@ Step 1 and step 2 (dir_file_fuzz) are implemented. Where the code differs from s
   - A batch that still has unfinished targets after its passes, or that failed, makes the step FAILED. Retry and recovery then pick it up, and the fuzz markers make them skip finished targets.
   - Batches never started because the budget ran out leave the step SUCCESS, with a note.
 - **Follow-up crawl.** The fuzzer's trailing crawl runs once as `RunChunkedTaskFollowUpActivity`, through `_run_task`, so it gets the time-limit stop. It runs after `FinalizeChunkedTaskActivity` has set the row status, and it does not overwrite an ABORTED row.
+- **Item 5, phase 1 (step 3) is implemented as well.**
+  - `reNgine/host_dedup.py` holds the rules. `RunTargetDedupActivity` runs after Tier 2 (`workflow.patched("target-dedup")`) and appears as the "Target Deduplication" row. Its migration is `startScan/0070`.
+  - The redirect rule counts only when a host's root redirects to the root of another live host of the scan, so apps behind one shared SSO host are not collapsed.
+  - The batched fuzzer and the Acunetix submission skip the marked hosts.
+  - The step is not run a second time after the crawl bridge.
 - **Defaults.** `max_total_hours` defaults to 12, not 8. The budget is checked before each batch run, so the step can end up to one batch time limit later.
 
 ## 1. Summary

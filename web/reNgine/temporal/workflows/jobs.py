@@ -357,6 +357,8 @@ class SingleTaskRetryWorkflow:
                 await workflow.execute_activity("RunWebAPIDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=4), heartbeat_timeout=timedelta(minutes=10), retry_policy=_RETRY_NETWORK_SCAN, task_queue="python-orchestrator-queue")
             elif task_name == "param_discovery":
                 await workflow.execute_activity("RunParamDiscoveryActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=10), retry_policy=_RETRY_LONG_SCAN, task_queue="python-orchestrator-queue")
+            elif task_name == "target_dedup":
+                await workflow.execute_activity("RunTargetDedupActivity", ctx, start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=5), retry_policy=_RETRY_INTERNAL, task_queue="python-orchestrator-queue")
             elif task_name == "dir_file_fuzz":
                 if workflow.patched("chunked-dir-file-fuzz") and _batching_enabled(ctx.get("yaml_configuration") or {}, "dir_file_fuzz"):
                     await _run_chunked(ctx, "dir_file_fuzz")

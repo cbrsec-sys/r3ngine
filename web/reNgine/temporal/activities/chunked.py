@@ -187,11 +187,13 @@ def plan_chunked_task_activity(ctx: dict, task: str) -> dict:
     plan = _load_plan(results_dir, task, scope)
     reused = plan is not None
     if not reused:
-        targets = spec.select_targets(proxy, ctx)
+        from reNgine.host_dedup import drop_duplicate_targets
+        targets, dropped = drop_duplicate_targets(scan_id, spec.select_targets(proxy, ctx), ctx)
         plan = {
             'version': PLAN_VERSION,
             'scope': scope,
             'batches': plan_batches(targets, config.batch_size, config.max_batches),
+            'duplicates_skipped': len(dropped),
         }
         _write_json(os.path.join(step_dir, 'plan.json'), plan)
     # seed_urls holds one URL per subdomain and is not needed past the crawl.
@@ -205,9 +207,11 @@ def plan_chunked_task_activity(ctx: dict, task: str) -> dict:
     hosts = _hosts(targets)
     _record(
         scan_id, proxy.activity_id, f"{task} plan",
-        "%s %d targets on %d hosts in %d batches, %d at a time%s" % (
+        "%s %d targets on %d hosts in %d batches, %d at a time%s%s" % (
             "Reusing the plan:" if reused else "Planned",
             len(targets), len(hosts), len(batches), config.max_parallel,
+            "; %d targets on duplicate hosts skipped (see Target Deduplication)" % plan.get('duplicates_skipped', 0)
+            if plan.get('duplicates_skipped') else "",
             "" if batches else " — nothing to do",
         ),
     )

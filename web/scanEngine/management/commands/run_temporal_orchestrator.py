@@ -169,6 +169,7 @@ from reNgine.temporal_activities import (
     run_chunked_task_batch_activity,
     finalize_chunked_task_activity,
     run_chunked_task_follow_up_activity,
+    run_target_dedup_activity,
     run_gf_on_all_endpoints_activity,
 
     # Tier 5: Analysis
@@ -609,6 +610,7 @@ class Command(BaseCommand):
                 run_chunked_task_batch_activity,
                 finalize_chunked_task_activity,
                 run_chunked_task_follow_up_activity,
+                run_target_dedup_activity,
                 run_gf_on_all_endpoints_activity,
 
                 # Tier 5

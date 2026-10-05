@@ -13,6 +13,9 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError
 
+with workflow.unsafe.imports_passed_through():
+    from reNgine.host_dedup import target_dedup_config
+
 
 # Retry policy presets — applied explicitly to every execute_activity call.
 # Default Temporal policy (unlimited, backoff to 100s) is intentionally overridden.
@@ -88,6 +91,11 @@ def _batching_enabled(yaml_config: dict, section: str) -> bool:
     """Whether the engine runs `section` in batches (on unless `batching.enabled: false`)."""
     batching = (yaml_config.get(section) or {}).get('batching')
     return not isinstance(batching, dict) or batching.get('enabled', True) is not False
+
+
+def _target_dedup_enabled(yaml_config: dict) -> bool:
+    """Whether the engine marks same-site hosts after HTTP crawl (on by default)."""
+    return target_dedup_config(yaml_config)[0]
 
 
 async def _run_chunked(ctx: dict, task: str) -> list:
