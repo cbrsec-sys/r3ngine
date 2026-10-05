@@ -285,6 +285,14 @@ dir_file_fuzz:
   threads: 30
   wordlist_name: dicc
   use_api_wordlist: false     # Use API-specific wordlist instead of dicc
+  # A large target is fuzzed in batches of hosts, each its own step with its own
+  # time limit, a few at a time. A Retry re-runs only the targets not finished yet.
+  batching:
+    enabled: true
+    batch_size: 25              # hosts per batch
+    max_parallel: 2             # batches at once (the worker runs 10 steps for all scans)
+    batch_timeout_minutes: 120
+    max_total_hours: 12         # batches not started by then are left for a Retry
 
 # ---------------------------------------------------------------------------
 # TIER 5 — Web API & Parameter Discovery
