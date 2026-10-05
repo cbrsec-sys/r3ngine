@@ -643,3 +643,6 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
     finally:
         activity_running = False
         heartbeat_thread.join(timeout=5)
+        # The worker reuses this thread for other activities; a stale set event
+        # would make every later stream_command on it refuse to start.
+        _task_cancel_local.cancel_event = None

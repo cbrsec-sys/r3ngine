@@ -82,6 +82,10 @@ class RunTaskTimeLimitTests(TestCase):
         status, = proxy.update_scan_activity.call_args.args
         self.assertEqual(status, SUCCESS_TASK)
         self.assertIn('Stopped at its 8 h time limit', proxy.update_scan_activity.call_args.kwargs['error_message'])
+        self.assertIsNone(
+            getattr(_task_cancel_local, 'cancel_event', None),
+            'a stale stop signal would block every later command on this worker thread',
+        )
 
     def test_a_failure_after_the_stop_is_not_retried(self) -> None:
         past_limit = _info(timedelta(hours=8), timedelta(hours=8))
