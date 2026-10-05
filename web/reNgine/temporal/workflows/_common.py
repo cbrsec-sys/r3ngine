@@ -11,6 +11,7 @@ import asyncio
 from datetime import timedelta
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 
 
 # Retry policy presets — applied explicitly to every execute_activity call.
@@ -57,6 +58,25 @@ _RETRY_LLM = RetryPolicy(
     backoff_coefficient=2.0,
     maximum_interval=timedelta(minutes=5),
 )
+
+
+async def _isolated_tool(name: str, call):
+    """Await a scanning tool's activity; if it fails, log it and let the scan go on.
+
+    One tool that exhausts its retries (a fuzzer past its time limit, a crawler
+    whose backend is down) used to fail the whole MasterScanWorkflow, so every
+    later tier was marked FAILED without having run. Its own timeline row already
+    records the failure, the scan still ends FAILED, and Retry re-runs just that
+    tool. Cancellation (a user abort) is not an ActivityError and still propagates.
+    """
+    try:
+        return await call
+    except ActivityError as exc:
+        workflow.logger.error(
+            "%s failed in workflow %s — continuing with the rest of the scan: %s",
+            name, workflow.info().workflow_id, exc,
+        )
+        return None
 
 
 async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> None:
