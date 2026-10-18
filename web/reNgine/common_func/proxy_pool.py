@@ -554,6 +554,9 @@ def get_random_proxy(http_only=False, socks5_only=False):
 
 	if http_only:
 		proxies = [p for p in proxies if p.lower().startswith('http')]
+	if not proxies:
+		logger.warning('No usable proxy in the pool (http_only=%s); running without one.', http_only)
+		return ''
 
 	# Remove entries that have already failed this session (within TTL)
 	now_epoch = time.time()

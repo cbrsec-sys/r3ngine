@@ -68,6 +68,14 @@ class PriorityProxyTests(TestCase):
         proxy.refresh_from_db()
         self.assertEqual(proxy.priority_proxies, PAID)
 
+    @patch('reNgine.common_func.proxy_pool.check_proxy_robust')
+    def test_http_only_with_a_socks_only_pool_returns_no_proxy(self, mock_check):
+        """Filtering left nothing to check; this used to crash the calling task."""
+        mock_check.return_value = False
+        Proxy.objects.create(use_proxy=True, proxies='socks5://free.com:1080', priority_proxies=PAID)
+
+        self.assertEqual(get_random_proxy(http_only=True), '')
+
     @patch('reNgine.common_func.check_proxy_robust')
     @patch('reNgine.tasks.proxies.requests.get')
     def test_proxy_fetch_cannot_touch_them(self, mock_get, mock_check):
